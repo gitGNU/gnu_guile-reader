@@ -1,0 +1,15 @@
+scheme-reader, an extensible, fast, reader for Guile
+====================================================
+
+The idea: provide an extensible, yet fast, reader for Guile, GNU's
+Scheme interpreter library.  Guile currently provides limited extensibility
+of its reader, by means of `read-hash-extend', for instance, or `read-enable'
+and the likes.  The point here is to be able to create a completely
+customizable Scheme reader using basic building-blocks such as an
+R5RS string reader, an sexp reader, etc., or even user-defined readers.
+
+In order to achieve performance equivalent (or better?) to Guile's C
+hand-coded reader, scheme-reader relies on GNU Lightning to compile readers
+to native code.
+
+Ludovic <ludovic.courtes@laas.fr>.
