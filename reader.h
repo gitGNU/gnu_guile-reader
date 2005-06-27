@@ -62,6 +62,9 @@ typedef struct
   } reader;
 } scm_token_reader_spec_t;
 
+/* A reader's specifications is just a zero-terminated array of token reader
+   specs.  */
+typedef scm_token_reader_spec_t *scm_reader_spec_t;
 
 
 /* Return a pointer to a reader function compliant with the specifications in
@@ -107,6 +110,10 @@ extern scm_reader_t scm_c_make_reader (jit_insn *code_buffer,
 #define SCM_END_TOKENS					\
   { { .type = SCM_TOKEN_UNDEF },			\
     .name = NULL, .reader = { .c_reader = NULL } }
+
+
+/* The SMOB type associated to `scm_reader_t'.  */
+extern scm_t_bits scm_reader_type;
 
 
 #endif
