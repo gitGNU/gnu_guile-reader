@@ -27,10 +27,42 @@
 
 #include <libguile.h>
 #include <ctype.h>
+#include <strings.h>
+#include <assert.h>
+
 #include "reader.h"
 #include "token-readers.h"
 
 
+
+/* Helper function similar to `scm_read_token ()'.  Read from PORT until a
+   whitespace is read.  */
+static __inline__ void
+read_token (SCM port, char *buf, size_t buf_size, size_t *read)
+{
+  *read = 0;
+
+  while (buf_size)
+    {
+      int chr;
+      chr = scm_getc (port);
+      if ((chr == ' ') || (chr == '\t') || (chr == '\n'))
+	{
+	  scm_ungetc (chr, port);
+	  break;
+	}
+      else if (chr == EOF)
+	break;
+
+      *(buf++) = (char)chr;
+      (*read)++;
+
+      if (*read == buf_size)
+	break;
+    }
+}
+
+
 /* Readers (mostly) stolen from Guile.  */
 
 SCM
@@ -433,6 +465,7 @@ scm_get_hash_procedure (int c)
 #endif
 }
 
+#if 0  /* XXX This function is being replaced by `scm_sharp_reader'.  */
 SCM
 scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
 #define FUNC_NAME "scm_read_sharp"
@@ -563,9 +596,9 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
       scm_i_input_error (FUNC_NAME, port, "unknown character name ~a",
 			 scm_list_1 (scm_c_substring (*tok_buf, 0, j)));
 
-      /* #:SYMBOL is a syntax for keywords supported in all contexts.  */
 #endif
 
+      /* #:SYMBOL is a syntax for keywords supported in all contexts.  */
     case ':':
       return scm_symbol_to_keyword (scm_reader (port));
 
@@ -599,11 +632,87 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
   return SCM_UNSPECIFIED;
 }
 #undef FUNC_NAME
+#endif
 
 
-/* Skribe's read syntax.  */
+/* Sharp readers, i.e. readers called after a `#' sign has been read.  */
+
 SCM
-scm_read_skribe_literal (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_boolean (int chr, SCM port, scm_reader_t scm_reader)
+{
+  switch (chr)
+    {
+    case 't':
+    case 'T':
+      return SCM_BOOL_T;
+
+    case 'f':
+    case 'F':
+      return SCM_BOOL_F;
+    }
+
+  return SCM_UNSPECIFIED;
+}
+
+SCM
+scm_read_character (int chr, SCM port, scm_reader_t scm_reader)
+{
+  unsigned c;
+  char charname[100];
+  size_t charname_len;
+
+  read_token (port, charname, sizeof (charname), &charname_len);
+
+  if (charname_len == 1)
+    return SCM_MAKE_CHAR (charname[0]);
+
+  if (*charname >= '0' && *charname < '8')
+    {
+      /* Dirk:FIXME::  This type of character syntax is not R5RS
+       * compliant.  Further, it should be verified that the constant
+       * does only consist of octal digits.  Finally, it should be
+       * checked whether the resulting fixnum is in the range of
+       * characters.  */
+      SCM p = scm_i_mem2number (charname, charname_len, 8);
+      if (SCM_I_INUMP (p))
+	return SCM_MAKE_CHAR (SCM_I_INUM (p));
+    }
+
+  for (c = 0; c < scm_n_charnames; c++)
+    if (scm_charnames[c]
+	&& (!strncasecmp (scm_charnames[c], charname, charname_len)))
+      return SCM_MAKE_CHAR (scm_charnums[c]);
+
+  scm_i_input_error (__FUNCTION__, port, "unknown character name ~a",
+		     scm_list_1 (scm_from_locale_stringn (charname,
+							  charname_len)));
+
+  return SCM_UNSPECIFIED;
+}
+
+SCM
+scm_read_keyword (int chr, SCM port, scm_reader_t scm_reader)
+{
+  return (scm_symbol_to_keyword (scm_reader (port)));
+}
+
+SCM
+scm_read_srfi4_vector (int chr, SCM port, scm_reader_t scm_reader)
+{
+  return scm_i_read_array (port, chr);
+}
+
+SCM
+scm_read_block_comment (int chr, SCM port, scm_reader_t scm_reader)
+{
+  skip_scsh_block_comment (port);
+  return SCM_UNSPECIFIED;
+}
+
+
+/* Skribe's read syntax.  So-called sk-exps.  */
+SCM
+scm_read_skribe_exp (int chr, SCM port, scm_reader_t scm_reader)
 {
   int c;
   char c_literal[1024];
@@ -657,10 +766,21 @@ scm_read_skribe_literal (int chr, SCM port, scm_reader_t scm_reader)
 
 /* Sample Scheme reader.  */
 
+const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
+  {
+    SCM_DEFTOKEN_SINGLE ('\\', "character",      scm_read_character),
+    SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector),
+    SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean),
+    SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword),
+    SCM_DEFTOKEN_SINGLE ('!',  "block-comment",  scm_read_block_comment),
+    SCM_END_TOKENS
+  };
 
+/* A reader that must be compiled at initialization-time.  */
+scm_reader_t scm_standard_sharp_reader = NULL;
 
 /* A default, Scheme-like, reader specification.  */
-const scm_token_reader_spec_t scm_reader_standard_specs[] =
+scm_token_reader_spec_t scm_reader_standard_specs[] =
   {
     SCM_DEFTOKEN_SINGLE ('(', "sexp",   scm_read_sexp),
     SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string),
@@ -668,6 +788,7 @@ const scm_token_reader_spec_t scm_reader_standard_specs[] =
     /* FIXME: Number can also start with `+' or `-' (?), which conflicts with
        symbol names.  */
     SCM_DEFTOKEN_RANGE ('0', '9', "number", scm_read_number),
+    SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+base", scm_read_number),
 
     /* Let's define symbols as two ranges plus one set of triggering
        characters.  */
@@ -677,14 +798,74 @@ const scm_token_reader_spec_t scm_reader_standard_specs[] =
 
     SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote", scm_read_quote),
 
-    SCM_DEFTOKEN_SINGLE ('#', "sharp",                   scm_read_sharp),
+    /* This one is defined at reader's compile-time.  */
+    SCM_DEFTOKEN_SINGLE ('#', "sharp",                   NULL),
 
     SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",
 			 scm_read_semicolon_comment),
 
+#if 0
     /* Skribe/Skribilo literal sequences.  In R6RS, `[' would rather be
        associated to `scm_read_sexp ()'.  */
-    SCM_DEFTOKEN_SINGLE ('[', "skribe-literal", scm_read_skribe_literal),
+    SCM_DEFTOKEN_SINGLE ('[', "skribe-exp", scm_read_skribe_exp),
+#endif
 
     SCM_END_TOKENS
   };
+
+/* The standard reader (which depends on the standard keyword reader),
+   compiled at initialization time.  */
+scm_reader_t scm_standard_reader = NULL;
+
+
+static char standard_reader_code[8000];
+static char standard_sharp_reader_code[4000];
+
+void
+scm_load_standard_reader (void)
+{
+  /* XXX  Ultimately, we might want to simply mmap a file containing the
+     pre-compiled readers.  */
+
+  size_t code_size = 0;
+
+  if (!scm_standard_sharp_reader)
+    {
+      scm_standard_sharp_reader =
+	scm_c_make_reader (standard_sharp_reader_code,
+			   sizeof (standard_sharp_reader_code),
+			   " \t\n",
+			   scm_sharp_reader_standard_specs,
+			   0,
+			   &code_size);
+    }
+
+  if (!scm_standard_reader)
+    {
+      /* Replace the sharp reader.  */
+      scm_token_reader_spec_t *tr;
+      for (tr = (scm_token_reader_spec_t *)scm_reader_standard_specs;
+	   tr->name != 0;
+	   tr++)
+	{
+	  if ((tr->token.type == SCM_TOKEN_SINGLE)
+	      && (tr->token.value.single == '#'))
+	    {
+	      tr->reader.type = SCM_TOKEN_READER_READER;
+	      tr->reader.value.reader = scm_standard_sharp_reader;
+	      break;
+	    }
+	}
+
+      /* We should not have reached the end of list.  */
+      assert (tr->name);
+
+      scm_standard_reader =
+	scm_c_make_reader (standard_reader_code,
+			   sizeof (standard_reader_code),
+			   " \t\n",
+			   scm_reader_standard_specs,
+			   0,
+			   &code_size);
+    }
+}

@@ -42,6 +42,16 @@ extern SCM scm_read_skribe_literal (int chr, SCM port,
 				    scm_reader_t scm_reader);
 
 /* Zero-terminated array of a standard Scheme reader specification.  */
-extern const scm_token_reader_spec_t scm_reader_standard_specs[];
+extern scm_token_reader_spec_t scm_reader_standard_specs[];
+extern const scm_token_reader_spec_t scm_sharp_reader_standard_specs[];
+
+/* Two standard (in Guile terms) readers compiled at initialization time.  */
+extern scm_reader_t scm_standard_reader;
+extern scm_reader_t scm_standard_sharp_reader;
+
+/* Load or compile the standard reader (and its `#' reader) declared above.
+   This function is automatically called by the `(reader)' module at
+   load-time.  */
+extern void scm_load_standard_reader (void);
 
 #endif

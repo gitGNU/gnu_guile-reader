@@ -27,17 +27,26 @@
 typedef SCM (* scm_reader_t) (SCM port);
 typedef SCM (* scm_token_reader_t) (int chr, SCM port, scm_reader_t reader);
 
+/* The way a token is defined.  */
 typedef enum
   {
-    SCM_TOKEN_UNDEF,
-    SCM_TOKEN_SINGLE,
-    SCM_TOKEN_RANGE,
-    SCM_TOKEN_SET,
+    SCM_TOKEN_UNDEF = 0,
+    SCM_TOKEN_SINGLE,           /* single character */
+    SCM_TOKEN_RANGE,            /* range of characters */
+    SCM_TOKEN_SET               /* set of characters */
   } scm_token_type_t;
+
+typedef enum
+  {
+    SCM_TOKEN_READER_UNDEF = 0,
+    SCM_TOKEN_READER_C,         /* C function, `scm_token_reader_t' */
+    SCM_TOKEN_READER_SCM,       /* Scheme procedure */
+    SCM_TOKEN_READER_READER     /* reader is an `scm_reader_t' */
+  } scm_token_reader_type_t;
 
 /* Token reader specification, i.e. reader functions associated to a
    character, a range of characters, or a set of characters.  */
-typedef struct
+typedef struct scm_token_reader_spec
 {
   struct
   {
@@ -54,11 +63,16 @@ typedef struct
     } value;
   } token;
   const char *name;
-  unsigned    is_scheme_proc:1;
-  union
+
+  struct
   {
-    scm_token_reader_t c_reader;
-    SCM                scm_reader;
+    scm_token_reader_type_t type;
+    union
+    {
+      scm_token_reader_t       c_reader;
+      SCM                      scm_reader;
+      scm_reader_t             reader;
+    } value;
   } reader;
 } scm_token_reader_spec_t;
 
@@ -73,7 +87,7 @@ typedef scm_token_reader_spec_t *scm_reader_spec_t;
    the generated code, NULL is returned and CODE_SIZE is set to the size of
    the generated code at this point.  On success, CODE_SIZE is also set to
    the actual size of the generated code.  */
-extern scm_reader_t scm_c_make_reader (jit_insn *code_buffer,
+extern scm_reader_t scm_c_make_reader (void *code_buffer,
 				       size_t buffer_size,
 				       const char *whitespaces,
 				       const scm_token_reader_spec_t *specs,
@@ -85,31 +99,29 @@ extern scm_reader_t scm_c_make_reader (jit_insn *code_buffer,
 #define SCM_DEFTOKEN_SINGLE(_chr, _name, _func)				\
   {									\
     { .type = SCM_TOKEN_SINGLE, .value = { .single = (_chr) } },	\
-    .is_scheme_proc = 0,						\
     .name = (_name),							\
-    .reader = { .c_reader = (_func) }					\
+    .reader = { .type = SCM_TOKEN_READER_C, .value.c_reader = (_func) }	\
   }
 
-#define SCM_DEFTOKEN_RANGE(_lo, _hi, _name, _func)		\
-  {								\
-    { .type = SCM_TOKEN_RANGE,					\
-      .value = { .range = { .low = (_lo), .high = (_hi) } } },	\
-    .name = (_name),						\
-    .is_scheme_proc = 0,					\
-    .reader = { .c_reader = (_func) }				\
+#define SCM_DEFTOKEN_RANGE(_lo, _hi, _name, _func)			\
+  {									\
+    { .type = SCM_TOKEN_RANGE,						\
+      .value = { .range = { .low = (_lo), .high = (_hi) } } },		\
+    .name = (_name),							\
+    .reader = { .type = SCM_TOKEN_READER_C, .value.c_reader = (_func) }	\
   }
 
-#define SCM_DEFTOKEN_SET(_set, _name, _func)			\
-  {								\
-    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },	\
-    .is_scheme_proc = 0,					\
-    .name = (_name),						\
-   .reader = { .c_reader = (_func) }				\
+#define SCM_DEFTOKEN_SET(_set, _name, _func)				\
+  {									\
+    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },		\
+    .name = (_name),							\
+   .reader = { .type = SCM_TOKEN_READER_C, .value.c_reader = (_func) }	\
   }
 
-#define SCM_END_TOKENS					\
-  { { .type = SCM_TOKEN_UNDEF },			\
-    .name = NULL, .reader = { .c_reader = NULL } }
+#define SCM_END_TOKENS							   \
+  { { .type = SCM_TOKEN_UNDEF },					   \
+    .name = NULL,							   \
+    .reader = { .type = SCM_TOKEN_READER_UNDEF, .value.c_reader = NULL } }
 
 
 /* The SMOB type associated to `scm_reader_t'.  */

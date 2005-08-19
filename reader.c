@@ -27,6 +27,7 @@
 #include <libguile.h>
 
 #include "reader.h"
+#include "token-readers.h"
 
 
 
@@ -92,7 +93,7 @@ token_spec_to_string (const scm_token_reader_spec_t *tr,
 	char first, last;
 	const char *p;
 
-	first = *tr->token.value.set;
+	first = last = *tr->token.value.set;
 	for (p = tr->token.value.set; *p; p++)
 	  last = *p;
 
@@ -114,7 +115,7 @@ do_scm_make_char (int chr)
 
 /* The guts of the system: compiles a reader to native code.  */
 scm_reader_t
-scm_c_make_reader (jit_insn *code_buffer,
+scm_c_make_reader (void *code_buffer,
 		   size_t buffer_size,
 		   const char *whitespaces,
 		   const scm_token_reader_spec_t *token_readers,
@@ -126,6 +127,8 @@ scm_c_make_reader (jit_insn *code_buffer,
   static const char start_c_call_string[] = "calling token reader `%s'...\n";
   static const char start_scm_call_string[] =
     "calling Scheme token reader for %s...\n";
+  static const char start_reader_call_string[] =
+    "calling reader for %s...\n";
   static const char end_call_string[] = "token reader for %s finished\n";
 
   scm_reader_t result;
@@ -289,14 +292,15 @@ scm_c_make_reader (jit_insn *code_buffer,
 	  CHECK_CODE_SIZE (buffer_size, start);
 	}
 
-      if (!tr->is_scheme_proc)
+      switch (tr->reader.type)
 	{
-	  if (tr->reader.c_reader)
+	case SCM_TOKEN_READER_C:
+	  if (tr->reader.value.c_reader)
 	    {
 	      /* Call the C reader function associated with this
 		 character.  */
 	      const char *name = (tr->name ? tr->name : "<nameless>");
-	      void *func = (void *)tr->reader.c_reader;
+	      void *func = (void *)tr->reader.value.c_reader;
 
 	      if (debug)
 		DO_DEBUG_2_PP (start_c_call_string, JIT_R0,
@@ -326,11 +330,12 @@ scm_c_make_reader (jit_insn *code_buffer,
 	    }
 	  else
 	    jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
-	}
-      else
-	{
+
+	  break;
+
+	case SCM_TOKEN_READER_SCM:
 	  /* Call the Scheme proc associated with this character.  */
-	  if (scm_procedure_p (tr->reader.scm_reader) == SCM_BOOL_T)
+	  if (scm_procedure_p (tr->reader.value.scm_reader) == SCM_BOOL_T)
 	    {
 	      char spec_str[60];
 	      SCM s_reader;
@@ -352,7 +357,7 @@ scm_c_make_reader (jit_insn *code_buffer,
 
 	      /* Actually call the Scheme procedure.  */
 	      jit_movi_p (JIT_R0, (void *)s_reader);
-	      jit_movi_p (JIT_R1, (void *)tr->reader.scm_reader);
+	      jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
 	      jit_prepare (4);
 	      jit_pusharg_p (JIT_R0); /* reader */
 	      jit_pusharg_p (JIT_V0); /* port */
@@ -371,6 +376,37 @@ scm_c_make_reader (jit_insn *code_buffer,
 	    }
 	  else
 	    jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+
+	  break;
+
+	case SCM_TOKEN_READER_READER:
+	  {
+	    /* A simple C function call.  */
+	    char spec_str[60];
+
+	    token_spec_to_string (tr, spec_str);
+	    if (debug)
+	      DO_DEBUG_2_PP (start_reader_call_string, JIT_R0,
+			     spec_str, JIT_R1, do_like_printf);
+
+	    CHECK_CODE_SIZE (buffer_size, start);
+	    jit_prepare (1);
+	    jit_pusharg_p (JIT_V0); /* port */
+	    jit_finish (tr->reader.value.reader);
+
+	    if (debug)
+	      {
+		CHECK_CODE_SIZE (buffer_size, start);
+		jit_movr_p (JIT_V2, JIT_RET);
+		DO_DEBUG_2_PP (end_call_string, JIT_R0,
+			       spec_str, JIT_R1, do_like_printf);
+		jit_movr_p (JIT_RET, JIT_V2);
+	      }
+	  }
+	  break;
+
+	default:
+	  return NULL;
 	}
 
       /* The reader's return value is already in JIT_RET, so we just have to
@@ -411,8 +447,6 @@ scm_c_make_reader (jit_insn *code_buffer,
 
 
 /* Wrapping/unwrapping methods.  */
-
-#include "token-readers.h"
 
 const scm_token_reader_spec_t *
 scm_token_reader_lookup (const scm_reader_spec_t spec,
@@ -458,15 +492,23 @@ read_token_reader_spec (SCM spec, scm_token_reader_spec_t *tr)
 {
   if (scm_procedure_p (spec) == SCM_BOOL_T)
     {
-      tr->is_scheme_proc = 1;
-      tr->reader.scm_reader = spec;
+      tr->reader.type = SCM_TOKEN_READER_SCM;
+      tr->reader.value.scm_reader = spec;
     }
   else if (scm_is_symbol (spec))
     {
+      const scm_token_reader_spec_t *ref_specs = scm_reader_standard_specs;
       const scm_token_reader_spec_t *ref;
 
-      ref = scm_token_reader_lookup (scm_reader_standard_specs,
+    lookup:
+      ref = scm_token_reader_lookup (ref_specs,
 				     scm_i_symbol_chars (spec));
+      if ((!ref) && (ref_specs == scm_reader_standard_specs))
+	{
+	  ref_specs = scm_sharp_reader_standard_specs;
+	  goto lookup;
+	}
+
       if (!ref)
 	{
 	  printf ("%s: %s: unknown token reader\n", __FUNCTION__,
@@ -474,11 +516,28 @@ read_token_reader_spec (SCM spec, scm_token_reader_spec_t *tr)
 	  return 1;
 	}
 
-      tr->is_scheme_proc = ref->is_scheme_proc;
-      if (tr->is_scheme_proc)
-	tr->reader.scm_reader = ref->reader.scm_reader;
-      else
-	tr->reader.c_reader = ref->reader.c_reader;
+      tr->reader.type = ref->reader.type;
+      switch (tr->reader.type)
+	{
+	case SCM_TOKEN_READER_C:
+	  tr->reader.value.c_reader = ref->reader.value.c_reader;
+	  break;
+	case SCM_TOKEN_READER_SCM:
+	  tr->reader.value.scm_reader = ref->reader.value.scm_reader;
+	  break;
+	case SCM_TOKEN_READER_READER:
+	  tr->reader.value.reader = ref->reader.value.reader;
+	  break;
+	default:
+	  printf ("%s: %i: unknown token reader type\n", __FUNCTION__,
+		  (int)tr->reader.type);
+	  return 1;
+	}
+    }
+  else if (SCM_SMOB_PREDICATE (scm_reader_type, spec))
+    {
+      tr->reader.type = SCM_TOKEN_READER_READER;
+      tr->reader.value.reader = (scm_reader_t)SCM_SMOB_DATA (spec);
     }
   else
     return 1;
@@ -542,8 +601,18 @@ scm_to_reader_spec (SCM lst)
       if (scm_is_symbol (car))
 	{
 	  const scm_token_reader_spec_t *trs;
+	  const scm_token_reader_spec_t *ref_specs = scm_reader_standard_specs;
+
+	lookup:
 	  trs = scm_token_reader_lookup (scm_reader_standard_specs,
 					 scm_i_symbol_chars (car));
+	  if ((!trs) && (ref_specs == scm_reader_standard_specs))
+	    {
+	      /* Try again.  */
+	      ref_specs = scm_sharp_reader_standard_specs;
+	      goto lookup;
+	    }
+
 	  if (!trs)
 	    {
 	      CLEAR_SPECS ();
@@ -668,6 +737,15 @@ SCM_DEFINE (scm_make_reader, "make-reader", 2, 1, 0,
   SCM_RETURN_NEWSMOB (scm_reader_type, reader);
 }
 
+
+SCM_DEFINE (scm_default_reader, "default-reader", 0, 0, 0,
+	    (void),
+	    "Returns Guile's default reader.")
+{
+  SCM_RETURN_NEWSMOB (scm_reader_type, scm_standard_reader);
+}
+
+
 
 scm_t_bits scm_reader_type;
 
@@ -711,4 +789,7 @@ dynr_init_bindings (void)
   scm_set_smob_apply (scm_reader_type, reader_apply, 0, 1, 0);
 
 #include "reader.c.x"
+
+  /* Compile/load the standard reader.  */
+  scm_load_standard_reader ();
 }
