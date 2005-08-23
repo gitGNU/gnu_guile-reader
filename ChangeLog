@@ -2,6 +2,54 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-08-23 15:19:47 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-4
+
+    Summary:
+      Implemented first-class token readers.
+    Revision:
+      scheme-reader--devo--0.1--patch-4
+
+    * Makefile.am (lib_LTLIBRARIES):  Renamed the lib to `libguile-reader.la'.
+    
+    * reader.c (scm_reader_smob_t):  New structure.
+      (SCM_NEW_READER_SMOB):  New macro.
+      (SCM_READER_SMOB_DATA):  New macro.
+      (SCM_TOKEN_READER_SMOB_DATA):  New macro.
+      (scm_c_make_reader):  Added calls to `CHECK_CODE_SIZE ()'.
+      (scm_token_reader_lookup):  Moved to `token-readers.c'.
+      (scm_from_reader):  New function.
+      (scm_from_token_reader):  New function.
+      (scm_to_reader):  New function.
+      (scm_make_reader):  Changed.  Now expects a list of token reader SMOBs.
+      (scm_make_token_reader):  New function.
+      (scm_standard_token_reader):  New function.
+      (scm_token_reader_type):  New variable.
+    
+    * reader.h (scm_token_reader_type):  New declaration.
+    
+    * reader.scm:  Export the new procs.
+    
+    * test-repl.scm:  Updated.
+    
+    * token-readers.c (scm_read_symbol):  Bail out on numbers.
+      (scm_read_number):  Expect hexadecimal digits.
+      (scm_read_keyword):  Call `scm_read_symbol' instead of SCM_READER.
+      (scm_read_extended_symbol):  New function.
+      (scm_token_reader_lookup):  New function.
+      (scm_reader_misc_specs):  New variable.
+    
+    * token-readers.h:  Slightly updated.
+    
+    * extract-token-readers.sh:  New (unused) file.
+
+    new files:
+     .arch-ids/extract-token-readers.sh.id extract-token-readers.sh
+
+    modified files:
+     ChangeLog Makefile.am reader.c reader.h reader.scm
+     test-repl.scm token-readers.c token-readers.h
+
+
 2005-08-19 16:15:40 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-3
 
     Summary:

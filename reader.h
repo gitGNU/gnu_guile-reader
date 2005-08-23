@@ -124,8 +124,8 @@ extern scm_reader_t scm_c_make_reader (void *code_buffer,
     .reader = { .type = SCM_TOKEN_READER_UNDEF, .value.c_reader = NULL } }
 
 
-/* The SMOB type associated to `scm_reader_t'.  */
-extern scm_t_bits scm_reader_type;
+/* The SMOB type associated to `scm_reader_t' and `scm_token_reader_t'.  */
+extern scm_t_bits scm_reader_type, scm_token_reader_type;
 
 
 #endif

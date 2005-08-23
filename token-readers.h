@@ -26,6 +26,9 @@
 #include <libguile.h>
 #include "reader.h"
 
+
+/* Main token readers.  */
+
 extern SCM scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader);
 
 extern SCM scm_read_string (int chr, SCM port, scm_reader_t scm_reader);
@@ -36,18 +39,28 @@ extern SCM scm_read_number (int chr, SCM port, scm_reader_t scm_reader);
 
 extern SCM scm_read_quote (int chr, SCM port, scm_reader_t scm_reader);
 
-extern SCM scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader);
-
 extern SCM scm_read_skribe_literal (int chr, SCM port,
 				    scm_reader_t scm_reader);
+
+/* Sharp token readers, should be called after `#' has been read.  */
 
+extern SCM scm_read_extended_symbol (int chr, SCM port, scm_reader_t);
+
+
+
 /* Zero-terminated array of a standard Scheme reader specification.  */
 extern scm_token_reader_spec_t scm_reader_standard_specs[];
 extern const scm_token_reader_spec_t scm_sharp_reader_standard_specs[];
+extern const scm_token_reader_spec_t scm_reader_misc_specs[];
 
 /* Two standard (in Guile terms) readers compiled at initialization time.  */
 extern scm_reader_t scm_standard_reader;
 extern scm_reader_t scm_standard_sharp_reader;
+
+/* Look for a token reader named NAME in the standard token readers and
+   return its specification if found, otherwise return NULL.  */
+extern const scm_token_reader_spec_t *
+scm_token_reader_lookup (const char *name);
 
 /* Load or compile the standard reader (and its `#' reader) declared above.
    This function is automatically called by the `(reader)' module at

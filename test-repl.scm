@@ -3,22 +3,30 @@
 ;;(kill (getpid) SIGTSTP)
 ;;(do-stuff (current-input-port))
 
-(define sharp-reader (make-reader " \n\t"
-				  '(character srfi-4
-				    boolean keyword block-comment)))
+(format #t "Hello, this is your friendly REPL using a dynamically\n\
+defined reader for Guile!~%~%")
 
-(format #t "sharp-reader: ~a~%" sharp-reader)
+(define *ws* " \n\t")
 
-(let loop ((reader (make-reader " \n\t"
-				`(sexp string number
-				  symbol-lower-case symbol-upper-case
-				  symbol-misc-chars
-				  quote-quasiquote-unquote
-				  (#\# . ,sharp-reader)
-				  semicolon-comment
-				  skribe-exp))))
-  (display "dynamic-reader> ")
+(define sharp-reader (make-reader *ws*
+				  (map standard-token-reader
+				       '(character srfi-4 number+base
+					 extended-symbol
+					 boolean keyword block-comment))
+				  #f))
+
+(let loop ((reader (make-reader *ws*
+				(cons (make-token-reader #\# sharp-reader)
+				      (map standard-token-reader
+					   `(sexp string number
+					     symbol-lower-case
+					     symbol-upper-case
+					     symbol-misc-chars
+					     quote-quasiquote-unquote
+					     semicolon-comment
+					     skribe-exp))))))
+  (display "guile-reader> ")
   (write (eval (reader (current-input-port)) (interaction-environment)))
   (display "\n")
-  (loop reader sharp-reader))
+  (loop reader))
 

@@ -254,7 +254,19 @@ scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader)
   c = chr;
   while (c != EOF)
     {
-      /* Note: for pratical reasons (read: laziness), we excluse brackets
+      if (c_id_len == 2)
+	{
+	  /* Are we actually reading a number rather than a symbol? */
+	  if (((c_id[0] == '+') || (c_id[0] == '-'))
+	      && (isdigit (c_id[1])))
+	    {
+	      /* Well, yes, this is a number:  Pass it again to SCM_READER.  */
+	      scm_ungets (c_id, 2, port);
+	      return SCM_UNSPECIFIED;
+	    }
+	}
+
+      /* Note: for pratical reasons (read: laziness), we exclude brackets
 	 from the list of allowed characters for symbols.  */
       if ((isalnum (c) || (isgraph (c)))
 	  && (c != '(') && (c != ')') && (c != '[') && (c != ']'))
@@ -274,6 +286,7 @@ scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader)
   return (scm_from_locale_symboln (c_id, c_id_len));
 }
 
+
 SCM
 scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
 {
@@ -284,7 +297,7 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
   c = chr;
   while (c != EOF)
     {
-      if (isdigit (c))
+      if (isxdigit (c))
 	c_num[c_num_len++] = (char)c;
       else
 	{
@@ -297,6 +310,10 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
 
       c = scm_getc (port);
     }
+
+  if (!c_num_len)
+    scm_i_input_error(__FUNCTION__, port,
+		      "invalid number syntax", SCM_EOL);
 
   return (scm_i_mem2number (c_num, c_num_len, 10));
 }
@@ -370,7 +387,7 @@ scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader)
 /* The hash syntax and its support functions.  */
 
 /* Consume an SCSH-style block comment.  Assume that we've already read the
-   initial `#!', and eat characters until we get a
+   initial `#!', and eat characters until we get an
    exclamation-point/sharp-sign sequence.  */
 static void
 skip_scsh_block_comment (SCM port)
@@ -693,7 +710,13 @@ scm_read_character (int chr, SCM port, scm_reader_t scm_reader)
 SCM
 scm_read_keyword (int chr, SCM port, scm_reader_t scm_reader)
 {
-  return (scm_symbol_to_keyword (scm_reader (port)));
+  /* Initially, I was tempted to call SCM_READER below, thinking that it was
+     likely to result in a call to `scm_read_symbol ()'.  However,
+     `scm_read_keyword ()' may typically be used either in the top-level
+     reader or in the sharp reader.  In the latter case, calling SCM_READER
+     just wouldn't work since the sharp reader doesn't handle symbols.  */
+  return (scm_symbol_to_keyword (scm_read_symbol (scm_getc (port), port,
+						  scm_reader)));
 }
 
 SCM
@@ -707,6 +730,61 @@ scm_read_block_comment (int chr, SCM port, scm_reader_t scm_reader)
 {
   skip_scsh_block_comment (port);
   return SCM_UNSPECIFIED;
+}
+
+SCM
+scm_read_extended_symbol (int chr, SCM port, scm_reader_t scm_reader)
+{
+  /* Guile's extended symbol read syntax looks like this:
+
+       #{This is all a symbol name}#
+
+     So here, CHR is expected to be `{'.  */
+  SCM result;
+  int saw_brace = 0, finished = 0;
+  size_t len = 0;
+  char buf[1024];
+
+  result = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+
+  while ((chr = scm_getc (port)) != EOF)
+    {
+      if (saw_brace)
+	{
+	  if (chr == '#')
+	    {
+	      finished = 1;
+	      break;
+	    }
+	  else
+	    {
+	      saw_brace = 0;
+	      buf[len++] = '}';
+	      buf[len++] = chr;
+	    }
+	}
+      else if (chr == '}')
+	saw_brace = 1;
+      else
+	buf[len++] = chr;
+
+      if (len >= sizeof (buf) - 2)
+	{
+	  scm_string_append (scm_list_2 (result,
+					 scm_from_locale_stringn (buf, len)));
+	  len = 0;
+	}
+
+      if (finished)
+	break;
+    }
+
+  if (len)
+    result = scm_string_append (scm_list_2
+				(result,
+				 scm_from_locale_stringn (buf, len)));
+
+  return (scm_string_to_symbol (result));
 }
 
 
@@ -764,6 +842,38 @@ scm_read_skribe_exp (int chr, SCM port, scm_reader_t scm_reader)
 }
 
 
+/* Directory of standard token readers.  */
+
+#include <string.h>
+/* #include "token-reader-lookup.c" */
+
+const scm_token_reader_spec_t *
+scm_token_reader_lookup (const char *name)
+{
+#if 0
+  const struct scm_token_reader_entry *entry;
+
+  entry = _scm_token_reader_lookup (name, strlen (name));
+#endif
+
+  const scm_token_reader_spec_t **group, *spec;
+  const scm_token_reader_spec_t *specs[] =
+    { scm_reader_standard_specs, scm_sharp_reader_standard_specs,
+      scm_reader_misc_specs, NULL };
+
+  for (group = specs; *group != NULL; group++)
+    {
+      for (spec = *group; spec->name != NULL; spec++)
+	{
+	  if (!strcmp (spec->name, name))
+	    return (spec);
+	}
+    }
+
+  return NULL;
+}
+
+
 /* Sample Scheme reader.  */
 
 const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
@@ -772,6 +882,8 @@ const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
     SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector),
     SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean),
     SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword),
+    SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+base",  scm_read_number),
+    SCM_DEFTOKEN_SINGLE ('{',  "extended-symbol",scm_read_extended_symbol),
     SCM_DEFTOKEN_SINGLE ('!',  "block-comment",  scm_read_block_comment),
     SCM_END_TOKENS
   };
@@ -788,7 +900,6 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
     /* FIXME: Number can also start with `+' or `-' (?), which conflicts with
        symbol names.  */
     SCM_DEFTOKEN_RANGE ('0', '9', "number", scm_read_number),
-    SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+base", scm_read_number),
 
     /* Let's define symbols as two ranges plus one set of triggering
        characters.  */
@@ -804,15 +915,22 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
     SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",
 			 scm_read_semicolon_comment),
 
-#if 0
+    SCM_END_TOKENS
+  };
+
+/* This is where we put non-standard token readers so that they can easily be
+   looked up with `scm_token_reader_lookup ()'.  */
+const scm_token_reader_spec_t scm_reader_misc_specs[] =
+  {
     /* Skribe/Skribilo literal sequences.  In R6RS, `[' would rather be
        associated to `scm_read_sexp ()'.  */
     SCM_DEFTOKEN_SINGLE ('[', "skribe-exp", scm_read_skribe_exp),
-#endif
 
     SCM_END_TOKENS
   };
 
+
+
 /* The standard reader (which depends on the standard keyword reader),
    compiled at initialization time.  */
 scm_reader_t scm_standard_reader = NULL;
