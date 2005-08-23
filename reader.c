@@ -487,9 +487,12 @@ scm_c_make_reader (void *code_buffer,
   jit_pusharg_i (JIT_V1);
   jit_finish (scm_ungetc);
 
-  jit_patch (jump_to_end);
-
   jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+  jit_ret ();
+
+  /* This is where we get when `scm_getc ()' returned EOF.  */
+  jit_patch (jump_to_end);
+  jit_movi_p (JIT_RET, (void *)SCM_EOF_VAL);
   jit_ret ();
 
   end = jit_get_ip ().ptr;

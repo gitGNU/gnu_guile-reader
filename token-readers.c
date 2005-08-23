@@ -35,6 +35,11 @@
 
 
 
+/* `isblank' is only in C99.  */
+#define CHAR_IS_BLANK(_chr)					\
+  (((_chr) == ' ') || ((_chr) == '\t') || ((_chr) == '\n'))
+
+
 /* Helper function similar to `scm_read_token ()'.  Read from PORT until a
    whitespace is read.  */
 static __inline__ void
@@ -46,7 +51,7 @@ read_token (SCM port, char *buf, size_t buf_size, size_t *read)
     {
       int chr;
       chr = scm_getc (port);
-      if ((chr == ' ') || (chr == '\t') || (chr == '\n'))
+      if (CHAR_IS_BLANK (chr))
 	{
 	  scm_ungetc (chr, port);
 	  break;
@@ -238,34 +243,18 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader)
 #undef FUNC_NAME
 
 
-#if 0
-/* The list of valid Scheme identifiers starting characters.  */
-static const char scm_identifiers_charset[] =
-"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-/+*&@%[]";
-#endif
-
 SCM
 scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader)
 {
   int c;
+  SCM result;
   char c_id[1024];
   size_t c_id_len = 0;
 
+  result = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
   c = chr;
   while (c != EOF)
     {
-      if (c_id_len == 2)
-	{
-	  /* Are we actually reading a number rather than a symbol? */
-	  if (((c_id[0] == '+') || (c_id[0] == '-'))
-	      && (isdigit (c_id[1])))
-	    {
-	      /* Well, yes, this is a number:  Pass it again to SCM_READER.  */
-	      scm_ungets (c_id, 2, port);
-	      return SCM_UNSPECIFIED;
-	    }
-	}
-
       /* Note: for pratical reasons (read: laziness), we exclude brackets
 	 from the list of allowed characters for symbols.  */
       if ((isalnum (c) || (isgraph (c)))
@@ -277,27 +266,91 @@ scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader)
 	  break;
 	}
 
-      if (c_id_len + 1 >= sizeof (c_id))  /* FIXME: shortcoming */
-	break;
+      if (c_id_len == 2)
+	{
+	  /* Are we actually reading a number rather than a symbol? */
+	  if (((c_id[0] == '+') || (c_id[0] == '-'))
+	      && (isdigit (c_id[1])))
+	    {
+	      /* Well, yes, this is a number:  call `scm_read_number ()' to
+		 the rescue.  XXX:  This is a bit hackish, indeed.  */
+	      scm_ungetc (c_id[1], port);
+	      return scm_read_number (chr, port, scm_reader);
+	    }
+	}
+
+      if (c_id_len + 1 >= sizeof (c_id))
+	{
+	  result =
+	    scm_string_append (scm_list_2
+			       (result,
+				scm_from_locale_stringn (c_id, c_id_len)));
+	  c_id_len = 0;
+	}
 
       c = scm_getc (port);
     }
 
-  return (scm_from_locale_symboln (c_id, c_id_len));
+  if (c_id_len)
+    result =
+      scm_string_append (scm_list_2
+			 (result,
+			  scm_from_locale_stringn (c_id, c_id_len)));
+
+  return (scm_string_to_symbol (result));
 }
 
 
 SCM
-scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_number_and_radix (int chr, SCM port, scm_reader_t scm_reader)
 {
   int c;
   char c_num[1024];
+  SCM result_str;
   size_t c_num_len = 0;
+  unsigned radix = 10;
 
+  result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+
+  switch (chr)
+    {
+    case 'B':
+    case 'b':
+      radix = 2;
+      break;
+
+    case 'o':
+    case 'O':
+      radix = 8;
+      break;
+
+    case 'd':
+    case 'D':
+      radix = 10;
+      break;
+
+    case 'x':
+    case 'X':
+      radix = 16;
+      break;
+
+    case 'i':
+    case 'I':
+    case 'e':
+    case 'E':
+      /* FIXME */
+
+    default:
+      scm_i_input_error (__FUNCTION__, port,
+			 "unknown number radix", SCM_EOL);
+    }
+
+  chr = scm_getc (port);
   c = chr;
   while (c != EOF)
     {
-      if (isxdigit (c))
+      if (((radix > 10) && (isxdigit (c)))
+	  || (isdigit (c)))
 	c_num[c_num_len++] = (char)c;
       else
 	{
@@ -305,8 +358,14 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
 	  break;
 	}
 
-      if (c_num_len + 1 >= sizeof (c_num))  /* FIXME: shortcoming */
-	break;
+      if (c_num_len + 1 >= sizeof (c_num))
+	{
+	  result_str =
+	    scm_string_append (scm_list_2
+			       (result_str,
+				scm_from_locale_stringn (c_num, c_num_len)));
+	  c_num_len = 0;
+	}
 
       c = scm_getc (port);
     }
@@ -315,7 +374,91 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
     scm_i_input_error(__FUNCTION__, port,
 		      "invalid number syntax", SCM_EOL);
 
-  return (scm_i_mem2number (c_num, c_num_len, 10));
+  result_str =
+    scm_string_append (scm_list_2
+		       (result_str,
+			scm_from_locale_stringn (c_num, c_num_len)));
+
+  return (scm_string_to_number (result_str, SCM_I_MAKINUM (radix)));
+}
+
+SCM
+scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
+{
+  int c;
+  SCM result, result_str;
+  char c_num[1024];
+  size_t c_num_len = 0;
+  unsigned saw_point = 0, return_symbol = 0;
+  int sign = 1;
+
+  if ((chr == '+') || (chr == '-'))
+    {
+      sign = (chr == '-') ? -1 : +1;
+      c = chr = scm_getc (port);
+    }
+
+  result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+  c = chr;
+
+  while (c != EOF)
+    {
+      if ((CHAR_IS_BLANK (c)) || (c == EOF))
+	{
+	  if (c != EOF)
+	    scm_ungetc (c, port);
+	  break;
+	}
+      else if (c == '.')
+	{
+	  if (saw_point)
+	    /* We've already seen a point before.  */
+	    return_symbol = 1;
+	  else
+	    saw_point = 1;
+	}
+      else if (ispunct (c))  /* E.g. a bracket */
+	{
+	  scm_ungetc (c, port);
+	  break;
+	}
+      else if (!isdigit (c))
+	return_symbol = 1;
+
+      c_num[c_num_len++] = (char)c;
+
+      if (c_num_len + 1 >= sizeof (c_num))
+	{
+	  result_str =
+	    scm_string_append (scm_list_2
+			       (result_str,
+				scm_from_locale_stringn (c_num, c_num_len)));
+	  c_num_len = 0;
+	}
+
+      c = scm_getc (port);
+    }
+
+  if (!c_num_len)
+    scm_i_input_error(__FUNCTION__, port,
+		      "invalid number syntax", SCM_EOL);
+
+  result_str =
+    scm_string_append (scm_list_2
+		       (result_str,
+			scm_from_locale_stringn (c_num, c_num_len)));
+
+  if (return_symbol)
+    /* The token wasn't actually a number so we'll return a symbol, just like
+       Guile's default reader does (e.g. it reads `123.123.123' as a
+       symbol).  */
+    return (scm_string_to_symbol (result_str));
+
+  result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
+  if (sign < 0)
+    result = scm_difference (SCM_I_MAKINUM (0), result);
+
+  return result;
 }
 
 SCM
@@ -460,13 +603,15 @@ recsexpr (SCM obj, long line, int column, SCM filename)
   }
 }
 
+#if 0 /* XXX This function was originally used for `read-hash-extend', but do
+	 we care any longer?  */
+
 /* Recover the read-hash procedure corresponding to char c.  */
 static inline SCM
 scm_get_hash_procedure (int c)
 {
   /* FIXME:  SCM_READ_HASH_PROCEDURES is not public!  */
   return SCM_BOOL_F;
-#if 0
   SCM rest = *scm_read_hash_procedures;
 
   while (1)
@@ -479,8 +624,8 @@ scm_get_hash_procedure (int c)
      
       rest = SCM_CDR (rest);
     }
-#endif
 }
+#endif
 
 #if 0  /* XXX This function is being replaced by `scm_sharp_reader'.  */
 SCM
@@ -882,7 +1027,7 @@ const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
     SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector),
     SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean),
     SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword),
-    SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+base",  scm_read_number),
+    SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+radix", scm_read_number_and_radix),
     SCM_DEFTOKEN_SINGLE ('{',  "extended-symbol",scm_read_extended_symbol),
     SCM_DEFTOKEN_SINGLE ('!',  "block-comment",  scm_read_block_comment),
     SCM_END_TOKENS
@@ -897,8 +1042,7 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
     SCM_DEFTOKEN_SINGLE ('(', "sexp",   scm_read_sexp),
     SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string),
 
-    /* FIXME: Number can also start with `+' or `-' (?), which conflicts with
-       symbol names.  */
+    /* Both numbers and symbols can start with `+' or `-'.  */
     SCM_DEFTOKEN_RANGE ('0', '9', "number", scm_read_number),
 
     /* Let's define symbols as two ranges plus one set of triggering

@@ -10,7 +10,7 @@ defined reader for Guile!~%~%")
 
 (define sharp-reader (make-reader *ws*
 				  (map standard-token-reader
-				       '(character srfi-4 number+base
+				       '(character srfi-4 number+radix
 					 extended-symbol
 					 boolean keyword block-comment))
 				  #f))
@@ -26,7 +26,10 @@ defined reader for Guile!~%~%")
 					     semicolon-comment
 					     skribe-exp))))))
   (display "guile-reader> ")
-  (write (eval (reader (current-input-port)) (interaction-environment)))
+  (let ((sexp (reader (current-input-port))))
+    (if (eof-object? sexp)
+	(quit))
+    (write (eval sexp (interaction-environment))))
   (display "\n")
   (loop reader))
 
