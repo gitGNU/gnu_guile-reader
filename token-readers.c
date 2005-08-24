@@ -51,13 +51,13 @@ read_token (SCM port, char *buf, size_t buf_size, size_t *read)
     {
       int chr;
       chr = scm_getc (port);
-      if (CHAR_IS_BLANK (chr))
+      if (chr == EOF)
+	break;
+      else if (!isalnum (chr))  /* (CHAR_IS_BLANK (chr)) */
 	{
 	  scm_ungetc (chr, port);
 	  break;
 	}
-      else if (chr == EOF)
-	break;
 
       *(buf++) = (char)chr;
       (*read)++;
@@ -74,6 +74,8 @@ SCM
 scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
 #define FUNC_NAME "scm_read_sexp"
 {
+  /* Note:  We rely here on the ability for SCM_READER to read `.' as a
+     symbol (see SCM_SYM_DOT below).  */
   register int c;
   register SCM tmp;
   register SCM tl, tl2 = SCM_EOL;
@@ -1046,10 +1048,11 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
     SCM_DEFTOKEN_RANGE ('0', '9', "number", scm_read_number),
 
     /* Let's define symbols as two ranges plus one set of triggering
-       characters.  */
+       characters.  Note that the sexp reader relies on the ability to read
+       `.' as a symbol.  */
     SCM_DEFTOKEN_RANGE ('a', 'z', "symbol-lower-case", scm_read_symbol),
     SCM_DEFTOKEN_RANGE ('A', 'Z', "symbol-upper-case", scm_read_symbol),
-    SCM_DEFTOKEN_SET ("+-/*%@_", "symbol-misc-chars",  scm_read_symbol),
+    SCM_DEFTOKEN_SET (".+-/*%@_", "symbol-misc-chars",  scm_read_symbol),
 
     SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote", scm_read_quote),
 

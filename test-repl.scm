@@ -8,11 +8,17 @@ defined reader for Guile!~%~%")
 
 (define *ws* " \n\t")
 
+(define test-token-reader (make-token-reader #\?
+					     (lambda (chr port read)
+					       (format #t "got chr `~a'~%"
+						       chr)
+					       (list quote 'magic!))))
 (define sharp-reader (make-reader *ws*
-				  (map standard-token-reader
-				       '(character srfi-4 number+radix
-					 extended-symbol
-					 boolean keyword block-comment))
+				  (cons test-token-reader
+					(map standard-token-reader
+					     '(character srfi-4 number+radix
+					       extended-symbol
+					       boolean keyword block-comment)))
 				  #f))
 
 (let loop ((reader (make-reader *ws*

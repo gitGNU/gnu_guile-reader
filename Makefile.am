@@ -12,7 +12,7 @@ EXTRA_DIST = test-repl.scm
 AM_CFLAGS = -Wall -g -O0
 
 # Tell GCC to not complain about what Lightning does.
-reader_c_CFLAGS = -Wno-unused-value
+#libguile_reader_la_CFLAGS = -Wno-unused-value
 
 snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 

@@ -153,7 +153,9 @@ token_spec_to_string (const scm_token_reader_spec_t *tr,
 static SCM
 do_scm_make_char (int chr)
 {
+#ifdef DEBUG
   printf ("%s: got char %i\n", __FUNCTION__, chr);
+#endif
   return SCM_MAKE_CHAR (chr);
 }
 
@@ -510,7 +512,8 @@ scm_c_make_reader (void *code_buffer,
 
 
 /* Read token specifier SPEC and update TR accordingly.  On error (i.e. if
-   SPEC is not a valid specification), return non-zero.  */
+   SPEC is not a valid specification), return non-zero.  This has to be in
+   sync with `token-reader-spec'.  */
 static int
 read_token_spec (SCM spec, scm_token_reader_spec_t *tr)
 {
@@ -518,6 +521,13 @@ read_token_spec (SCM spec, scm_token_reader_spec_t *tr)
     {
       tr->token.type = SCM_TOKEN_SINGLE;
       tr->token.value.single = SCM_CHAR (spec);
+    }
+  else if (scm_list_p (spec) == SCM_BOOL_T)
+    {
+      SCM s_set;
+      s_set = scm_string (spec);
+      tr->token.type = SCM_TOKEN_SET;
+      tr->token.value.set = scm_to_locale_string (s_set);
     }
   else if (scm_is_pair (spec))
     {
@@ -531,171 +541,6 @@ read_token_spec (SCM spec, scm_token_reader_spec_t *tr)
   return 0;
 }
 
-/* Read token reader specifier SPEC and update TR accordingly.  On error
-   (i.e. if SPEC is not a valid specification), return non-zero.  */
-static int
-read_token_reader_spec (SCM spec, scm_token_reader_spec_t *tr)
-{
-  if (scm_procedure_p (spec) == SCM_BOOL_T)
-    {
-      tr->reader.type = SCM_TOKEN_READER_SCM;
-      tr->reader.value.scm_reader = spec;
-    }
-  else if (scm_is_symbol (spec))
-    {
-      const scm_token_reader_spec_t *ref;
-
-      ref = scm_token_reader_lookup (scm_i_symbol_chars (spec));
-      if (!ref)
-	{
-	  printf ("%s: %s: unknown token reader\n", __FUNCTION__,
-		  scm_i_symbol_chars (spec));
-	  return 1;
-	}
-
-      tr->reader.type = ref->reader.type;
-      switch (tr->reader.type)
-	{
-	case SCM_TOKEN_READER_C:
-	  tr->reader.value.c_reader = ref->reader.value.c_reader;
-	  break;
-	case SCM_TOKEN_READER_SCM:
-	  tr->reader.value.scm_reader = ref->reader.value.scm_reader;
-	  break;
-	case SCM_TOKEN_READER_READER:
-	  tr->reader.value.reader = ref->reader.value.reader;
-	  break;
-	default:
-	  printf ("%s: %i: unknown token reader type\n", __FUNCTION__,
-		  (int)tr->reader.type);
-	  return 1;
-	}
-    }
-  else if (SCM_SMOB_PREDICATE (scm_reader_type, spec))
-    {
-      printf ("reader is a reader\n");
-      tr->reader.type = SCM_TOKEN_READER_READER;
-      SCM_READER_SMOB_DATA (tr->reader.value.reader, spec);
-    }
-  else
-    return 1;
-
-  return 0;
-}
-
-
-scm_reader_spec_t
-scm_to_reader_spec (SCM lst)
-#define FUNC_NAME "scm_to_reader_spec"
-{
-  SCM car;
-  scm_token_reader_spec_t *specs = NULL;
-  size_t specs_size = 0, spec_items = 0;
-
-#define APPEND_TO_SPECS(_trs)							\
-  do										\
-    {										\
-      if (spec_items + 1 > specs_size)						\
-	{									\
-	  specs_size = specs_size ? specs_size << 1 : 20;			\
-	  specs = realloc (specs,						\
-			   specs_size * sizeof (scm_token_reader_spec_t));	\
-	  if (!specs)								\
-	    goto finish;							\
-	}									\
-      specs[spec_items++] = (_trs);						\
-    }										\
-  while (0)
-
-#define TERMINATE_SPECS()						\
-  do									\
-    {									\
-      scm_token_reader_spec_t _trs;					\
-      _trs.name = NULL;							\
-      _trs.token.type = SCM_TOKEN_UNDEF;				\
-      APPEND_TO_SPECS (_trs);						\
-      specs = realloc (specs,						\
-		       spec_items * sizeof (scm_token_reader_spec_t));	\
-    }									\
-  while (0)
-
-#define CLEAR_SPECS()				\
-  do						\
-    {						\
-      free (specs);				\
-      specs = NULL, specs_size = 0;		\
-    }						\
-  while (0)
-
-
-  SCM_VALIDATE_LIST (0, lst);
-
-  for (car = SCM_CAR (lst);
-       lst != SCM_EOL;
-       lst = SCM_CDR (lst))
-    {
-      car = SCM_CAR (lst);
-
-      if (scm_is_symbol (car))
-	{
-	  const scm_token_reader_spec_t *trs;
-
-	  trs = scm_token_reader_lookup (scm_i_symbol_chars (car));
-	  if (!trs)
-	    {
-	      CLEAR_SPECS ();
-	      goto finish;
-	    }
-
-	  APPEND_TO_SPECS (*trs);
-	}
-      else if (scm_is_pair (car))
-	{
-	  scm_token_reader_spec_t trs;
-	  SCM caar = SCM_CAR (car);
-	  SCM cdar = SCM_CADR (car);
-
-	  scm_write_line (caar, SCM_UNDEFINED);
-	  scm_write_line (cdar, SCM_UNDEFINED);
-
-	  trs.name = "%user-scheme-proc";
-
-	  /* Read the token specifier.  */
-	  if (read_token_spec (caar, &trs))
-	    {
-	      printf ("%s: invalid token specifier\n", __FUNCTION__);
-	      CLEAR_SPECS ();
-	      goto finish;
-	    }
-
-	  /* Read the token reader specifier.  */
-	  if (read_token_reader_spec (cdar, &trs))
-	    {
-	      printf ("%s: invalid token reader specifier\n", __FUNCTION__);
-	      CLEAR_SPECS ();
-	      goto finish;
-	    }
-
-	  APPEND_TO_SPECS (trs);
-	}
-      else
-	{
-	  printf ("%s: unknown token specifier object\n", __FUNCTION__);
-	  CLEAR_SPECS ();
-	  goto finish;
-	}
-    }
-
- finish:
-  if (specs)
-    TERMINATE_SPECS ();
-
-  return specs;
-}
-
-#undef APPEND_TO_SPECS
-#undef TERMINATE_SPECS
-#undef CLEAR_SPECS
 
 SCM
 scm_from_reader (scm_reader_t reader)
@@ -747,6 +592,7 @@ scm_to_reader (SCM reader)
 
 #include "token-readers.h"
 
+#if 0
 SCM_DEFINE (dynr_do_stuff, "do-stuff", 1, 0, 0,
 	    (SCM port),
 	    "Do stuff.")
@@ -762,10 +608,12 @@ SCM_DEFINE (dynr_do_stuff, "do-stuff", 1, 0, 0,
 
   return (reader (port));
 }
+#endif
 
 SCM_DEFINE (scm_make_reader, "make-reader", 2, 1, 0,
 	    (SCM whitespaces, SCM token_readers, SCM debug_p),
 	    "Create a reader.")
+#define FUNC_NAME "make-reader"
 {
   SCM s_reader;
   scm_reader_t reader;
@@ -834,7 +682,7 @@ SCM_DEFINE (scm_make_reader, "make-reader", 2, 1, 0,
   SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader, 1);
   return (s_reader);
 }
-
+#undef FUNC_NAME
 
 SCM_DEFINE (scm_default_reader, "default-reader", 0, 0, 0,
 	    (void),
@@ -851,9 +699,12 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 0, 0,
 	    (SCM spec, SCM proc),
 	    "Use procedure (or reader) @var{proc} as a token reader for "
 	    "the characters defined by @var{spec}.")
+#define FUNC_NAME "make-token-reader"
 {
   SCM s_token_reader;
   scm_token_reader_spec_t *c_spec;
+
+  SCM_VALIDATE_PROC (2, proc);
 
   c_spec = scm_malloc (sizeof (scm_token_reader_spec_t));
 
@@ -874,7 +725,7 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 0, 0,
       SCM_READER_SMOB_DATA (c_spec->reader.value.reader, proc);
       c_spec->name = NULL;
     }
-  else if (scm_procedure (proc) == SCM_BOOL_T)
+  else if (scm_procedure_p (proc) == SCM_BOOL_T)
     {
       c_spec->reader.type = SCM_TOKEN_READER_SCM;
       c_spec->reader.value.scm_reader = proc;
@@ -893,11 +744,13 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 0, 0,
 		       c_spec, 1);
   return (s_token_reader);
 }
+#undef FUNC_NAME
 
 SCM_DEFINE (scm_standard_token_reader, "standard-token-reader", 1, 0, 0,
 	    (SCM name),
 	    "Lookup standard token reader named @var{name} (a symbol) and "
 	    "return it.  Return @code{#f} if not found.")
+#define FUNC_NAME "standard-token-reader"
 {
   SCM s_token_reader;
   const scm_token_reader_spec_t *spec;
@@ -912,6 +765,79 @@ SCM_DEFINE (scm_standard_token_reader, "standard-token-reader", 1, 0, 0,
   SCM_NEW_READER_SMOB (s_token_reader, scm_token_reader_type, spec, 0);
   return (s_token_reader);
 }
+#undef FUNC_NAME
+
+SCM_DEFINE (scm_token_reader_proc, "token-reader-procedure", 1, 0, 0,
+	    (SCM tr),
+	    "Return the procedure attached to token reader @var{tr}, "
+	    "or @code{#f} if it's not a Scheme procedure.")
+#define FUNC_NAME "token-reader-procedure"
+{
+  scm_token_reader_spec_t *c_tr;
+
+  scm_assert_smob_type (scm_token_reader_type, tr);
+  SCM_TOKEN_READER_SMOB_DATA (c_tr, tr);
+
+  switch (c_tr->reader.type)
+    {
+    case SCM_TOKEN_READER_SCM:
+      return (c_tr->reader.value.scm_reader);
+
+    case SCM_TOKEN_READER_READER:
+      {
+	SCM s_reader;
+	SCM_NEW_READER_SMOB (s_reader, scm_reader_type,
+			     c_tr->reader.value.reader, 0);
+	return (s_reader);
+      }
+
+    case SCM_TOKEN_READER_C:
+      return SCM_BOOL_F;
+
+    default:
+      return SCM_UNSPECIFIED;
+    }
+
+  return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (scm_token_reader_spec, "token-reader-specification", 1, 0, 0,
+	    (SCM tr),
+	    "Return the specification, of token reader @var{tr}.")
+#define FUNC_NAME "token-reader-specification"
+{
+  /* Note:  This has to be in sync with `read_token_spec ()'.  */
+  scm_token_reader_spec_t *c_tr;
+
+  scm_assert_smob_type (scm_token_reader_type, tr);
+  SCM_TOKEN_READER_SMOB_DATA (c_tr, tr);
+
+  switch (c_tr->token.type)
+    {
+    case SCM_TOKEN_SINGLE:
+      return (SCM_MAKE_CHAR (c_tr->token.value.single));
+
+    case SCM_TOKEN_RANGE:
+      {
+	SCM lo, hi;
+	lo = SCM_MAKE_CHAR (c_tr->token.value.range.low);
+	hi = SCM_MAKE_CHAR (c_tr->token.value.range.high);
+	return (scm_cons (lo, hi));
+      }
+
+    case SCM_TOKEN_SET:
+      return (scm_string_to_list
+	      (scm_from_locale_string (c_tr->token.value.set)));
+
+    default:
+      return SCM_UNSPECIFIED;
+    }
+
+  return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
 
 
 /* SMOB types.  */
@@ -980,6 +906,10 @@ token_reader_free (SCM tr)
       scm_token_reader_spec_t *c_spec;
 
       c_spec = (scm_token_reader_spec_t *)smobinfo->c_object;
+      if (c_spec->token.type == SCM_TOKEN_SET)
+	/* XXX: We're assuming we can safely do this when it's freeable.
+	   This is the actually the case when created from Scheme.  */
+	free ((void *)c_spec->token.value.set);
       free (c_spec);
     }
 
