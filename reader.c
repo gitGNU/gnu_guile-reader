@@ -76,6 +76,45 @@ while(0)
 
 
 
+/* Fill BUFFER with an ASCII representation of TR.  BUFFER must be at least
+   20-byte long.  */
+static inline void
+token_spec_to_string (const scm_token_reader_spec_t *tr,
+		      char *buffer)
+{
+  switch (tr->token.type)
+    {
+    case SCM_TOKEN_SINGLE:
+      sprintf (buffer, "char 0x%02x", tr->token.value.single);
+      break;
+
+    case SCM_TOKEN_RANGE:
+      sprintf (buffer, "range 0x%02x-0x%02x",
+	       tr->token.value.range.low, tr->token.value.range.high);
+      break;
+
+    case SCM_TOKEN_SET:
+      {
+	char first, last;
+	const char *p;
+
+	first = last = *tr->token.value.set;
+	for (p = tr->token.value.set; *p; p++)
+	  last = *p;
+
+	sprintf (buffer, "set 0x%02x..0x%02x", first, last);
+	break;
+      }
+
+    default:
+      sprintf (buffer, "<invalid 0x%02x>", tr->token.type);
+    }
+}
+
+#if 1 /* HAVE_LIGHTNING_H */
+
+/* The Lightning-based implementation of `scm_c_make_reader ()'.  */
+
 static void
 do_like_printf (const char *fmt, int i)
 {
@@ -115,40 +154,6 @@ do								\
 } while (0)
 
 
-/* Fill BUFFER with an ASCII representation of TR.  BUFFER must be at least
-   20-byte long.  */
-static inline void
-token_spec_to_string (const scm_token_reader_spec_t *tr,
-		      char *buffer)
-{
-  switch (tr->token.type)
-    {
-    case SCM_TOKEN_SINGLE:
-      sprintf (buffer, "char 0x%02x", tr->token.value.single);
-      break;
-
-    case SCM_TOKEN_RANGE:
-      sprintf (buffer, "range 0x%02x-0x%02x",
-	       tr->token.value.range.low, tr->token.value.range.high);
-      break;
-
-    case SCM_TOKEN_SET:
-      {
-	char first, last;
-	const char *p;
-
-	first = last = *tr->token.value.set;
-	for (p = tr->token.value.set; *p; p++)
-	  last = *p;
-
-	sprintf (buffer, "set 0x%02x..0x%02x", first, last);
-	break;
-      }
-
-    default:
-      sprintf (buffer, "<invalid 0x%02x>", tr->token.type);
-    }
-}
 
 static SCM
 do_scm_make_char (int chr)
@@ -505,6 +510,151 @@ scm_c_make_reader (void *code_buffer,
 
   return result;
 }
+
+
+#else /* HAVE_LIGHTNING_H */
+
+/* The slow Lightning-free implementation of `scm_c_make_reader ()' and
+   `scm_call_reader ()'.  */
+
+struct scm_reader
+{
+  char *whitespaces;
+  scm_token_reader_spec_t *token_readers;
+};
+
+scm_reader_t
+scm_c_make_reader (void *code_buffer,
+		   size_t buffer_size,
+		   const char *whitespaces,
+		   const scm_token_reader_spec_t *token_readers,
+		   int debug,
+		   size_t *code_size)
+{
+  char *ws;
+  struct scm_reader *result;
+  scm_token_reader_spec_t *tr_copy;
+  const scm_token_reader_spec_t *tr;
+  unsigned char *buffer = code_buffer;
+
+  *code_size = sizeof (*result) + strlen (whitespaces) + 1;
+  if (buffer_size < sizeof (*result) + strlen (whitespaces) + 1)
+    return NULL;
+
+  result = (struct scm_reader *)buffer;
+  ws = buffer + sizeof (*result);
+  tr_copy = (scm_token_reader_spec_t *)(ws + strlen (whitespaces) + 1);
+
+  result->whitespaces = ws;
+  result->token_readers = tr_copy;
+
+  memcpy (ws, whitespaces, strlen (whitespaces));
+
+  for (tr = token_readers;
+       tr->token.type != SCM_TOKEN_UNDEF;
+       tr++, tr_copy++, *code_size += sizeof (*tr))
+    {
+      if (*code_size + sizeof (*tr) > buffer_size)
+	return NULL;
+
+      memcpy (tr_copy, tr, sizeof (*tr));
+    }
+
+  /* Copy the terminating zero.  */
+  if (*code_size + sizeof (*tr) > buffer_size)
+    return NULL;
+
+  memcpy (tr_copy, tr, sizeof (*tr));
+  *code_size += sizeof (*tr);
+
+  return result;
+}
+
+static inline int
+tr_handles_char (const scm_token_reader_spec_t *tr, char c)
+{
+  switch (tr->token.type)
+    {
+    case SCM_TOKEN_SINGLE:
+      return (c == tr->token.value.single);
+
+    case SCM_TOKEN_RANGE:
+      return ((c >= tr->token.value.range.low)
+	      && (c <= tr->token.value.range.high));
+
+    case SCM_TOKEN_SET:
+      return (index (tr->token.value.set, c) ? 1 : 0);
+
+    default:
+      return 0;
+    }
+
+  return 0;
+}
+
+static SCM
+tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
+	   scm_reader_t reader)
+{
+  switch (tr->reader.type)
+    {
+    case SCM_TOKEN_READER_C:
+      return tr->reader.value.c_reader (c, port, reader);
+
+    case SCM_TOKEN_READER_SCM:
+      {
+	SCM s_reader;
+	SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader, 0);
+	return scm_call_3 (tr->reader.value.scm_reader,
+			   SCM_MAKE_CHAR (c), port, s_reader);
+      }
+
+    case SCM_TOKEN_READER_READER:
+      return scm_call_reader (tr->reader.value.reader, port);
+
+    default:
+      return SCM_UNSPECIFIED;
+    }
+
+  return SCM_UNSPECIFIED;
+}
+
+SCM
+scm_call_reader (scm_reader_t reader, SCM port)
+{
+  int c = 0;
+  scm_token_reader_spec_t *tr;
+  SCM result = SCM_UNSPECIFIED;
+
+ doit:
+  while ((c = scm_getc (port)) != EOF)
+    {
+      if (index (reader->whitespaces, c))
+	continue;
+
+      for (tr = reader->token_readers;
+	   tr->token.type != SCM_TOKEN_UNDEF;
+	   tr++)
+	{
+	  if (tr_handles_char (tr, c))
+	    {
+	      result = tr_invoke (tr, c, port, reader);
+	      if (result == SCM_UNSPECIFIED)
+		goto doit;
+	      else
+		return result;
+	    }
+	}
+
+      /* Unhandled character.  */
+      return SCM_UNSPECIFIED;
+    }
+
+  return SCM_EOF_VAL;
+}
+
+
+#endif /* HAVE_LIGHTNING_H */
 
 
 
@@ -880,7 +1030,7 @@ reader_apply (SCM reader, SCM port)
 
   SCM_READER_SMOB_DATA (c_reader, reader);
 
-  return (c_reader (port));
+  return (scm_call_reader (c_reader, port));
 }
 
 static SCM

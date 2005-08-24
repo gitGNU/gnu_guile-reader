@@ -3,7 +3,7 @@
    Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    Part of the code in here (a few `scm_token_reader_t' functions below) is
-   heavily based on Guile's code (file `read.c') which contain the following
+   based on Guile's code (file `read.c') which contain the following
    copyright line:
 
    Copyright (C) 1995,1996,1997,1999,2000,2001,2003, 2004 Free Software
@@ -24,6 +24,9 @@
    along with this library; if not, write to the Free Software Foundation,
    Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
+
+/* A library of stardard token readers that can be assembled to create a
+   reader equivalent to that of Guile.  */
 
 #include <libguile.h>
 #include <ctype.h>
@@ -88,9 +91,9 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
   if (')' == c)
     return SCM_EOL;
   scm_ungetc (c, port);
-  if (scm_is_eq (scm_sym_dot, (tmp = scm_reader (port))))
+  if (scm_is_eq (scm_sym_dot, (tmp = scm_call_reader (scm_reader, port))))
     {
-      ans = scm_reader (port);
+      ans = scm_call_reader (scm_reader, port);
       if (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
 	scm_i_input_error (FUNC_NAME, port, "missing close paren", SCM_EOL);
       return ans;
@@ -107,9 +110,9 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
       SCM new_tail;
 
       scm_ungetc (c, port);
-      if (scm_is_eq (scm_sym_dot, (tmp = scm_reader (port))))
+      if (scm_is_eq (scm_sym_dot, (tmp = scm_call_reader (scm_reader, port))))
 	{
-	  SCM_SETCDR (tl, tmp = scm_reader (port));
+	  SCM_SETCDR (tl, tmp = scm_call_reader (scm_reader, port));
 	  if (SCM_COPY_SOURCE_P)
 	    SCM_SETCDR (tl2, scm_cons (scm_is_pair (tmp)
 				       ? tmp /* FIXME: Was *copy */
@@ -499,7 +502,7 @@ scm_read_quote (int chr, SCM port, scm_reader_t scm_reader)
       abort ();
     }
 
-  p = scm_cons2 (p, scm_reader (port), SCM_EOL);
+  p = scm_cons2 (p, scm_call_reader (scm_reader, port), SCM_EOL);
   if (SCM_RECORD_POSITIONS_P)
     scm_whash_insert (scm_source_whash,
 		      p,
@@ -715,7 +718,7 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
       c = '#';
       /* The call below should yield a call to `scm_read_number ()' or some
 	 such.  */
-      return scm_reader (port);
+      return scm_call_reader (scm_reader, port);
 
     case '!':
       /* Only handle `#! ... !#' block comments if no user extension was
@@ -764,7 +767,7 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
 
       /* #:SYMBOL is a syntax for keywords supported in all contexts.  */
     case ':':
-      return scm_symbol_to_keyword (scm_reader (port));
+      return scm_symbol_to_keyword (scm_call_reader (scm_reader, port));
 
     default:
     callshrp:
@@ -961,7 +964,7 @@ scm_read_skribe_exp (int chr, SCM port, scm_reader_t scm_reader)
 	      c_literal_len = 0;
 	      scm_ungetc (c, port);
 	      subexp = scm_cons2 (scm_sym_unquote,
-				  scm_reader (port), SCM_EOL);
+				  scm_call_reader (scm_reader, port), SCM_EOL);
 	      result = scm_cons (subexp, result);
 	    }
 	  else

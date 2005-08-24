@@ -2,6 +2,25 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-08-24 17:04:06 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-7
+
+    Summary:
+      Implemented and tested the Lightning-free version of `scm_c_make_reader ()'.
+    Revision:
+      scheme-reader--devo--0.1--patch-7
+
+    * reader.h (scm_call_reader):  New macro.
+    
+    * reader.c (scm_call_reader):  New function.
+      (tr_handles_char):  New function.
+      (tr_invoke):  New function.
+    
+    * token-readers.c:  Call readers using `scm_call_reader ()'.
+
+    modified files:
+     ChangeLog reader.c reader.h token-readers.c
+
+
 2005-08-24 12:40:06 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-6
 
     Summary:

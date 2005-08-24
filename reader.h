@@ -24,7 +24,25 @@
 #include <lightning.h>
 
 
+#if 1 /* HAVE_LIGHTNING_H */
+
 typedef SCM (* scm_reader_t) (SCM port);
+
+/* Readers should *always* be called using the `scm_call_reader ()' macro
+   since this may be done differently in the non-Lightning case.  */
+#define scm_call_reader(_reader, _port)  ((_reader) (_port))
+
+#else
+
+typedef struct scm_reader *scm_reader_t;
+
+/* In the non-Lightning case, reader invocation relies on a slower, generic,
+   support function.  */
+extern SCM scm_call_reader (scm_reader_t reader, SCM port);
+
+#endif
+
+
 typedef SCM (* scm_token_reader_t) (int chr, SCM port, scm_reader_t reader);
 
 /* The way a token is defined.  */
