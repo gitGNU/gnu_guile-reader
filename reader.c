@@ -919,8 +919,7 @@ SCM_DEFINE (scm_standard_token_reader, "standard-token-reader", 1, 0, 0,
 
 SCM_DEFINE (scm_token_reader_proc, "token-reader-procedure", 1, 0, 0,
 	    (SCM tr),
-	    "Return the procedure attached to token reader @var{tr}, "
-	    "or @code{#f} if it's not a Scheme procedure.")
+	    "Return the procedure attached to token reader @var{tr}.")
 #define FUNC_NAME "token-reader-procedure"
 {
   scm_token_reader_spec_t *c_tr;
@@ -942,7 +941,17 @@ SCM_DEFINE (scm_token_reader_proc, "token-reader-procedure", 1, 0, 0,
       }
 
     case SCM_TOKEN_READER_C:
-      return SCM_BOOL_F;
+      {
+	char *name = NULL;
+	if (c_tr->name)
+	  {
+	    name = alloca (strlen (c_tr->name) + 20);
+	    strcpy (name, "%token-reader:");
+	    strcat (name, c_tr->name);
+	  }
+	SCM_RETURN_NEWSMOB (scm_token_reader_proc_type,
+			    c_tr->reader.value.c_reader);
+      }
 
     default:
       return SCM_UNSPECIFIED;
@@ -991,7 +1000,8 @@ SCM_DEFINE (scm_token_reader_spec, "token-reader-specification", 1, 0, 0,
 
 
 /* SMOB types.  */
-scm_t_bits scm_reader_type, scm_token_reader_type;
+scm_t_bits scm_reader_type, scm_token_reader_type,
+  scm_token_reader_proc_type;
 
 static SCM
 reader_mark (SCM reader)
@@ -1070,22 +1080,38 @@ token_reader_free (SCM tr)
   return 0;
 }
 
-#if 0
 static SCM
-token_reader_apply (SCM tr, SCM chr, SCM port, SCM reader)
+token_reader_proc_mark (SCM tr_proc)
 {
-  /* FIXME:  Type checking */
-  scm_reader_t c_reader;
-  scm_token_reader_t c_tr;
-  int c_chr;
+  return SCM_BOOL_F;
+}
 
-  c_tr = (scm_token_reader_t)SCM_SMOB_DATA (tr);
-  c_reader = (scm_reader_t)SCM_SMOB_DATA (reader);
+static size_t
+token_reader_proc_free (SCM tr_proc)
+{
+  return 0;
+}
+
+static SCM
+token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
+#define FUNC_NAME "%token-reader-proc-apply"
+{
+  int c_chr;
+  scm_reader_t c_reader;
+  scm_token_reader_t c_tr_proc;
+
+  SCM_VALIDATE_CHAR (1, chr);
+  SCM_VALIDATE_PORT (2, port);
+  /* FIXME:  We should be able to accept arbitrary Scheme procs as well.  */
+  scm_assert_smob_type (scm_reader_type, reader);
+
+  c_tr_proc = (scm_token_reader_t)SCM_SMOB_DATA (tr_proc);
+  SCM_READER_SMOB_DATA (c_reader, reader);
   c_chr = SCM_CHAR (chr);
 
-  return (c_tr (c_chr, port, c_reader));
+  return (c_tr_proc (c_chr, port, c_reader));
 }
-#endif
+#undef FUNC_NAME
 
 
 
@@ -1101,6 +1127,12 @@ scm_reader_init_bindings (void)
   scm_token_reader_type = scm_make_smob_type ("token-reader", 0);
   scm_set_smob_mark (scm_token_reader_type, token_reader_mark);
   scm_set_smob_free (scm_token_reader_type, token_reader_free);
+
+  scm_token_reader_proc_type = scm_make_smob_type ("token-reader-proc", 0);
+  scm_set_smob_mark (scm_token_reader_proc_type, token_reader_proc_mark);
+  scm_set_smob_free (scm_token_reader_proc_type, token_reader_proc_free);
+  scm_set_smob_apply (scm_token_reader_proc_type, token_reader_proc_apply,
+		      3, 0, 0);
 
 #include "reader.c.x"
 

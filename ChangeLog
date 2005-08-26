@@ -2,6 +2,27 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-08-26 16:00:40 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-8
+
+    Summary:
+      Added a SMOB type representing C-implemented token reader procedures.
+    Revision:
+      scheme-reader--devo--0.1--patch-8
+
+    * reader.c (token-reader-procedure):  Return a `token-reader-proc' SMOB
+      is reader is a C reader.
+      (scm_token_reader_proc_type):  New variable.
+      (token_reader_proc_apply):  New proc.
+      (token_reader_proc_free):  New proc.
+      (token_reader_proc_mark):  New proc.
+      (scm_reader_init_bindings):  Init the new SMOB type.
+    
+    * reader.h (scm_token_reader_proc_type):  New declaration.
+
+    modified files:
+     ChangeLog reader.c reader.h
+
+
 2005-08-24 17:04:06 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-7
 
     Summary:
