@@ -1,4 +1,4 @@
-/* A dynamic Scheme reader compiler.
+/* A Scheme reader compiler for Guile.
 
    Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
@@ -73,6 +73,38 @@ read_token (SCM port, char *buf, size_t buf_size, size_t *read)
 
 /* Readers (mostly) stolen from Guile.  */
 
+
+/* A simplified version of `scm_flush_ws ()' that makes no assumption about
+   the comment syntax being used (in particular, it doesn't assume SCSH block
+   comments).  */
+static int
+_flush_ws (SCM port, const char *eoferr)
+{
+  register int c;
+  while (1)
+    switch (c = scm_getc (port))
+      {
+      case EOF:
+	if (eoferr)
+	  {
+	    scm_i_input_error (eoferr,
+			       port,
+			       "end of file",
+			       SCM_EOL);
+	  }
+	return c;
+
+      case SCM_LINE_INCREMENTORS:
+      case SCM_SINGLE_SPACES:
+      case '\t':
+	break;
+      default:
+	return c;
+      }
+}
+
+#define scm_flush_ws _flush_ws
+
 SCM
 scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
 #define FUNC_NAME "scm_read_sexp"
@@ -90,21 +122,27 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
   c = scm_flush_ws (port, "scm_read_sexp");
   if (')' == c)
     return SCM_EOL;
+
   scm_ungetc (c, port);
   if (scm_is_eq (scm_sym_dot, (tmp = scm_call_reader (scm_reader, port))))
     {
       ans = scm_call_reader (scm_reader, port);
       if (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
-	scm_i_input_error (FUNC_NAME, port, "missing close paren", SCM_EOL);
+	scm_i_input_error (FUNC_NAME, port, "missing closing paren",
+			   SCM_EOL);
       return ans;
     }
+
   /* Build the head of the list structure. */
   ans = tl = scm_cons (tmp, SCM_EOL);
+#if 0
   if (SCM_COPY_SOURCE_P)
     ans2 = tl2 = scm_cons (scm_is_pair (tmp)
 			   ? tmp /* FIXME: was *copy */
 			   : tmp,
 			   SCM_EOL);
+#endif
+
   while (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
     {
       SCM new_tail;
@@ -113,14 +151,17 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
       if (scm_is_eq (scm_sym_dot, (tmp = scm_call_reader (scm_reader, port))))
 	{
 	  SCM_SETCDR (tl, tmp = scm_call_reader (scm_reader, port));
+#if 0
 	  if (SCM_COPY_SOURCE_P)
 	    SCM_SETCDR (tl2, scm_cons (scm_is_pair (tmp)
 				       ? tmp /* FIXME: Was *copy */
 				       : tmp,
 				       SCM_EOL));
+#endif
+
 	  if (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
 	    scm_i_input_error (FUNC_NAME, port,
-			       "missing close paren", SCM_EOL);
+			       "in pair:  missing closing paren", SCM_EOL);
 	  goto exit;
 	}
 
@@ -128,6 +169,7 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
       SCM_SETCDR (tl, new_tail);
       tl = new_tail;
 
+#if 0
       if (SCM_COPY_SOURCE_P)
 	{
 	  SCM new_tail2 = scm_cons (scm_is_pair (tmp)
@@ -136,6 +178,7 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
 	  SCM_SETCDR (tl2, new_tail2);
 	  tl2 = new_tail2;
 	}
+#endif
     }
 exit:
   scm_whash_insert (scm_source_whash,
@@ -152,6 +195,8 @@ exit:
 }
 #undef FUNC_NAME
 
+#undef scm_flush_ws
+
 SCM
 scm_read_string (int chr, SCM port, scm_reader_t scm_reader)
 #define FUNC_NAME "scm_read_string"
@@ -166,7 +211,7 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader)
     {
       if (c == EOF)
 	str_eof: scm_i_input_error (FUNC_NAME, port,
-				    "end of file in string constant", 
+				    "end of file in string constant",
 				    SCM_EOL);
 
       while (j + 2 >= scm_i_string_length (tok_buf))
@@ -545,9 +590,9 @@ skip_scsh_block_comment (SCM port)
   for (;;)
     {
       int c = scm_getc (port);
-      
+
       if (c == EOF)
-	scm_i_input_error ("skip_block_comment", port, 
+	scm_i_input_error ("skip_block_comment", port,
 			   "unterminated `#! ... !#' comment", SCM_EOL);
 
       if (c == '!')
@@ -559,54 +604,7 @@ skip_scsh_block_comment (SCM port)
     }
 }
 
-/* recsexpr is used when recording expressions
- * constructed by read:sharp.
- */
-static inline SCM
-recsexpr (SCM obj, long line, int column, SCM filename)
-{
-  if (!scm_is_pair(obj)) {
-    return obj;
-  } else {
-    SCM tmp = obj, copy;
-    /* If this sexpr is visible in the read:sharp source, we want to
-       keep that information, so only record non-constant cons cells
-       which haven't previously been read by the reader. */
-    if (scm_is_false (scm_whash_lookup (scm_source_whash, obj)))
-      {
-	if (SCM_COPY_SOURCE_P)
-	  {
-	    copy = scm_cons (recsexpr (SCM_CAR (obj), line, column, filename),
-			     SCM_UNDEFINED);
-	    while ((tmp = SCM_CDR (tmp)) && scm_is_pair (tmp))
-	      {
-		SCM_SETCDR (copy, scm_cons (recsexpr (SCM_CAR (tmp),
-						      line,
-						      column,
-						      filename),
-					    SCM_UNDEFINED));
-		copy = SCM_CDR (copy);
-	      }
-	    SCM_SETCDR (copy, tmp);
-	  }
-	else
-	  {
-	    recsexpr (SCM_CAR (obj), line, column, filename);
-	    while ((tmp = SCM_CDR (tmp)) && scm_is_pair (tmp))
-	      recsexpr (SCM_CAR (tmp), line, column, filename);
-	    copy = SCM_UNDEFINED;
-	  }
-	scm_whash_insert (scm_source_whash,
-			  obj,
-			  scm_make_srcprops (line,
-					     column,
-					     filename,
-					     copy,
-					     SCM_EOL));
-      }
-    return obj;
-  }
-}
+
 
 #if 0 /* XXX This function was originally used for `read-hash-extend', but do
 	 we care any longer?  */
@@ -1044,6 +1042,11 @@ scm_reader_t scm_standard_sharp_reader = NULL;
 /* A default, Scheme-like, reader specification.  */
 scm_token_reader_spec_t scm_reader_standard_specs[] =
   {
+    /* Whitespaces are defined using a NULL reader:  characters in this range
+       are just ignored by the reader.  XXX:  The set itself cannot contain
+       the null character.  */
+    SCM_DEFTOKEN_RANGE ('\1', ' ', "whitespace", NULL),
+
     SCM_DEFTOKEN_SINGLE ('(', "sexp",   scm_read_sexp),
     SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string),
 
@@ -1055,7 +1058,8 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
        `.' as a symbol.  */
     SCM_DEFTOKEN_RANGE ('a', 'z', "symbol-lower-case", scm_read_symbol),
     SCM_DEFTOKEN_RANGE ('A', 'Z', "symbol-upper-case", scm_read_symbol),
-    SCM_DEFTOKEN_SET (".+-/*%@_", "symbol-misc-chars",  scm_read_symbol),
+    SCM_DEFTOKEN_SET (".+-/*%@_<>!=?$",
+		      "symbol-misc-chars",  scm_read_symbol),
 
     SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote", scm_read_quote),
 
@@ -1102,7 +1106,6 @@ scm_load_standard_reader (void)
       scm_standard_sharp_reader =
 	scm_c_make_reader (standard_sharp_reader_code,
 			   sizeof (standard_sharp_reader_code),
-			   " \t\n",
 			   scm_sharp_reader_standard_specs,
 			   0,
 			   &code_size);
@@ -1131,7 +1134,6 @@ scm_load_standard_reader (void)
       scm_standard_reader =
 	scm_c_make_reader (standard_reader_code,
 			   sizeof (standard_reader_code),
-			   " \t\n",
 			   scm_reader_standard_specs,
 			   0,
 			   &code_size);

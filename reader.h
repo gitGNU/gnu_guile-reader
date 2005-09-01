@@ -1,4 +1,4 @@
-/* A dynamic Scheme reader compiler.
+/* A Scheme reader compiler for Guile.
 
    Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
@@ -23,8 +23,10 @@
 #include <libguile.h>
 #include <lightning.h>
 
+#include "reader-config.h"
 
-#if 1 /* HAVE_LIGHTNING_H */
+
+#ifdef SCM_READER_USE_LIGHTNING
 
 typedef SCM (* scm_reader_t) (SCM port);
 
@@ -100,14 +102,13 @@ typedef scm_token_reader_spec_t *scm_reader_spec_t;
 
 
 /* Return a pointer to a reader function compliant with the specifications in
-   WHITESPACES and TOKEN_READERS.  If DEBUG is non-zero, debugging code is
-   generated.  If CODE_BUFFER, of BUFFER_SIZE bytes, is too small to contain
-   the generated code, NULL is returned and CODE_SIZE is set to the size of
-   the generated code at this point.  On success, CODE_SIZE is also set to
-   the actual size of the generated code.  */
+   TOKEN_READERS.  If DEBUG is non-zero, debugging code is generated.  If
+   CODE_BUFFER, of BUFFER_SIZE bytes, is too small to contain the generated
+   code, NULL is returned and CODE_SIZE is set to the size of the generated
+   code at this point.  On success, CODE_SIZE is also set to the actual size
+   of the generated code.  */
 extern scm_reader_t scm_c_make_reader (void *code_buffer,
 				       size_t buffer_size,
-				       const char *whitespaces,
 				       const scm_token_reader_spec_t *specs,
 				       int debug,
 				       size_t *code_size);

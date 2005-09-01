@@ -6,7 +6,7 @@ AC_INIT(scheme-reader, 0.1, ludovic.courtes@laas.fr)
 AM_INIT_AUTOMAKE(scheme-reader, 0.1)
 
 AC_CONFIG_SRCDIR([reader.c])
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADER([config.h reader-config.h])
 
 # Checks for programs.
 AC_PROG_CC

@@ -2,6 +2,54 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-09-01 16:19:34 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-9
+
+    Summary:
+      Merge with laptop:  various bug fixes and an API improvement (still buggy).
+    Revision:
+      scheme-reader--devo--0.1--patch-9
+
+    Patches applied:
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--base-0
+       tag of lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1--patch-2
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-1
+       Merged with the main development branch.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-2
+       Optimized a bit the `token-reader-proc' case.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-3
+       Fixed two bugs that showed up when SCSH block comments were used.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-4
+       Simplification of `scm_c_make_reader ()';  small bug fixes.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-5
+       Various GC-related and other bug fixes.
+    
+
+    new files:
+     .arch-ids/INSTALL.id .arch-ids/reader-config.h.in.id INSTALL
+     reader-config.h.in test-repl.scm
+
+    removed files:
+     .arch-ids/test-repl.scm.id test-repl.scm
+
+    modified files:
+     ChangeLog Makefile.am README configure.ac reader.c reader.h
+     token-readers.c token-readers.h {arch}/=tagging-method
+
+    new patches:
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--base-0
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-1
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-2
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-3
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-4
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-5
+
+
 2005-08-26 16:00:40 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-8
 
     Summary:

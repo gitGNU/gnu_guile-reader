@@ -1,15 +1,37 @@
 scheme-reader, an extensible, fast, reader for Guile
 ====================================================
 
+Introduction
+------------
+
 The idea: provide an extensible, yet fast, reader for Guile, GNU's
-Scheme interpreter library.  Guile currently provides limited extensibility
-of its reader, by means of `read-hash-extend', for instance, or `read-enable'
-and the likes.  The point here is to be able to create a completely
-customizable Scheme reader using basic building-blocks such as an
-R5RS string reader, an sexp reader, etc., or even user-defined readers.
+Scheme interpreter library.  Guile currently provides limited
+extensibility of its reader, by means of `read-hash-extend', for
+instance, or `read-enable' and the likes.  Moreover, while this may not
+always be desirable, those extension facilities have a global effect,
+changing the behavior of the sole reader implementation available at
+run-time.  This makes it impossible to have, for instance, one module
+consider names starting with `:' as symbols, while another considers
+them as keywords.
+
+Extensions such as the read syntax for SRFI-4 numeric vectors had to be
+added to Guile's built-in C reader.  Syntactic extensions that did not
+appeal the majority of users, like Emacs-Lisp vectors, are #ifdef'd
+within the reader code and are not available by default.  Moreover, some
+extensions are incompatible with each other, such as the DSSSL keyword
+syntax and the SCSH block comments.  In short the current reader syntax
+is hardly extensible.
+
+The point here is to be able to create a completely customizable Scheme
+reader using basic building-blocks such as an R5RS string reader, an
+sexp reader, etc., or even user-defined readers.
 
 In order to achieve performance equivalent (or better?) to Guile's C
-hand-coded reader, scheme-reader relies on GNU Lightning to compile readers
-to native code.
+hand-coded reader, scheme-reader relies on GNU Lightning to compile
+readers to native code.  For compatibility, a Lightning-free, slower
+implementation is available for platforms not supported by Lightning.
 
-Ludovic <ludovic.courtes@laas.fr>.
+
+August 2005.
+
+Ludovic Courtès <ludovic.courtes@laas.fr>.

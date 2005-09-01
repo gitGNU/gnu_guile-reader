@@ -1,4 +1,4 @@
-/* A dynamic Scheme reader compiler.
+/* A Scheme reader compiler for Guile.
 
    Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
