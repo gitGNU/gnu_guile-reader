@@ -61,7 +61,8 @@ reader for Guile!~%~%")
                               extended-symbol
                               boolean keyword
                               block-comment)))
-               #f))
+               (lambda (chr port read)
+                 (error "unexpected character after `#'" chr))))
 
 (define the-reader
   ;; The top-level reader.  It reuses the previously defined reader for `#'
@@ -73,10 +74,11 @@ reader for Guile!~%~%")
                               symbol-lower-case
                               symbol-upper-case
                               symbol-misc-chars
+                              colon-keyword
                               quote-quasiquote-unquote
                               semicolon-comment
-                              skribe-exp)))
-               #f))
+                              skribe-exp)))))
+
 
 ;; And now the REPL itself.
 (let loop ((reader the-reader))

@@ -33,6 +33,37 @@
 #endif
 
 
+/* Debugging support.  */
+static void debug (const char *, ...)
+#ifdef __GNUC__
+     __attribute__ ((format (printf, 1, 2)))
+#endif
+     ;
+
+#ifdef DEBUG
+#include <stdio.h>
+
+static __inline__ void
+debug (const char *fmt, ...)
+{
+  va_list ap;
+
+  va_start (fmt, ap);
+  vfprintf (stderr, fmt, ap);
+  va_end (ap);
+}
+
+#else
+
+static __inline__ void
+debug (const char *fmt, ...)
+{
+  /* Nothing.  */
+}
+
+#endif /* DEBUG */
+
+
 
 /* SMOB helper data structures and macros.  */
 
@@ -163,9 +194,8 @@ do								\
 static SCM
 do_scm_make_char (int chr)
 {
-#ifdef DEBUG
-  printf ("%s: got char %i\n", __FUNCTION__, chr);
-#endif
+  debug ("%s: got char %i\n", __FUNCTION__, chr);
+
   return SCM_MAKE_CHAR (chr);
 }
 
@@ -178,7 +208,7 @@ do_scm_make_reader_smob (scm_reader_t reader)
      will be a short-lived SMOB.  */
   SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader, NULL, 0);
 
-  printf ("d-s-m-r-s: new reader @ %p [SCM %p]\n", reader, s_reader);
+  debug ("d-s-m-r-s: new reader @ %p [SCM %p]\n", reader, s_reader);
 
   return s_reader;
 }
@@ -188,6 +218,7 @@ scm_reader_t
 scm_c_make_reader (void *code_buffer,
 		   size_t buffer_size,
 		   const scm_token_reader_spec_t *token_readers,
+		   SCM fault_handler,
 		   int debug,
 		   size_t *code_size)
 {
@@ -205,16 +236,19 @@ scm_c_make_reader (void *code_buffer,
   jit_insn *jumps[20], *ref, *do_again, *jump_to_end;
   size_t jump_count = 0;
   const scm_token_reader_spec_t *tr;
-  SCM in;
+  SCM arg_port;
+  int arg_caller_handled;
 
   result = (scm_reader_t) (jit_set_ip (code_buffer).iptr);
   start = jit_get_ip ().ptr;
 
-  /* Take one argument (the port) and put it into V0 (preserved accross
-     function calls).  */
-  jit_prolog (1);
-  in = (void *)jit_arg_p ();
-  jit_getarg_p (JIT_V0, in);
+  /* Take two arguments (the port and an `int') and put them into V0 and V2
+     (preserved accross function calls).  */
+  jit_prolog (2);
+  arg_port = (SCM)jit_arg_p ();
+  jit_getarg_p (JIT_V0, arg_port);
+  arg_caller_handled = jit_arg_i ();
+  jit_getarg_i (JIT_V2, arg_caller_handled);
 
   /* The PORT argument is optional.  If not passed (i.e. equals to
      SCM_UNDEFINED), default to the current input port.  */
@@ -381,16 +415,18 @@ scm_c_make_reader (void *code_buffer,
 	      if (debug)
 		{
 		  CHECK_CODE_SIZE (buffer_size, start);
-		  jit_movr_p (JIT_V2, JIT_RET);
+		  jit_movr_p (JIT_V1, JIT_RET);
 		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 				 name, JIT_R1, do_like_printf);
-		  jit_movr_p (JIT_RET, JIT_V2);
+		  jit_movr_p (JIT_RET, JIT_V1);
 		}
 
-	      /* When the reader returns SCM_UNSPECIFIED, then start again.
-		 This is what, for instance, comment readers do.  */
 	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
+	      if (!tr->escape)
+		/* When the reader returns SCM_UNSPECIFIED, then start again.
+		   This is what, for instance, comment readers do in the
+		   top-level reader.  */
+		jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
 	    }
 	  else
 	    /* The NULL reader:  simply ignore the character that was just
@@ -421,7 +457,7 @@ scm_c_make_reader (void *code_buffer,
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_V1);
 	      jit_finish (do_scm_make_char);
-	      jit_retval_p (JIT_R2);
+	      jit_retval_p (JIT_V1);
 
 	      /* Same for the reader.  */
 	      jit_movi_p (JIT_R0, start);
@@ -437,23 +473,25 @@ scm_c_make_reader (void *code_buffer,
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_pusharg_p (JIT_R0); /* reader */
 	      jit_pusharg_p (JIT_V0); /* port */
-	      jit_pusharg_p (JIT_R2); /* character */
+	      jit_pusharg_p (JIT_V1); /* character */
 	      jit_pusharg_p (JIT_R1); /* procedure */
 	      jit_finish (scm_call_3);
 
 	      if (debug)
 		{
 		  CHECK_CODE_SIZE (buffer_size, start);
-		  jit_retval_p (JIT_V2);
+		  jit_retval_p (JIT_V1);
 		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 				 "spec_str", JIT_R1, do_like_printf);
-		  jit_movr_p (JIT_RET, JIT_V2);
+		  jit_movr_p (JIT_RET, JIT_V1);
 		}
 
-	      /* When the reader returns SCM_UNSPECIFIED, then start again.
-		 This is what, for instance, comment readers do.  */
 	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
+	      if (!tr->escape)
+		/* When the reader returns SCM_UNSPECIFIED, then start again.
+		   This is what, for instance, comment readers do in the
+		   top-level reader.  */
+		jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
 	    }
 	  else
 	    jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
@@ -483,16 +521,18 @@ scm_c_make_reader (void *code_buffer,
 	      if (debug)
 		{
 		  CHECK_CODE_SIZE (buffer_size, start);
-		  jit_retval_p (JIT_V2);
+		  jit_retval_p (JIT_V1);
 		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 				 "spec_str", JIT_R1, do_like_printf);
-		  jit_movr_p (JIT_RET, JIT_V2);
+		  jit_movr_p (JIT_RET, JIT_V1);
 		}
 
-	      /* When the reader returns SCM_UNSPECIFIED, then start again.
-		 This is what, for instance, comment readers do.  */
 	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
+	      if (!tr->escape)
+		/* When the reader returns SCM_UNSPECIFIED, then start again.
+		   This is what, for instance, comment readers do in the
+		   top-level reader.  */
+		jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
 	    }
 	  else
 	    /* The NULL reader:  simply ignore the character that was just
@@ -520,15 +560,59 @@ scm_c_make_reader (void *code_buffer,
     }
 
   /* When this point is reached, then no handler was specified for the
-     character we just read.  So we return it to PORT.  */
-  CHECK_CODE_SIZE (buffer_size, start);
-  jit_prepare (2);
-  jit_pusharg_p (JIT_V0);
-  jit_pusharg_i (JIT_V1);
-  jit_finish (scm_ungetc);
+     character we just read.  */
+  if (scm_procedure_p (fault_handler) == SCM_BOOL_T)
+    {
+      /* Check whether the CALLER_HANDLED argument is true, in which case
+	 we'll simply return the faulty character to PORT and return.  */
+      CHECK_CODE_SIZE (buffer_size, start);
+      ref = jit_beqi_i (jit_forward (), JIT_V2, 0);
+      jit_prepare (2);
+      jit_pusharg_p (JIT_V0);
+      jit_pusharg_i (JIT_V1);
+      jit_finish (scm_ungetc);
+
+      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+      jit_ret ();
+
+      jit_patch (ref);
+
+      /* Else, since CALLER_HANDLED is false, call the user-defined fault
+	 handler.  */
+      CHECK_CODE_SIZE (buffer_size, start);
+      jit_prepare (1);
+      jit_pusharg_p ((void *)start);
+      jit_finish (do_scm_make_reader_smob);
+      jit_retval_p (JIT_V2);
+
+      jit_prepare (1);
+      jit_pusharg_i (JIT_V1);
+      jit_finish (do_scm_make_char);
+      jit_retval_p (JIT_R1);
+
+      CHECK_CODE_SIZE (buffer_size, start);
+      jit_movi_p (JIT_R0, (void *)fault_handler);
+      jit_prepare (4);
+      jit_pusharg_p (JIT_V2);  /* reader */
+      jit_pusharg_p (JIT_V0);  /* port */
+      jit_pusharg_p (JIT_R1);  /* character */
+      jit_pusharg_p (JIT_R0);  /* procedure */
+      jit_finish (scm_call_3);
+    }
+  else
+    {
+      /* The user did not define any method to handle this situation so
+	 return the faulty character to PORT.  */
+      CHECK_CODE_SIZE (buffer_size, start);
+      jit_prepare (2);
+      jit_pusharg_p (JIT_V0);
+      jit_pusharg_i (JIT_V1);
+      jit_finish (scm_ungetc);
+
+      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+    }
 
   CHECK_CODE_SIZE (buffer_size, start);
-  jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
   jit_ret ();
 
   /* This is where we get when `scm_getc ()' returned EOF.  */
@@ -540,7 +624,9 @@ scm_c_make_reader (void *code_buffer,
   jit_flush_code (start, end);
 
   *code_size = end - start;
-  printf ("generated %u bytes of code\n", end - start);
+  if (debug)
+    printf ("generated %u bytes of code\n", end - start);
+
   assert (*code_size <= buffer_size);
 
   return result;
@@ -644,7 +730,7 @@ tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
 
     case SCM_TOKEN_READER_READER:
       if (tr->reader.value.reader)
-	return scm_call_reader (tr->reader.value.reader, port);
+	return scm_call_reader (tr->reader.value.reader, port, 0);
       else
 	return SCM_UNDEFINED;
 
@@ -656,7 +742,7 @@ tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
 }
 
 SCM
-scm_call_reader (scm_reader_t reader, SCM port)
+scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
 #define FUNC_NAME "%call-reader"
 {
   int c = 0;
@@ -806,12 +892,12 @@ SCM_DEFINE (dynr_do_stuff, "do-stuff", 1, 0, 0,
 }
 #endif
 
-SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 0,
-	    (SCM token_readers, SCM debug_p),
+SCM_DEFINE (scm_make_reader, "make-reader", 1, 2, 0,
+	    (SCM token_readers, SCM fault_handler_proc, SCM debug_p),
 	    "Create a reader.")
 #define FUNC_NAME "make-reader"
 {
-  SCM s_reader, *s_tr;
+  SCM s_reader, *s_deps;
   scm_reader_t reader;
   size_t code_size = 1024;
   jit_insn *code_buffer;
@@ -820,11 +906,15 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 0,
   scm_token_reader_spec_t *c_specs;
 
   SCM_VALIDATE_LIST (1, token_readers);
+  if (fault_handler_proc == SCM_UNDEFINED)
+    fault_handler_proc = scm_reader_standard_fault_handler_proc;
+  else if (fault_handler_proc != SCM_BOOL_F)
+    SCM_VALIDATE_PROC (2, fault_handler_proc);
 
   /* Convert the list TOKEN_READERS to a C array in C_SPECS.  */
   token_reader_count = scm_to_uint (scm_length (token_readers));
   c_specs = alloca ((token_reader_count + 1) * sizeof (*c_specs));
-  s_tr = scm_malloc ((token_reader_count + 1) * sizeof (*s_tr));
+  s_deps = scm_malloc ((token_reader_count + 2) * sizeof (SCM));
   for (i = 0;
        i < token_reader_count;
        i++, token_readers = SCM_CDR (token_readers))
@@ -838,7 +928,7 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 0,
 
       /* Keep a copy of the TR SMOBs that the reader being built depends
 	 on.  */
-      s_tr[i] = tr;
+      s_deps[i] = tr;
     }
 
   /* Make it a zero-terminated array.  */
@@ -846,8 +936,12 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 0,
   c_specs[i].name = NULL;
   c_specs[i].reader.type = SCM_TOKEN_READER_UNDEF;
 
+  if (fault_handler_proc != SCM_BOOL_F)
+    /* Add the fault handler proc as part of the SMOB's dependencies.  */
+    s_deps[i++] = fault_handler_proc;
+
   /* Terminate the SMOB array with `#f'.  */
-  s_tr[i] = SCM_BOOL_F;
+  s_deps[i] = SCM_BOOL_F;
 
   /* Go ahead with the reader compilation process.  */
   code_buffer = scm_malloc (code_size);
@@ -855,14 +949,14 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 0,
   do
     {
       reader = scm_c_make_reader (code_buffer, code_size,
-				  c_specs,
+				  c_specs, fault_handler_proc,
 				  (debug_p == SCM_UNDEFINED) ? 0
 				  : ((debug_p == SCM_BOOL_F) ? 0 : 1),
 				  &actual_size);
       if (!reader)
 	{
-	  printf ("%s: reader too small (%u vs. %u)\n",
-		  __FUNCTION__, code_size, actual_size);
+	  debug ("%s: reader too small (%u vs. %u)\n",
+		 __FUNCTION__, code_size, actual_size);
 	  code_size <<= 1;
 	  code_buffer = scm_realloc (code_buffer, code_size);
 	}
@@ -873,9 +967,9 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 0,
 
   /* Return a "freeable" SMOB, i.e. whose memory is owned and managed by
      Scheme code.  */
-  SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader, s_tr, 1);
+  SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader, s_deps, 1);
 
-  printf ("new reader @ %p [SCM %p]\n", reader, s_reader);
+  debug ("new reader @ %p [SCM %p]\n", reader, s_reader);
   return (s_reader);
 }
 #undef FUNC_NAME
@@ -892,10 +986,12 @@ SCM_DEFINE (scm_default_reader, "default-reader", 0, 0, 0,
   return (s_reader);
 }
 
-SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 0, 0,
-	    (SCM spec, SCM proc),
+SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
+	    (SCM spec, SCM proc, SCM escape_p),
 	    "Use procedure (or reader) @var{proc} as a token reader for "
-	    "the characters defined by @var{spec}.")
+	    "the characters defined by @var{spec}.  If @var{escape_p} is true, "
+	    "then the reader this token reader belongs to should return "
+	    "even if its result is undefined.")
 #define FUNC_NAME "make-token-reader"
 {
   SCM s_token_reader;
@@ -903,6 +999,11 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 0, 0,
 
   if (proc != SCM_BOOL_F)
     SCM_VALIDATE_PROC (2, proc);
+
+  if (escape_p == SCM_UNDEFINED)
+    escape_p = SCM_BOOL_F;
+  else
+    SCM_VALIDATE_BOOL (3, escape_p);
 
   c_spec = scm_malloc (sizeof (scm_token_reader_spec_t));
 
@@ -948,6 +1049,7 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 0, 0,
 		 scm_list_1 (proc), SCM_EOL);
     }
 
+  c_spec->escape = (escape_p == SCM_BOOL_T) ? 1 : 0;
   c_spec->name = NULL;
 
   /* Return a "freeable" SMOB.  */
@@ -1008,8 +1110,8 @@ SCM_DEFINE (scm_token_reader_proc, "token-reader-procedure", 1, 0, 0,
 					handled by another SMOB pointing to
 					the same reader.  */
 			       0);
-	  printf ("t-r-p: new reader @ %p [SCM %p]\n",
-		  c_tr->reader.value.reader, s_reader);
+	  debug ("t-r-p: new reader @ %p [SCM %p]\n",
+		 c_tr->reader.value.reader, s_reader);
 	  return (s_reader);
 	}
       else
@@ -1075,6 +1177,20 @@ SCM_DEFINE (scm_token_reader_spec, "token-reader-specification", 1, 0, 0,
 }
 #undef FUNC_NAME
 
+SCM_DEFINE (scm_token_reader_escape_p, "token-reader-escape?", 1, 0, 0,
+	    (SCM tr),
+	    "Return @code{#t} if token reader @var{tr} requires the readers "
+	    "that use it to return even if its return value is unspecified.")
+#define FUNC_NAME "token-reader-escape?"
+{
+  scm_token_reader_spec_t *c_tr;
+
+  scm_assert_smob_type (scm_token_reader_type, tr);
+
+  return (c_tr->escape ? SCM_BOOL_T : SCM_BOOL_F);
+}
+#undef FUNC_NAME
+
 
 
 /* SMOB types.  */
@@ -1120,7 +1236,7 @@ reader_free (SCM reader)
 
       c_reader = (scm_reader_t)smobinfo->c_object;
       assert (c_reader);
-      printf ("freeing reader %p [SCM %p]\n", c_reader, reader);
+      debug ("freeing reader %p [SCM %p]\n", c_reader, reader);
       free (c_reader);
     }
 
@@ -1132,7 +1248,7 @@ reader_free (SCM reader)
 }
 
 static SCM
-reader_apply (SCM reader, SCM port)
+reader_apply (SCM reader, SCM port, SCM caller_handled)
 {
   scm_reader_t c_reader;
 
@@ -1141,7 +1257,8 @@ reader_apply (SCM reader, SCM port)
   /* Type checking and optional argument definition are checked in either
      `scm_call_reader ()' or the compiled reader's code.  */
 
-  return (scm_call_reader (c_reader, port));
+  return (scm_call_reader (c_reader, port,
+			   (caller_handled == SCM_BOOL_T) ? 1 :0));
 }
 
 static SCM
@@ -1223,7 +1340,7 @@ scm_reader_init_bindings (void)
   scm_reader_type = scm_make_smob_type ("reader", 0);
   scm_set_smob_mark (scm_reader_type, reader_mark);
   scm_set_smob_free (scm_reader_type, reader_free);
-  scm_set_smob_apply (scm_reader_type, reader_apply, 0, 1, 0);
+  scm_set_smob_apply (scm_reader_type, reader_apply, 0, 2, 0);
 
   scm_token_reader_type = scm_make_smob_type ("token-reader", 0);
   scm_set_smob_mark (scm_token_reader_type, token_reader_mark);

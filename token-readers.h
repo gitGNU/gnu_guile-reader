@@ -57,6 +57,9 @@ extern const scm_token_reader_spec_t scm_reader_misc_specs[];
 extern scm_reader_t scm_standard_reader;
 extern scm_reader_t scm_standard_sharp_reader;
 
+/* A standard reader fault handler.  */
+extern SCM scm_reader_standard_fault_handler_proc;
+
 /* Look for a token reader named NAME in the standard token readers and
    return its specification if found, otherwise return NULL.  */
 extern const scm_token_reader_spec_t *

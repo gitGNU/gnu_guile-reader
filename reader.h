@@ -28,11 +28,16 @@
 
 #ifdef SCM_READER_USE_LIGHTNING
 
-typedef SCM (* scm_reader_t) (SCM port);
+typedef SCM (* scm_reader_t) (SCM port, int caller_handled);
 
-/* Readers should *always* be called using the `scm_call_reader ()' macro
+/* Invoke READER reading from port PORT.  If CALLER_HANDLED is non-zero, then
+   read faults (reading an unhandled character) will be handled by the caller
+   and READER should therefore not make any attempt to handle them.
+
+   Readers should *always* be called using the `scm_call_reader ()' macro
    since this may be done differently in the non-Lightning case.  */
-#define scm_call_reader(_reader, _port)  ((_reader) (_port))
+#define scm_call_reader(_reader, _port, _caller_handled)	\
+  ((_reader) ((_port), (_caller_handled)))
 
 #else
 
@@ -40,7 +45,8 @@ typedef struct scm_reader *scm_reader_t;
 
 /* In the non-Lightning case, reader invocation relies on a slower, generic,
    support function.  */
-extern SCM scm_call_reader (scm_reader_t reader, SCM port);
+extern SCM scm_call_reader (scm_reader_t reader, SCM port,
+			    int caller_handled);
 
 #endif
 
@@ -94,6 +100,10 @@ typedef struct scm_token_reader_spec
       scm_reader_t             reader;
     } value;
   } reader;
+
+  /* If true, then the reader this TR belongs to should return even if
+     SCM_UNSPECIFIED is returned.  */
+  unsigned escape:1;
 } scm_token_reader_spec_t;
 
 /* A reader's specifications is just a zero-terminated array of token reader
@@ -103,38 +113,60 @@ typedef scm_token_reader_spec_t *scm_reader_spec_t;
 
 /* Return a pointer to a reader function compliant with the specifications in
    TOKEN_READERS.  If DEBUG is non-zero, debugging code is generated.  If
-   CODE_BUFFER, of BUFFER_SIZE bytes, is too small to contain the generated
-   code, NULL is returned and CODE_SIZE is set to the size of the generated
-   code at this point.  On success, CODE_SIZE is also set to the actual size
-   of the generated code.  */
+   FAULT_HANDLER_PROC is a procedure, then the generated reader will call it
+   whenever a character is read that is not handled (passing it the faulty
+   character, the port, and the reader).  If CODE_BUFFER, of BUFFER_SIZE
+   bytes, is too small to contain the generated code, NULL is returned and
+   CODE_SIZE is set to the size of the generated code at this point.  On
+   success, CODE_SIZE is also set to the actual size of the generated
+   code.  */
 extern scm_reader_t scm_c_make_reader (void *code_buffer,
 				       size_t buffer_size,
 				       const scm_token_reader_spec_t *specs,
+				       SCM fault_handler_proc,
 				       int debug,
 				       size_t *code_size);
 
+/* Scheme version of `scm_c_make_reader ()'.  TOKEN_READERS should be a list
+   of token readers (returned by `make-token-reader' or
+   `standard-token-reader' for instance).  The two other arguments are
+   optional and may be, respectively, a three-argument procedure to call when
+   an unexpected character is read, and a boolean indicating whether to
+   produce debugging output.  */
+extern SCM scm_make_reader (SCM token_readers,
+			    SCM fault_handler_proc,
+			    SCM debug_p);
+
+
+
 /* Convenience macros for statically specifying C token readers.  */
 
-#define SCM_DEFTOKEN_SINGLE(_chr, _name, _func)				\
+#define SCM_DEFTOKEN_SINGLE(_chr, _name, _func, _escape)		\
   {									\
     { .type = SCM_TOKEN_SINGLE, .value = { .single = (_chr) } },	\
     .name = (_name),							\
-    .reader = { .type = SCM_TOKEN_READER_C, .value.c_reader = (_func) }	\
+    .reader = { .type = SCM_TOKEN_READER_C,				\
+		.value.c_reader = (_func) },				\
+    .escape = _escape							\
   }
 
-#define SCM_DEFTOKEN_RANGE(_lo, _hi, _name, _func)			\
-  {									\
-    { .type = SCM_TOKEN_RANGE,						\
-      .value = { .range = { .low = (_lo), .high = (_hi) } } },		\
-    .name = (_name),							\
-    .reader = { .type = SCM_TOKEN_READER_C, .value.c_reader = (_func) }	\
+#define SCM_DEFTOKEN_RANGE(_lo, _hi, _name, _func, _escape)	\
+  {								\
+    { .type = SCM_TOKEN_RANGE,					\
+      .value = { .range = { .low = (_lo), .high = (_hi) } } },	\
+    .name = (_name),						\
+    .reader = { .type = SCM_TOKEN_READER_C,			\
+		.value.c_reader = (_func) },			\
+    .escape = _escape						\
   }
 
-#define SCM_DEFTOKEN_SET(_set, _name, _func)				\
-  {									\
-    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },		\
-    .name = (_name),							\
-   .reader = { .type = SCM_TOKEN_READER_C, .value.c_reader = (_func) }	\
+#define SCM_DEFTOKEN_SET(_set, _name, _func, _escape)		\
+  {								\
+    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },	\
+    .name = (_name),						\
+   .reader = { .type = SCM_TOKEN_READER_C,			\
+	       .value.c_reader = (_func) },			\
+   .escape = _escape						\
   }
 
 #define SCM_END_TOKENS							   \

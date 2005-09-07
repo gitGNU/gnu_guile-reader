@@ -11,6 +11,7 @@ BUILT_SOURCES = reader.c.x
 
 
 EXTRA_DIST = test-repl.scm
+TESTS = testsuite.scm
 
 AM_CFLAGS = -Wall -g -O0
 

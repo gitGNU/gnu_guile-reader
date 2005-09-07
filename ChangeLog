@@ -2,6 +2,42 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-09-07 17:02:41 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-10
+
+    Summary:
+      New testsuite;  now able to define a fault handler, or to let the caller handle them.
+    Revision:
+      scheme-reader--devo--0.1--patch-10
+
+    Patches applied:
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-6
+       Added support for reader fault handlers;  wrote a test suite.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-7
+       Added the capability to escape to token readers.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-8
+       Allow for caller handling of a reader's unhandled characters.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-9
+       Added support for complex numbers, fixed a number of TRs.
+    
+
+    new files:
+     testsuite.scm
+
+    modified files:
+     ChangeLog Makefile.am reader.c reader.h test-repl.scm
+     token-readers.c token-readers.h
+
+    new patches:
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-6
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-7
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-8
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-9
+
+
 2005-09-01 16:19:34 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-9
 
     Summary:
