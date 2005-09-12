@@ -25,7 +25,8 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 
 (define-module (testsuite)
   #:use-module (system reader)
-  #:use-module (srfi srfi-1))
+  #:use-module (srfi srfi-1)
+  #:use-module (ice-9 format))
 
 ;;; Author:  Ludovic Courtès
 ;;;

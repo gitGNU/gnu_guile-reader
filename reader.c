@@ -581,8 +581,9 @@ scm_c_make_reader (void *code_buffer,
       /* Else, since CALLER_HANDLED is false, call the user-defined fault
 	 handler.  */
       CHECK_CODE_SIZE (buffer_size, start);
+      jit_movi_p (JIT_R1, start);
       jit_prepare (1);
-      jit_pusharg_p ((void *)start);
+      jit_pusharg_p (JIT_R1);
       jit_finish (do_scm_make_reader_smob);
       jit_retval_p (JIT_V2);
 

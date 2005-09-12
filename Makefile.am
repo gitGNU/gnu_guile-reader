@@ -15,8 +15,8 @@ BUILT_SOURCES = reader.c.x
 noinst_PROGRAMS = guile
 guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
 
-EXTRA_DIST = test-repl.scm
 TESTS = testsuite.scm
+EXTRA_DIST = test-repl.scm $(TESTS)
 
 AM_CFLAGS = -Wall -g -O0
 
@@ -28,6 +28,9 @@ snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 
 %.c.x: %.c
 	guile-snarf-1.7 -o $@ $< $(snarfcppopts)
+
+%.doc: %.c
+	$(CPP) $(CPPFLAGS) -DSCM_MAGIC_SNARF_DOCS $< > $@
 
 # Gperf experiments.
 #BUILT_SOURCES += token-reader-lookup.c

@@ -2,6 +2,35 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-09-12 11:39:10 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-12
+
+    Summary:
+      Got ready for release 0.1.
+    Revision:
+      scheme-reader--devo--0.1--patch-12
+
+    * Makefile.am (EXTRA_DIST):  Added $(TESTS).
+      (%.doc):  New (unused) rule.
+    
+    * configure.ac:  Look for `scm_take_u8vector' in order to make sure we're
+      using Guile 1.7.
+    
+    * doc/guile-reader.texi:  Significantly augmented.
+    
+    * extract-token-readers.sh:  Handle the `--no-gperf-header' option
+      (currently unused).
+    
+    * reader.c (scm_c_make_reader):  When CALLER_HANDLED is a procedure,
+      don't use `jit_pusharg_p ((void *)start' (which is wrong), use
+      `jit_pusharg_p (JIT_R1)' instead.
+    
+    * testsuite.scm:  Use `(ice-9 format)'.
+
+    modified files:
+     ChangeLog Makefile.am configure.ac doc/guile-reader.texi
+     extract-token-readers.sh reader.c testsuite.scm
+
+
 2005-09-12 07:33:10 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-11
 
     Summary:

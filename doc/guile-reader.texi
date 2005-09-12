@@ -13,7 +13,7 @@
 
 
 @ifinfo
-@dircategory Scheme Programming
+@dircategory The Algorithmic Language Scheme
 @direntry
 * Guile Reader: (guile-reader).      Guile's Reader Framework.
 @end direntry
@@ -73,9 +73,9 @@ approved by the Free Software Foundation.
 
 This document describes Guile-Reader version @value{VERSION}.
 
-This documentation is currently far from complete.  Details missing
-about the API can very likely be found in the C header files or the C
-source files.
+This documentation is currently incomplete.  Details missing about the
+API can very likely be found in the C header files or the C source
+files.
 
 @menu
 * Introduction::                
@@ -93,22 +93,24 @@ source files.
 Guile currently provides limited extensibility of its reader, by means
 of @inforef{Reader Extensions, @code{read-hash-extend}, guile}, for
 instance, or @inforef{Scheme Read, @code{read-enable}, guile}.
-SRFI-60 tries to propose a generic, portable, extension mechanism
-similar to @code{read-hash-extend} but limited to @code{#,} sequences.
-Moreover, while this may not always be desirable, those extension
-facilities have a global effect, changing the behavior of the sole
-reader implementation available at run-time.  This makes it impossible
-to have, for instance, one module consider names starting with
-@code{:} as symbols, while another considers them as keywords.
+@uref{http://srfi.schemers.org/srfi-10/srfi-10.html, SRFI-10} tries to
+propose a generic, portable, extension mechanism similar to
+@code{read-hash-extend} but limited to @code{#,} sequences.  Moreover,
+while this may not always be desirable, those extension facilities
+have a global effect, changing the behavior of the sole reader
+implementation available at run-time.  This makes it impossible to
+have, for instance, one module consider names starting with @code{:}
+as symbols, while another considers them as keywords.
 
-Extensions such as the read syntax for SRFI-4 numeric vectors had to
-be added to Guile's built-in C reader.  Syntactic extensions that did
-not appeal the majority of users, like Emacs-Lisp vectors, are
-@code{#ifdef}'d within the reader code and are not available by
-default.  Moreover, some extensions are incompatible with each other,
-such as the DSSSL keyword syntax and the @inforef{Block Comments, SCSH
-block comments, guile}.  In short the current reader syntax is hardly
-extensible.
+Extensions such as the read syntax for SRFI-4 numeric vectors
+(@inforef{Uniform Numeric Vectors, SRFI-4 vectors, guile}, for more
+information) had to be added to Guile's built-in C reader.  Syntactic
+extensions that did not appeal the majority of users, like Emacs-Lisp
+vectors, are @code{#ifdef}'d within the reader code and are not
+available by default.  Moreover, some extensions are incompatible with
+each other, such as the DSSSL keyword syntax and the @inforef{Block
+Comments, SCSH block comments, guile}.  In short the current reader
+syntax is hardly extensible.
 
 The idea of Guile Reader is to provide a framework allowing users to
 quickly define readers for whatever syntax they like.  While it is
@@ -163,6 +165,17 @@ The next section will provide details about the API.
 @node API Reference, Internals, Overview, Top
 @chapter API Reference
 
+All the Scheme procedures described below are exported by the
+@code{(system reader)} module.  In order to be able to use them, you
+will need to import this module first:
+
+@example
+(use-modules (system reader))
+@end example
+
+A C variant is also available for most of them by including the
+declarations available in the @code{<guile-reader/reader.h>} header
+file.
 
 @menu
 * Token Readers::               
@@ -172,6 +185,12 @@ The next section will provide details about the API.
 @node Token Readers, Readers, API Reference, API Reference
 @section Token Readers
 
+Basically, token readers are the association of a character or set of
+characters and a function that is able to interpret character
+sequences that start by one of these characters.  We will see below
+how to define new token readers first, and then how to re-use existing
+ones.
+
 @menu
 * Defining a New Token Reader::  
 * Token Reader Library::        
@@ -180,11 +199,128 @@ The next section will provide details about the API.
 @node Defining a New Token Reader, Token Reader Library, Token Readers, Token Readers
 @subsection Defining a New Token Reader
 
+A new token reader object can be created by calling the
+@code{make-token-reader} procedure with a @dfn{character
+specification} and a procedure.  A character specification defines the
+set of characters which should trigger an invocation of the
+corresponding procedure.  The character specification may be either:
+
+@itemize
+@item a single character;
+@item a pair of characters, which is interpreted as a character range;
+@item a list of characters, which is interpreted as a set of
+characters.
+@end itemize
+
+The procedure itself will be passed three arguments:
+
+@itemize
+@item the character that was read and which triggered its call;  in
+the S-exp example, this would be @code{(};
+@item the port to read from;
+@item the reader which performed this invocation;  this may be useful,
+like in the S-exp example, if the TR itself does not have enough
+knowledge to read and interpret everything.
+@end itemize
+
+It must return a Scheme object resulting from the interpretation of
+the characters read.  It may as well raise an error if the input
+sequence is corrupt.  Finally, it may return @code{*unspecified*}, in
+which case the calling reader will not return and instead continue
+reading.  This is particularly useful to define comment token readers:
+a TR that has just read a comment will obviously not have any sensible
+Scheme object to return, and a reader is not expected to return
+anything but a ``real'' Scheme object.  A token reader for Scheme's
+@code{;} line comments may be defined as follows:
+
+@example
+(make-token-reader #\; read-a-line-and-return-unspecified)
+@end example
+
+This behavior may, however, be overridden by passing
+@code{make-token-reader} a third argument (called @var{escape?}):
+
+@example
+(make-token-reader #\; read-a-line-and-return-unspecified #t)
+@end example
+
+A reader that includes this TR will return @code{*unspecified*} once a
+line comment has been read.  This is particularly useful, for
+instance, when implementing @code{#!} block comments (@inforef{Block
+Comments, SCSH block comments, guile}, for more information) as a
+TR attached to @code{#\!} within the @code{#\#} sub-reader (see
+example below, @pxref{Token Reader Library}).
+
+Finally, the procedure passed to @code{make-token-reader} may be
+@code{#f}, in which case the resulting TR will just have the effect of
+ignoring the characters it is associated to.  For instance,
+handling white spaces may be done by defining a TR like this:
+
+@example
+(make-token-reader '(#\space #\newline #\tab) #f)
+@end example
+
 @code{make-token-reader}
+FIXME:  Snarf doc from `reader.c'.
+
 
 @node Token Reader Library,  , Defining a New Token Reader, Token Readers
 @subsection Token Reader Library
 
+Guile-reader comes with a number of re-usable token readers.
+Together, they might be assembled to form a complete Scheme reader
+equivalent to that of Guile (@pxref{Reader Library}).  Or they can be
+used individually in any reader.
+
+The @code{standard-token-reader} procedure takes a symbol that names a
+standard TR from the library and returns it (or @code{#f} if not
+found).  Among those TRs are:
+
+@itemize
+@item @code{whitespace}, which reads (actually, skips) white spaces;
+@item @code{symbol-upper-case}, which reads symbols starting with an
+upper-case letter;
+@item @code{string}, which reads strings;
+@item @code{number}, which reads a number;
+@item @code{sexp}, which reads an S-expression.
+@end itemize
+
+A few @dfn{sharp TRs}, i.e. TRs which expect the @code{#} character to
+have been read prior to their invocation, are available:
+
+@itemize
+@item @code{boolean}, which reads a boolean;
+@item @code{character}, which reads an R5RS character once the
+@code{#} character has been read;
+@item @code{srfi-4}, which reads an SRFI-4 vector;
+@item @code{keyword}, which reads a keyword, equivalent to
+@code{colon-keyword};
+@item @code{number+radix}, which reads a number plus its radix, as in
+@code{#xdeadbeef}.
+@end itemize
+
+This list is not complete but it should already give you a good
+overview of what is available (FIXME).  As can be inferred from the
+above two lists, reading character sequences starting with the
+@code{#} characters can easily be done by defining a sub-reader for
+that character.  That reader can then be passed to
+@code{make-token-reader} as the procedure attached to @code{#}:
+
+@example
+(define sharp-reader
+  (make-reader (map standard-token-reader
+                    '(boolean character
+                      number+radix keyword
+                      srfi-4
+                      block-comment))))
+
+(define top-level-reader
+  (make-reader (list (make-token-reader #\# sharp-reader)
+                     ...
+                     )))
+@end example
+
+FIXME:  Snarf doc from `reader.c'.
 @code{standard-token-reader}
 
 @code{token-reader-specification}
@@ -194,6 +330,10 @@ The next section will provide details about the API.
 @node Readers,  , Token Readers, API Reference
 @section Readers
 
+Guile-reader is about defining readers.  Continuing to read was
+definitely a good idea since we have finally reached the point where
+we will start talking about how to define new readers.
+
 @menu
 * Defining a New Reader::       
 * Reader Library::              
@@ -202,12 +342,77 @@ The next section will provide details about the API.
 @node Defining a New Reader, Reader Library, Readers, Readers
 @subsection Defining a New Reader
 
+Roughly, a reader is no more than a loop which reads characters from a
+given port, and dispatches further interpretation to more specific
+procedures.  Written in Scheme, it could resemble something like:
+
+@example
+(define (my-reader port)
+  (let loop ((result *unspecified*))
+    (let ((the-char (getc port)))
+      (case the-char
+        ((#\()  (my-sexp-token-reader the-char port my-reader)))
+        ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9)
+         (my-number-token-reader the-char port my-reader))
+        (else
+         (error "unexpected character" the-char))))))
+@end example
+
+Using guile-reader, this is done simply by providing a list of token
+readers to the @code{make-reader} procedure, as in the following
+example:
+
+@example
+(define my-reader
+  (make-reader (list (make-token-reader #\( my-sexp-token-reader)
+                     (make-token-reader '(#\0 . #\9)
+                                        my-number-token-reader))))
+@end example
+
+However, the procedure returned by @code{make-reader} is different
+from the hand-written one above in that in takes an additional
+optional argument which makes it look like this:
+
+@example
+(define (my-reader port faults-caller-handled?)
+  (let loop ((the-char (getc port)))
+    (case the-char
+      ...
+      (else
+        (if (not faults-caller-handled?)
+            (error "unexpected character" the-char)
+            (ungetc the-char) ;; and return *unspecified*
+            )))))
+@end example
+
+Therefore, by default, @code{my-reader} will raise an error as soon as
+it reads a character that it does not know how to handle.  However, if
+the caller passes @code{#t} as its @code{faults-caller-handled?}
+argument, then @code{my-reader} is expected to ``unget'' the faulty
+character and return @code{*unspecified*}, thus allowing the caller to
+handle the situation.
+
+This is useful, for instance, in the S-exp token reader example: the
+S-exp token reader needs to call its calling reader in order to read
+the components between the opening and closing brackets;  however, the
+calling reader may be unable to handle the @code{#\)} character so the
+S-exp token reader has to handle it by itself and needs to tell it to
+the reader.
+
 @code{make-reader}
+FIXME:  Snarf doc from `reader.c'.
+
 
 @node Reader Library,  , Defining a New Reader, Readers
 @subsection Reader Library
 
+The @code{(system reader)} module exports the @code{default-reader}
+procedure which returns a reader equivalent to Guile's built-in
+default reader made of re-usable token readers written in C
+(@pxref{Token Reader Library}).
+
 @code{default-reader}
+FIXME:  Snarf doc from `reader.c'.
 
 
 @node Internals,  , API Reference, Top
@@ -220,6 +425,11 @@ lightning}.  As of version 1.2, GNU Lightning can generate code for
 the PowerPC, SPARC, and IA32 architectures.  For other platforms,
 guile-reader provides an alternative (slower) implementation that does
 not depend on it.
+
+Re-using token readers written in C, as explained in @xref{Token
+Reader Library}, does not imply any additional cost: the underlying C
+function will be called directly by the reader, without having to go
+through any marshalling/unmarshalling stage.
 
 
 @c *********************************************************************
