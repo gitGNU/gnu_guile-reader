@@ -21,12 +21,13 @@
 #define __SCM_READER_H__
 
 #include <libguile.h>
-#include <lightning.h>
 
 #include "reader-config.h"
 
 
 #ifdef SCM_READER_USE_LIGHTNING
+
+#include <lightning.h>
 
 typedef SCM (* scm_reader_t) (SCM port, int caller_handled);
 
@@ -137,6 +138,28 @@ extern SCM scm_make_reader (SCM token_readers,
 			    SCM fault_handler_proc,
 			    SCM debug_p);
 
+
+/* Return a Scheme representation of the token reader specified by TR.  If
+   CALLER_OWNED is non-zero, it is assumed that C code will keep control over
+   the resources held by TR (notably the memory pointed to by TR).  If
+   CALLER_OWNED is zero, then garbage collection of the returned SMOB will
+   yield to the resources and memory pointed to by TR being freed.  */
+extern SCM scm_from_token_reader (const scm_token_reader_spec_t *tr,
+				  int caller_owned);
+
+/* Return a pointer to a newly allocated C representation of token reader TR.
+   The returned object may eventually be freed using `free ()', as well as
+   the `token.value.set' pointer if `token.type' is SCM_TOKEN_SET.  */
+extern scm_token_reader_spec_t *scm_to_token_reader (SCM tr);
+
+/* Create a token reader and return its Scheme representation.  SPEC
+   represents its specifications, i.e. when this token reader should be
+   triggered.  SPEC may be either a single character, or a pair or characters
+   (representing a range), or a list of characters (representing a set).  If
+   PROC is not #f, then it is the procedure that will be invoked.  Finally,
+   ESCAPE_P is a boolean that determines whether the token reader may
+   ``escape'' its parent reader returning SCM_UNSPECIFIED.  */
+extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
 
 
 /* Convenience macros for statically specifying C token readers.  */

@@ -1,14 +1,19 @@
+SUBDIRS = module doc
+
 lib_LTLIBRARIES = libguile-reader.la
 libguile_reader_la_SOURCES = reader.c token-readers.c
-libguile_reader_la_LDFLAGS = -module
+libguile_reader_la_LDFLAGS = -module -interface 0:0:0
 
 readerincludedir = $(includedir)/guile-reader
 
-moduledir = $(GUILE_SITE)
-module_EXTRA = reader.scm
 readerinclude_HEADERS = reader.h reader-config.h token-readers.h
 BUILT_SOURCES = reader.c.x
 
+# We build a `guile' executable here so that it is linked against
+# `libguile-reader' and Libtool's magic ensures that we can use it to
+# run the test suite.
+noinst_PROGRAMS = guile
+guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
 
 EXTRA_DIST = test-repl.scm
 TESTS = testsuite.scm

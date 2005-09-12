@@ -1,0 +1,248 @@
+\input texinfo  @c -*-texinfo-*-
+
+@c %**start of header
+@setfilename guile-reader.info
+@settitle Guile's Reader Framework
+@footnotestyle end
+@setchapternewpage odd
+@c %**end of header
+
+@set EDITION 1
+@set VERSION 0.1
+@c @set UPDATED 2005-04-26
+
+
+@ifinfo
+@dircategory Scheme Programming
+@direntry
+* Guile Reader: (guile-reader).      Guile's Reader Framework.
+@end direntry
+
+This file documents Guile Reader.
+
+Copyright @copyright{} 2005 Ludovic Court`es
+
+Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+Permission is granted to copy and distribute translations of this manual
+into another language, under the above conditions for modified versions,
+except that this permission notice may be stated in a translation
+approved by the Free Software Foundation.
+@end ifinfo
+
+@titlepage
+@title Guile's Reader Framework
+@subtitle for Guile-Reader @value{VERSION}
+@author Ludovic Courtès
+
+@page
+@vskip 0pt plus 1filll
+Edition @value{EDITION} @*
+@c Updated for Guile Reader @value{VERSION} @*
+@value{UPDATED} @*
+
+Copyright @copyright{} 2005 Ludovic Court`es
+
+Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+Permission is granted to copy and distribute translations of this manual
+into another language, under the above conditions for modified versions,
+except that this permission notice may be stated in a translation
+approved by the Free Software Foundation.
+@end titlepage
+
+@contents
+
+@c *********************************************************************
+@node Top, Introduction, (dir), (dir)
+@top Guile's Reader Framework
+
+This document describes Guile-Reader version @value{VERSION}.
+
+This documentation is currently far from complete.  Details missing
+about the API can very likely be found in the C header files or the C
+source files.
+
+@menu
+* Introduction::                
+* Overview::                    
+* API Reference::               
+* Internals::                   
+@end menu
+
+
+@c *********************************************************************
+
+@node Introduction, Overview, Top, Top
+@chapter Introduction
+
+Guile currently provides limited extensibility of its reader, by means
+of @inforef{Reader Extensions, @code{read-hash-extend}, guile}, for
+instance, or @inforef{Scheme Read, @code{read-enable}, guile}.
+SRFI-60 tries to propose a generic, portable, extension mechanism
+similar to @code{read-hash-extend} but limited to @code{#,} sequences.
+Moreover, while this may not always be desirable, those extension
+facilities have a global effect, changing the behavior of the sole
+reader implementation available at run-time.  This makes it impossible
+to have, for instance, one module consider names starting with
+@code{:} as symbols, while another considers them as keywords.
+
+Extensions such as the read syntax for SRFI-4 numeric vectors had to
+be added to Guile's built-in C reader.  Syntactic extensions that did
+not appeal the majority of users, like Emacs-Lisp vectors, are
+@code{#ifdef}'d within the reader code and are not available by
+default.  Moreover, some extensions are incompatible with each other,
+such as the DSSSL keyword syntax and the @inforef{Block Comments, SCSH
+block comments, guile}.  In short the current reader syntax is hardly
+extensible.
+
+The idea of Guile Reader is to provide a framework allowing users to
+quickly define readers for whatever syntax they like.  While it is
+much simpler than a full-blown parser generator like Bison, its simple
+programming interface should make it very straightforward to implement
+readers, especially for Scheme-like syntaxes.  Best of all, Guile
+Reader comes with a library of components that can typically be used
+to construct a reader for the Scheme syntax.  And each one of this
+components may be reused at will when creating other readers.
+
+
+@node Overview, API Reference, Introduction, Top
+@chapter Overview
+
+Before going into the details of the reader framework API, let us have
+a quick overview of what this is.  Basically, guile-reader introduces
+two objects: @dfn{readers} and @dfn{token readers}.  Readers can be
+thought of, simply, as procedures like Scheme's @code{read}
+@inforef{Input, R5RS, r5rs}, i.e. procedures that take one (optional)
+argument, namely the port to read from.  We will see later that
+readers as defined by guile-reader can actually receive a second
+argument (FIXME: xref).  A reader, like @code{read}, reads a sequence
+of characters (the @dfn{external representation} of some object) and
+returns a Scheme object.
+
+Token readers (TRs, for short) are the building block of a reader.  A
+token reader is basically an association between a character or set of
+characters and a procedure to read and interpret a sequence of
+characters starting with one of the former.  For instance, in a
+standard Scheme reader, the character @code{(} may be associated to a
+procedure that reads an S-expression.  Likewise, lower-case and
+upper-case letters associated with the appropriate procedure form a
+token reader for symbols.
+
+In guile-reader, TRs may be written either in Scheme or in C, and they
+can even be a reader produced by guile-reader itself.  Unless it is a
+reader, the procedure (or C function) used to create a TR will receive
+three arguments:
+
+@itemize
+@item the character that was read and which triggered its call;  in
+the S-exp example, this would be @code{(};
+@item the port to read from;
+@item the reader which performed this invocation;  this may be useful,
+like in the S-exp example, if the TR itself does not have enough
+knowledge to read and interpret everything.
+@end itemize
+
+The next section will provide details about the API.
+
+
+@node API Reference, Internals, Overview, Top
+@chapter API Reference
+
+
+@menu
+* Token Readers::               
+* Readers::                     
+@end menu
+
+@node Token Readers, Readers, API Reference, API Reference
+@section Token Readers
+
+@menu
+* Defining a New Token Reader::  
+* Token Reader Library::        
+@end menu
+
+@node Defining a New Token Reader, Token Reader Library, Token Readers, Token Readers
+@subsection Defining a New Token Reader
+
+@code{make-token-reader}
+
+@node Token Reader Library,  , Defining a New Token Reader, Token Readers
+@subsection Token Reader Library
+
+@code{standard-token-reader}
+
+@code{token-reader-specification}
+@code{token-reader-procedure}
+@code{token-reader-escape?}
+
+@node Readers,  , Token Readers, API Reference
+@section Readers
+
+@menu
+* Defining a New Reader::       
+* Reader Library::              
+@end menu
+
+@node Defining a New Reader, Reader Library, Readers, Readers
+@subsection Defining a New Reader
+
+@code{make-reader}
+
+@node Reader Library,  , Defining a New Reader, Readers
+@subsection Reader Library
+
+@code{default-reader}
+
+
+@node Internals,  , API Reference, Top
+@chapter Internals
+
+In order to not have to trade too much performance for flexibility,
+guile-reader dynamically compiles code for the readers defined using
+GNU Lightning @inforef{Overview, Introduction to GNU Lightning,
+lightning}.  As of version 1.2, GNU Lightning can generate code for
+the PowerPC, SPARC, and IA32 architectures.  For other platforms,
+guile-reader provides an alternative (slower) implementation that does
+not depend on it.
+
+
+@c *********************************************************************
+@c @node Concept Index, Command Index, Related Information, Top
+@c @unnumbered Concept Index
+@c @printindex cp
+
+@c @node Command Index, Variable Index, Concept Index, Top
+@c @unnumbered Command Index
+@c @printindex fn
+
+@c @node Variable Index,  , Command Index, Top
+@c @unnumbered Variable Index
+@c @printindex vr
+
+@bye
+
+
+@ignore
+;;; arch-tag: e82c9dff-b040-4398-a1e9-1e2570cfc025
+@end ignore
+
+@c Local Variables:
+@c mode:outline-minor
+@c outline-regexp:"@\\(ch\\|sec\\|subs\\)"
+@c End:

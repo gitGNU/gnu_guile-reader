@@ -2,14 +2,15 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(scheme-reader, 0.1, ludovic.courtes@laas.fr)
-AM_INIT_AUTOMAKE(scheme-reader, 0.1)
+AC_INIT(guile-reader, 0.1, ludovic.courtes@laas.fr)
+AM_INIT_AUTOMAKE(guile-reader, 0.1)
 
 AC_CONFIG_SRCDIR([reader.c])
 AC_CONFIG_HEADER([config.h reader-config.h])
 
 # Checks for programs.
 AC_PROG_CC
+AC_LIBTOOL_DLOPEN
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
@@ -37,6 +38,9 @@ if test "x$guile_snarf" = "xnot-found"; then
 fi
 GUILE_SITE_DIR
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile
+	         module/Makefile
+		 module/system/Makefile
+		 doc/Makefile])
 
 AC_OUTPUT

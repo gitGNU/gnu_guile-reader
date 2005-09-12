@@ -2,6 +2,62 @@
 # arch-tag: automatic-ChangeLog--lcourtes@laas.fr--2004-libre/scheme-reader--devo--0.1
 #
 
+2005-09-12 07:33:10 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-11
+
+    Summary:
+      GC and TR bug fixes;  renamed module;  cleaned build process;  doc.
+    Revision:
+      scheme-reader--devo--0.1--patch-11
+
+    Patches applied:
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-10
+       Fixed token readers for the remaining corner cases;  now reads `boot-9.scm'.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-11
+       Updated the Lightning-free implementation.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-12
+       Cleaned up the build and installation process.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-13
+       Fixed a GC bug;  renamed the reader module;  exported more C functions.
+    
+     * lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-14
+       Added a documentation skeleton.
+    
+
+    new files:
+     doc/.arch-ids/=id doc/.arch-ids/Makefile.am.id
+     doc/.arch-ids/texinfo.tex.id doc/Makefile.am
+     doc/guile-reader.texi doc/texinfo.tex guile.c
+     module/.arch-ids/=id module/.arch-ids/Makefile.am.id
+     module/Makefile.am module/system/.arch-ids/=id
+     module/system/.arch-ids/Makefile.am.id
+     module/system/Makefile.am
+
+    modified files:
+     ChangeLog Makefile.am configure.ac module/system/reader.scm
+     reader.c reader.h test-repl.scm testsuite.scm token-readers.c
+
+    renamed files:
+     .arch-ids/reader.scm.id
+       ==> module/system/.arch-ids/reader.scm.id
+     reader.scm
+       ==> module/system/reader.scm
+
+    new directories:
+     doc doc/.arch-ids module module/.arch-ids module/system
+     module/system/.arch-ids
+
+    new patches:
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-10
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-11
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-12
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-13
+     lcourtes@laas.fr--2005-mobile/scheme-reader--devo--0.1--patch-14
+
+
 2005-09-07 17:02:41 GMT	Ludovic Court`es <ludovic.courtes@laas.fr>	patch-10
 
     Summary:

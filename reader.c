@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdarg.h>
 #include <assert.h>
 
 #include <libguile.h>
@@ -48,7 +49,7 @@ debug (const char *fmt, ...)
 {
   va_list ap;
 
-  va_start (fmt, ap);
+  va_start (ap, fmt);
   vfprintf (stderr, fmt, ap);
   va_end (ap);
 }
@@ -642,12 +643,15 @@ scm_c_make_reader (void *code_buffer,
 struct scm_reader
 {
   scm_token_reader_spec_t *token_readers;
+  SCM fault_handler_proc;
+  int debug;
 };
 
 scm_reader_t
 scm_c_make_reader (void *code_buffer,
 		   size_t buffer_size,
 		   const scm_token_reader_spec_t *token_readers,
+		   SCM fault_handler_proc,
 		   int debug,
 		   size_t *code_size)
 {
@@ -661,6 +665,8 @@ scm_c_make_reader (void *code_buffer,
     return NULL;
 
   result = (struct scm_reader *)buffer;
+  result->fault_handler_proc = fault_handler_proc;
+  result->debug = debug;
   tr_copy = (scm_token_reader_spec_t *)(buffer + sizeof (*result));
 
   result->token_readers = tr_copy;
@@ -717,7 +723,7 @@ tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
       if (tr->reader.value.c_reader)
 	return tr->reader.value.c_reader (c, port, reader);
       else
-	return SCM_UNDEFINED;
+	return SCM_UNSPECIFIED;
 
     case SCM_TOKEN_READER_SCM:
       {
@@ -732,7 +738,7 @@ tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
       if (tr->reader.value.reader)
 	return scm_call_reader (tr->reader.value.reader, port, 0);
       else
-	return SCM_UNDEFINED;
+	return SCM_UNSPECIFIED;
 
     default:
       return SCM_UNSPECIFIED;
@@ -764,7 +770,7 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
 	  if (tr_handles_char (tr, c))
 	    {
 	      result = tr_invoke (tr, c, port, reader);
-	      if ((result == SCM_UNSPECIFIED) || (result == SCM_UNDEFINED))
+	      if ((result == SCM_UNSPECIFIED) && (!tr->escape))
 		goto doit;
 	      else
 		return result;
@@ -772,7 +778,31 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
 	}
 
       /* Unhandled character.  */
-      return SCM_UNSPECIFIED;
+      if (caller_handled)
+	{
+	  /* Caller will take care of C.  */
+	  scm_ungetc (c, port);
+	  return SCM_UNSPECIFIED;
+	}
+      else
+	{
+	  if (scm_procedure_p (reader->fault_handler_proc) == SCM_BOOL_T)
+	    {
+	      /* Call the user-defined fault-handler.  */
+	      SCM s_reader;
+
+	      SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader,
+				   NULL, 0);
+	      return (scm_call_3 (reader->fault_handler_proc,
+				  SCM_MAKE_CHAR (c), port, s_reader));
+	    }
+	  else
+	    {
+	      /* No handler defined.  */
+	      scm_ungetc (c, port);
+	      return SCM_UNSPECIFIED;
+	    }
+	}
     }
 
   return SCM_EOF_VAL;
@@ -835,19 +865,64 @@ scm_from_reader (scm_reader_t reader)
 #endif
 
 SCM
-scm_from_token_reader (const scm_token_reader_spec_t *token_reader)
+scm_from_token_reader (const scm_token_reader_spec_t *token_reader,
+		       int caller_owned)
 {
+  SCM *s_deps;
   SCM s_token_reader;
   scm_token_reader_spec_t *copy;
 
-  copy = scm_malloc (sizeof (*copy));
-  *copy = *token_reader;
+  if (caller_owned)
+    {
+      /* Operate on a copy.  */
+      copy = scm_malloc (sizeof (*copy));
+      *copy = *token_reader;
+    }
+  else
+    /* Operate directly on TOKEN_READER.  */
+    copy = (scm_token_reader_spec_t *)token_reader;
+
+  s_deps = scm_malloc (2 * sizeof (*s_deps));
+
+  if (token_reader->reader.type == SCM_TOKEN_READER_SCM)
+    s_deps[0] = token_reader->reader.value.scm_reader;
+  else
+    s_deps[0] = SCM_BOOL_F;
+
+  s_deps[1] = SCM_BOOL_F;
 
   /* Return a "freeable" SMOB.  */
   SCM_NEW_READER_SMOB (s_token_reader, scm_token_reader_type, copy,
-		       NULL, 1);
+		       s_deps, 1);
+
   return (s_token_reader);
 }
+
+scm_token_reader_spec_t *
+scm_to_token_reader (SCM tr)
+#define FUNC_NAME "scm_to_token_reader"
+{
+  scm_token_reader_spec_t *c_tr, *c_copy;
+
+  scm_assert_smob_type (scm_token_reader_type, tr);
+
+  c_copy = scm_malloc (sizeof (*c_copy));
+  SCM_TOKEN_READER_SMOB_DATA (c_tr, tr);
+
+  *c_copy = *c_tr;
+  if (c_copy->token.type == SCM_TOKEN_SET)
+    {
+      /* Create a copy of the set.  */
+      char *set;
+
+      set = scm_malloc (strlen (c_tr->token.value.set) + 1);
+      strcpy (set, c_tr->token.value.set);
+      c_copy->token.value.set = set;
+    }
+
+  return c_copy;
+}
+#undef FUNC_NAME
 
 scm_reader_t
 scm_to_reader (SCM reader)
@@ -874,23 +949,6 @@ scm_to_reader (SCM reader)
 
 #include "token-readers.h"
 
-#if 0
-SCM_DEFINE (dynr_do_stuff, "do-stuff", 1, 0, 0,
-	    (SCM port),
-	    "Do stuff.")
-{
-  static jit_insn code_buffer[4096];
-  static scm_reader_t reader = NULL;
-  size_t size;
-
-  if (!reader)
-    reader = scm_c_make_reader (code_buffer, sizeof (code_buffer),
-				scm_reader_standard_specs,
-				1, &size);
-
-  return (reader (port));
-}
-#endif
 
 SCM_DEFINE (scm_make_reader, "make-reader", 1, 2, 0,
 	    (SCM token_readers, SCM fault_handler_proc, SCM debug_p),
@@ -900,7 +958,7 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 2, 0,
   SCM s_reader, *s_deps;
   scm_reader_t reader;
   size_t code_size = 1024;
-  jit_insn *code_buffer;
+  void *code_buffer;
   size_t actual_size;
   unsigned token_reader_count, i;
   scm_token_reader_spec_t *c_specs;
@@ -927,7 +985,7 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 2, 0,
       c_specs[i] = *tr_spec;
 
       /* Keep a copy of the TR SMOBs that the reader being built depends
-	 on.  */
+	 on so that they can get marked appropriately during GC.  */
       s_deps[i] = tr;
     }
 
@@ -994,6 +1052,7 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
 	    "even if its result is undefined.")
 #define FUNC_NAME "make-token-reader"
 {
+  SCM *s_deps;
   SCM s_token_reader;
   scm_token_reader_spec_t *c_spec;
 
@@ -1006,6 +1065,7 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
     SCM_VALIDATE_BOOL (3, escape_p);
 
   c_spec = scm_malloc (sizeof (scm_token_reader_spec_t));
+  s_deps = scm_malloc (2 * sizeof (*s_deps));
 
   if (read_token_spec (spec, c_spec))
     {
@@ -1052,9 +1112,17 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
   c_spec->escape = (escape_p == SCM_BOOL_T) ? 1 : 0;
   c_spec->name = NULL;
 
+  /* Keep track of the SMOBs this token reader depends on.  */
+  if (proc != SCM_BOOL_F)
+    s_deps[0] = proc;
+  else
+    s_deps[0] = proc;
+
+  s_deps[1] = SCM_BOOL_F;
+
   /* Return a "freeable" SMOB.  */
   SCM_NEW_READER_SMOB (s_token_reader, scm_token_reader_type,
-		       c_spec, NULL, 1);
+		       c_spec, s_deps, 1);
   return (s_token_reader);
 }
 #undef FUNC_NAME
@@ -1186,6 +1254,7 @@ SCM_DEFINE (scm_token_reader_escape_p, "token-reader-escape?", 1, 0, 0,
   scm_token_reader_spec_t *c_tr;
 
   scm_assert_smob_type (scm_token_reader_type, tr);
+  SCM_TOKEN_READER_SMOB_DATA (c_tr, tr);
 
   return (c_tr->escape ? SCM_BOOL_T : SCM_BOOL_F);
 }
@@ -1199,7 +1268,7 @@ scm_t_bits scm_reader_type, scm_token_reader_type,
 
 
 static SCM
-reader_mark (SCM reader)
+generic_reader_smob_mark (SCM reader)
 {
   scm_reader_smob_t *smobinfo;
 
@@ -1222,26 +1291,30 @@ reader_mark (SCM reader)
 }
 
 static size_t
-reader_free (SCM reader)
+generic_reader_smob_free (SCM reader_smob)
 {
   scm_reader_smob_t *smobinfo;
 
-  scm_assert_smob_type (scm_reader_type, reader);
-
-  smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (reader);
+  smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (reader_smob);
   assert (smobinfo);
   if (smobinfo->freeable)
     {
-      scm_reader_t c_reader;
+      void *c_object = smobinfo->c_object;
+      unsigned smob_type = SCM_SMOBNUM (reader_smob);
 
-      c_reader = (scm_reader_t)smobinfo->c_object;
-      assert (c_reader);
-      debug ("freeing reader %p [SCM %p]\n", c_reader, reader);
-      free (c_reader);
+      assert (c_object);
+      debug ("freeing %s %p [SCM %p]\n",
+	     SCM_SMOBNAME (smob_type), c_object, reader_smob);
+      free (c_object);
     }
 
   smobinfo->freeable = 0;
   smobinfo->c_object = NULL;
+
+  if (smobinfo->deps)
+    free (smobinfo->deps);
+  smobinfo->deps = NULL;
+
   free (smobinfo);
 
   return 0;
@@ -1262,51 +1335,20 @@ reader_apply (SCM reader, SCM port, SCM caller_handled)
 }
 
 static SCM
-token_reader_mark (SCM tr)
-{
-  scm_token_reader_spec_t *c_spec;
-
-  SCM_TOKEN_READER_SMOB_DATA (c_spec, tr);
-  if (c_spec->reader.type == SCM_TOKEN_READER_SCM)
-    return (c_spec->reader.value.scm_reader);
-
-  return SCM_BOOL_F;
-}
-
-static size_t
-token_reader_free (SCM tr)
-{
-  scm_reader_smob_t *smobinfo;
-
-  smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (tr);
-  if (smobinfo->freeable)
-    {
-      scm_token_reader_spec_t *c_spec;
-
-      c_spec = (scm_token_reader_spec_t *)smobinfo->c_object;
-      if (c_spec->token.type == SCM_TOKEN_SET)
-	/* XXX: We're assuming we can safely do this when it's freeable.
-	   This is the actually the case when created from Scheme.  */
-	free ((void *)c_spec->token.value.set);
-      free (c_spec);
-    }
-
-  smobinfo->freeable = 0;
-  smobinfo->c_object = NULL;
-  free (smobinfo);
-
-  return 0;
-}
-
-static SCM
 token_reader_proc_mark (SCM tr_proc)
 {
+  /* Nothing to mark.  */
   return SCM_BOOL_F;
 }
 
 static size_t
 token_reader_proc_free (SCM tr_proc)
 {
+  /* Nothing to be freed.  */
+#if 0
+  debug ("freeing TR proc %p [SCM %p]\n",
+	 (void *)SCM_SMOB_DATA (tr_proc), (void *)tr_proc);
+#endif
   return 0;
 }
 
@@ -1338,13 +1380,13 @@ void
 scm_reader_init_bindings (void)
 {
   scm_reader_type = scm_make_smob_type ("reader", 0);
-  scm_set_smob_mark (scm_reader_type, reader_mark);
-  scm_set_smob_free (scm_reader_type, reader_free);
+  scm_set_smob_mark (scm_reader_type, generic_reader_smob_mark);
+  scm_set_smob_free (scm_reader_type, generic_reader_smob_free);
   scm_set_smob_apply (scm_reader_type, reader_apply, 0, 2, 0);
 
   scm_token_reader_type = scm_make_smob_type ("token-reader", 0);
-  scm_set_smob_mark (scm_token_reader_type, token_reader_mark);
-  scm_set_smob_free (scm_token_reader_type, token_reader_free);
+  scm_set_smob_mark (scm_token_reader_type, generic_reader_smob_mark);
+  scm_set_smob_free (scm_token_reader_type, generic_reader_smob_free);
 
   scm_token_reader_proc_type = scm_make_smob_type ("token-reader-proc", 0);
   scm_set_smob_mark (scm_token_reader_proc_type, token_reader_proc_mark);

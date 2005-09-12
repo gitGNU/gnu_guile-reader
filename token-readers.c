@@ -29,6 +29,8 @@
    reader equivalent to that of Guile.  */
 
 #include <libguile.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <ctype.h>
 #include <strings.h>
 #include <assert.h>
@@ -42,11 +44,11 @@
 #define CHAR_IS_BLANK(_chr)					\
   (((_chr) == ' ') || ((_chr) == '\t') || ((_chr) == '\n'))
 
-/* R5RS one-character tokens and delimiters (see section 7.1.1, ``Lexical
+/* R5RS one-character delimiters (see section 7.1.1, ``Lexical
    structure'').  */
 #define CHAR_IS_R5RS_DELIMITER(c)				\
-  ((c == ')') || (c == '(') || (c == '\'') || (c == '`')	\
-   || (c == '#') || (c == ',') || (c == ';') || (c == '"'))
+  (CHAR_IS_BLANK (c)						\
+   || (c == ')') || (c == '(') || (c == ';') || (c == '"'))
 
 /* Helper function similar to `scm_read_token ()'.  Read from PORT until a
    whitespace is read.  */
@@ -61,8 +63,7 @@ read_token (SCM port, char *buf, size_t buf_size, size_t *read)
       chr = scm_getc (port);
       if (chr == EOF)
 	break;
-      else if ((CHAR_IS_R5RS_DELIMITER (chr)) || (CHAR_IS_BLANK (chr)))
-	/* (!isalnum (chr))  */ /* (CHAR_IS_BLANK (chr)) */
+      else if (CHAR_IS_R5RS_DELIMITER (chr))
 	{
 	  scm_ungetc (chr, port);
 	  break;
@@ -346,7 +347,7 @@ scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader)
 	{
 	  /* Are we actually reading a number rather than a symbol? */
 	  if (((c_id[0] == '+') || (c_id[0] == '-'))
-	      && (isdigit (c_id[1])))
+	      && ((isdigit (c_id[1])) || (tolower (c_id[1]) == 'i')))
 	    {
 	      /* Well, yes, this is a number:  call `scm_read_number ()' to
 		 the rescue.  XXX:  This is a bit hackish, indeed.  */
@@ -465,18 +466,15 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
   SCM result, result_str;
   char c_num[1024];
   size_t c_num_len = 0;
-  unsigned saw_point = 0, saw_plus_or_minus = 0, last_char_is_i = 0;
+  unsigned saw_point = 0, saw_plus_or_minus = 0, saw_leading_sign = 0;
+  unsigned last_char_is_i = 0;
   unsigned return_symbol = 0;
-  int sign = 1;
-
-  if ((chr == '+') || (chr == '-'))
-    {
-      sign = (chr == '-') ? -1 : +1;
-      c = chr = scm_getc (port);
-    }
 
   result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
   c = chr;
+
+  if ((c == '+') || (c == '-'))
+    saw_leading_sign = 1;
 
   while (c != EOF)
     {
@@ -502,14 +500,7 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
 	    saw_point = 1;
 	}
       else if ((c == '+') || (c == '-'))
-	{
-	  if (saw_plus_or_minus)
-	    /* Already seen a `+' or `-' before, so this can't be a
-	       complex.  */
-	    return_symbol = 1;
-	  else
-	    saw_plus_or_minus = 1;
-	}
+	saw_plus_or_minus++;
       else if (!isdigit (c))
 	return_symbol = 1;
 
@@ -527,12 +518,19 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
       c = scm_getc (port);
     }
 
-  if (saw_plus_or_minus)
+  if (last_char_is_i)
     {
-      if (last_char_is_i)
+      if ((saw_plus_or_minus >= 1) && (saw_plus_or_minus <= 2))
 	/* Oh, this is a complex number!  */
 	return_symbol = 0;
       else
+	return_symbol = 1;
+    }
+  else
+    {
+      if ((saw_plus_or_minus) && (!saw_leading_sign))
+	return_symbol = 1;
+      else if (saw_plus_or_minus > 1)
 	return_symbol = 1;
     }
 
@@ -552,8 +550,6 @@ scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
     return (scm_string_to_symbol (result_str));
 
   result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
-  if (sign < 0)
-    result = scm_difference (SCM_I_MAKINUM (0), result);
 
   return result;
 }
@@ -875,6 +871,17 @@ scm_read_character (int chr, SCM port, scm_reader_t scm_reader)
 
   read_token (port, charname, sizeof (charname), &charname_len);
 
+  if (charname_len == 0)
+    {
+      chr = scm_getc (port);
+      if (chr == EOF)
+	scm_i_input_error (__FUNCTION__, port, "unexpected end of file "
+			   "while reading character", SCM_EOL);
+
+      /* CHR must be a token delimiter, like a whitespace.  */
+      return (SCM_MAKE_CHAR (chr));
+    }
+
   if (charname_len == 1)
     return SCM_MAKE_CHAR (charname[0]);
 
@@ -1111,7 +1118,7 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
        `.' as a symbol.  */
     SCM_DEFTOKEN_RANGE ('a', 'z', "symbol-lower-case", scm_read_symbol, 0),
     SCM_DEFTOKEN_RANGE ('A', 'Z', "symbol-upper-case", scm_read_symbol, 0),
-    SCM_DEFTOKEN_SET (".+-/*%@_<>!=?$",
+    SCM_DEFTOKEN_SET (".+-/*%&@_<>!=?$",
 		      "symbol-misc-chars",  scm_read_symbol, 0),
 
     SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote", scm_read_quote, 0),

@@ -1,7 +1,7 @@
 #!/bin/sh
 # aside from this initial boilerplate, this is actually -*- scheme -*- code
 main='(module-ref (resolve-module '\''(testsuite)) '\'main')'
-exec ${GUILE-guile} -l $0 -c "(apply $main (cdr (command-line)))" "$@"
+exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
 ;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
@@ -24,7 +24,7 @@ exec ${GUILE-guile} -l $0 -c "(apply $main (cdr (command-line)))" "$@"
 
 
 (define-module (testsuite)
-  #:use-module (reader)
+  #:use-module (system reader)
   #:use-module (srfi srfi-1))
 
 ;;; Author:  Ludovic Courtès
@@ -65,6 +65,7 @@ exec ${GUILE-guile} -l $0 -c "(apply $main (cdr (command-line)))" "$@"
         ((string? obj)  "string")
         ((number? obj)  "number")
         ((keyword? obj) "keyword")
+        ((char? obj)    "character")
         (else           "expression")))
 
 (define-public (sexp-equal? ref sexp)
@@ -99,9 +100,11 @@ encountered."
     (negative-number . "-12")
     (complex-number . "1+2i")
     (complex-number-floating . "1.0-3.14I")
+    (complex-pure-imaginary . "+i")
     (complex-like-symbol . "1.0-2.0")
     (symbol-lower-case . "symbol")
     (symbol-upper-case . "SYMBOL")
+    (symbol-ampersand . "&symbol")
     (symbol-percent . "%symbol")
     (symbol-star . "*symbol*")
     (symbol-at . "@symbol@")
@@ -137,6 +140,10 @@ encountered."
     (character . "#\\x")
     (character-newline . "#\\newline")
     (character-dot . "#\\.")
+    (character-comma . "#\\,")
+    (character-quote . "#\\'")
+    (character-space . "#\\ ")
+    (character-bracket . "#\\)")
     (keyword . "#:kw")
     (guile-extended-symbol . "#{extended symbol}#")
     (srfi-4-vector . "#u8(1 2 3 4 5)")

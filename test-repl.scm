@@ -1,4 +1,4 @@
-;;; test-repl.scm -- A simple REPL that uses a dynamically defined reader.
+;;; test-repl.scm -- A simple REPL that uses a user-defined reader.
 ;;;
 ;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
@@ -21,7 +21,7 @@
 ;;; arch-tag: test-repl.scm
 
 
-(use-modules (reader))
+(use-modules (system reader))
 
 ;;(kill (getpid) SIGTSTP)
 ;;(do-stuff (current-input-port))
@@ -90,4 +90,4 @@ reader for Guile!~%~%")
   (display "\n")
   (loop reader))
 
-;; test-repl.scm ends here
+;;; test-repl.scm ends here
