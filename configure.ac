@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(guile-reader, 0.1, ludovic.courtes@laas.fr)
-AM_INIT_AUTOMAKE(guile-reader, 0.1)
+AC_INIT(guile-reader, 0.2, ludovic.courtes@laas.fr)
+AM_INIT_AUTOMAKE(guile-reader, 0.2)
 
 AC_CONFIG_SRCDIR([reader.c])
 AC_CONFIG_HEADER([config.h reader-config.h])

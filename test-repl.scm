@@ -62,7 +62,9 @@ reader for Guile!~%~%")
                               boolean keyword
                               block-comment)))
                (lambda (chr port read)
-                 (error "unexpected character after `#'" chr))))
+                 (error "unexpected character after `#'" chr))
+	       #t ;; record positions
+	       ))
 
 (define the-reader
   ;; The top-level reader.  It reuses the previously defined reader for `#'
@@ -77,7 +79,11 @@ reader for Guile!~%~%")
                               colon-keyword
                               quote-quasiquote-unquote
                               semicolon-comment
-                              skribe-exp)))))
+                              skribe-exp)))
+	       #f ;; use the default fault handler
+	       #t ;; record positions
+	       #f ;; debugging
+	       ))
 
 
 ;; And now the REPL itself.

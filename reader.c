@@ -152,6 +152,9 @@ token_spec_to_string (const scm_token_reader_spec_t *tr,
 
 /* The Lightning-based implementation of `scm_c_make_reader ()'.  */
 
+
+/* Run-time helper function.  */
+
 static void
 do_like_printf (const char *fmt, int i)
 {
@@ -161,35 +164,6 @@ do_like_printf (const char *fmt, int i)
 #endif
   printf (fmt, i);
 }
-
-/* Make sure we are not producing more code than can fit in the user's
-   buffer.  This is somewhat dangerous.  (XXX)  */
-#define CHECK_CODE_SIZE(_max, _start)			\
-do							\
-{							\
-  if (jit_get_ip ().ptr - (_start) + 40 >= (_max))	\
-    {							\
-      *code_size = jit_get_ip ().ptr - (_start);	\
-      assert (*code_size <= (_max));			\
-      return NULL;					\
-    }							\
-} while (0)
-
-/* Generate code the calls FUNC, a printf-like function, where PTR1 points to
-   an immediate format string containing either `%s' or `%p', and PTR2 is a
-   pointer (immediate value).  REG1 (resp. REG2) is the register where PTR1
-   (resp. PTR2) is stored.  */
-#define DO_DEBUG_2_PP(_ptr1, _reg1, _ptr2, _reg2, _func)	\
-do								\
-{								\
-  jit_movi_p ((_reg1), (_ptr1));				\
-  jit_movi_p ((_reg2), (_ptr2));				\
-  jit_prepare (2);						\
-  jit_pusharg_p ((_reg2));					\
-  jit_pusharg_p ((_reg1));					\
-  jit_finish ((_func));						\
-} while (0)
-
 
 
 static SCM
@@ -214,12 +188,390 @@ do_scm_make_reader_smob (scm_reader_t reader)
   return s_reader;
 }
 
+static void
+do_scm_set_source_position (SCM obj, SCM line, SCM column,
+			    SCM filename)
+{
+  size_t len;
+  char *c_filename;
+
+  debug ("%s: o=%p l=%p c=%p f=%p\n",
+	  __FUNCTION__, obj, line, column, filename);
+
+  assert (scm_is_string (filename));
+  assert (scm_is_number (column));
+  assert (scm_is_number (line));
+
+  len = scm_c_string_length (filename);
+  c_filename = alloca (len + 1);
+  scm_to_locale_stringbuf (filename, c_filename, len);
+  c_filename[len] = 0;
+
+  debug ("%s (obj=%p[%s], line=%u, col=%u, file=\"%s\")\n",
+	 __FUNCTION__, (void *)obj,
+	 SCM_IMP (obj) ? "imm" : "non-imm",
+	 scm_to_uint (line), scm_to_uint (column),
+	 c_filename);
+
+  if ((SCM_NIMP (obj)) && (scm_is_pair (obj)))
+    {
+      /* FIXME:  Why does `scm_set_source_property_x ()' expect the thing to
+	 be a pair?  */
+
+      /* OBJ is a non-immediate Scheme value so we can set its source
+	 properties.  */
+      scm_set_source_property_x (obj, scm_sym_line, line);
+      scm_set_source_property_x (obj, scm_sym_column, column);
+      scm_set_source_property_x (obj, scm_sym_filename, filename);
+    }
+}
+
+
+/* Code generation functions.  */
+
+/* Register allocation invariants
+   ------------------------------
+
+   Registers V0, V1, and V2 are preserved accross function calls.  We have
+   only three of them so care must be taken to use them carefully.  The
+   following invariants were chosen:
+
+   - V0 contains at any time the PORT argument;
+
+   - V1 contains at any time the character just returned by `scm_getc ()',
+   i.e. a C integer;
+
+   - V2 contains the frame pointer, i.e. a pointer to the base of all stack
+     variables.
+
+
+   Variables allocated on the stack
+   --------------------------------
+
+   The generated code stores a few variables on the stack, starting at the
+   frame pointer and going downwards.  The `JIT_STACK_' macros give the
+   offset of those variables.  */
+
+#define JIT_STACK_CALLER_HANDLED      0
+#define JIT_STACK_POSITION_FILENAME   4
+#define JIT_STACK_POSITION_LINE       8
+#define JIT_STACK_POSITION_COLUMN    12
+
+/* Total size needed to store local variables.  */
+#define JIT_STACK_LOCAL_VARIABLES_SIZE 16
+
+/* FIXME: Using Lightning 1.2 on x86, register V2 is _not_ preserved accross
+   function calls as it should be.  The two macros below are meant to work
+   around this.  */
+
+#if (defined __i386__)
+
+# define workaround_pre_call()   do { jit_pushr_p (JIT_V2); } while (0)
+# define workaround_post_call()  do { jit_popr_p (JIT_V2); } while (0)
+
+#else
+
+# define workaround_pre_call()   do {} while (0)
+# define workaround_post_call()  do {} while (0)
+
+#endif
+
+
+/* Generate code the calls FUNC, a printf-like function, where PTR1 points to
+   an immediate format string containing either `%s' or `%p', and PTR2 is a
+   pointer (immediate value).  REG1 (resp. REG2) is the register where PTR1
+   (resp. PTR2) is stored.  */
+#define DO_DEBUG_2_PP(_ptr1, _reg1, _ptr2, _reg2, _func)	\
+do								\
+{								\
+  workaround_pre_call ();					\
+  jit_movi_p ((_reg1), (_ptr1));				\
+  jit_movi_p ((_reg2), (_ptr2));				\
+  jit_prepare (2);						\
+  jit_pusharg_p ((_reg2));					\
+  jit_pusharg_p ((_reg1));					\
+  jit_finish ((_func));						\
+  workaround_post_call ();					\
+} while (0)
+
+/* In the current code generation function, check whether we are not getting
+   too close to MAX bytes, given the fact that code generation started at
+   START (a pointer-to-char).  Return ERROR if this is the case.  */
+#define CHECK_CODE_SIZE(_max, _start, _error)		\
+do							\
+{							\
+  if (jit_get_ip ().ptr - (_start) + 40 >= (_max))	\
+    return (_error);					\
+							\
+} while (0)
+
+
+/* Generate code that will fetch and store the current position information
+   of PORT.  The relevant information is made available on the stack.  The
+   usual register allocation invariants are assumed.  */
+static __inline__ int
+generate_position_store (jit_state *lightning_state,
+			 char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  debug ("%s (@%p)\n", __FUNCTION__, jit_get_ip ().ptr);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  workaround_pre_call ();
+  jit_prepare (1);
+  jit_pusharg_p (JIT_V0);  /* port */
+  (void)jit_finish (scm_port_line);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  workaround_post_call ();
+  jit_stxi_p (-JIT_STACK_POSITION_LINE, JIT_V2, JIT_RET);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  workaround_pre_call ();
+  jit_prepare (1);
+  jit_pusharg_p (JIT_V0);
+  (void)jit_finish (scm_port_column);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  workaround_post_call ();
+  jit_stxi_p (-JIT_STACK_POSITION_COLUMN, JIT_V2, JIT_RET);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  workaround_pre_call ();
+  jit_prepare (1);
+  jit_pusharg_p (JIT_V0);
+  (void)jit_finish (scm_port_filename);
+  workaround_post_call ();
+  jit_stxi_p (-JIT_STACK_POSITION_FILENAME, JIT_V2, JIT_RET);
+
+  /* XXX: We shouldn't need to call `scm_gc_protect ()' here since
+     PORT is unlikely to be GC'd anyway.  */
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  return 0;
+}
+#undef _jit
+
+/* Generate code that will set the source properties of the expression just
+   read and available in register JIT_RET.  The relevant information is
+   assumed to be stored on the stack.  The usual register allocation
+   invariants are assumed.  */
+static __inline__ int
+generate_position_set (jit_state *lightning_state,
+		       char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  debug ("%s\n", __FUNCTION__);
+
+  /* Put the expression just read in V1 which is no longer used at
+     this point (it used to contain the character read).  */
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_pushr_i (JIT_V1);  /* character as an `int' */
+  jit_retval_p (JIT_V1); /* Scheme expression just read */
+
+  /* Pop back line, column and filename.  */
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_ldxi_p (JIT_R0, JIT_V2, -JIT_STACK_POSITION_LINE);
+  jit_ldxi_p (JIT_R1, JIT_V2, -JIT_STACK_POSITION_COLUMN);
+  jit_ldxi_p (JIT_R2, JIT_V2, -JIT_STACK_POSITION_FILENAME);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  workaround_pre_call ();
+  jit_prepare (4);
+  jit_pusharg_p (JIT_R2);
+  jit_pusharg_p (JIT_R1);
+  jit_pusharg_p (JIT_R0);
+  jit_pusharg_p (JIT_V1); /* expr */
+  jit_finish (do_scm_set_source_position);
+  workaround_post_call ();
+
+  /* Put the expression read back in JIT_RET.  */
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_movr_p (JIT_RET, JIT_V1);
+  jit_popr_i (JIT_V1);
+
+  return 0;
+}
+#undef _jit
+
+/* Generate a prologue that reserves enough space on the stack to store the
+   reader's local variables and store the original value of the stack pointer
+   (which we'll refer to as the ``frame pointer'') in V2.  */
+static __inline__ int
+generate_reader_prologue (jit_state *lightning_state,
+			  int debug,
+			  char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  static const char *msg_prologue = "reader prologue: SP is %p\n";
+
+  if (debug)
+    {
+      jit_pushr_p (JIT_R0);
+      jit_pushr_p (JIT_R1);
+
+      (void)jit_movi_p (JIT_R0, msg_prologue);
+      jit_addi_p (JIT_R1, JIT_SP, 2 * sizeof (void *));
+
+      jit_prepare (2);
+      jit_pusharg_p (JIT_R1);
+      jit_pusharg_p (JIT_R0);
+      (void)jit_finish (do_like_printf);
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+
+      jit_popr_p (JIT_R1);
+      jit_popr_p (JIT_R0);
+    }
+
+  jit_movr_p (JIT_V2, JIT_SP);
+  jit_subi_p (JIT_SP, JIT_SP, JIT_STACK_LOCAL_VARIABLES_SIZE + 16);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  return 0;
+}
+#undef _jit
+
+/* Generate code that restores the stack pointer from the frame pointer
+   and returns.  The usual register invariants are assumed.  */
+static __inline__ int
+generate_reader_epilogue (jit_state *lightning_state,
+			  int debug,
+			  char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  static const char *msg_epilogue = "reader epilogue: restoring SP %p\n";
+
+  if (debug)
+    {
+      jit_pushr_p (JIT_RET);
+
+      (void)jit_movi_p (JIT_R0, msg_epilogue);
+      workaround_pre_call ();
+      jit_prepare (2);
+      jit_pusharg_p (JIT_V2);
+      jit_pusharg_p (JIT_R0);
+      (void)jit_finish (do_like_printf);
+      workaround_post_call ();
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+
+      jit_popr_p (JIT_RET);
+    }
+
+  jit_movr_p (JIT_SP, JIT_V2);
+  jit_ret ();
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  return 0;
+}
+#undef _jit
+
+/* Generate code that handles an unexpected character (the character, a C
+   integer, is expected to be in V1 at this point).  I.e., if the
+   CALLER_HANDLED argument passed to the function being generated (this
+   argument is expected to be on the stack) is true, then do nothing.
+   Otherwise, call FAULT_HANDLER.  */
+static __inline__ int
+generate_unexpected_character_handling (jit_state *lightning_state,
+					SCM fault_handler, int debug,
+					char *start, size_t buffer_size)
+{
+  if (scm_procedure_p (fault_handler) == SCM_BOOL_T)
+    {
+      /* Check whether the CALLER_HANDLED argument is true, in which case
+	 we'll simply return the faulty character to PORT and return.  */
+      jit_insn *ref;
+
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+      jit_ldxi_i (JIT_R0, JIT_V2, -JIT_STACK_CALLER_HANDLED);
+      ref = jit_beqi_i (jit_forward (), JIT_R0, 0);
+      workaround_pre_call ();
+      jit_prepare (2);
+      jit_pusharg_p (JIT_V0); /* port */
+      jit_pusharg_i (JIT_V1); /* character */
+      jit_finish (scm_ungetc);
+      workaround_post_call ();
+
+      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+      generate_reader_epilogue (&_jit, debug, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+
+      jit_patch (ref);
+
+      /* Else, since CALLER_HANDLED is false, call the user-defined fault
+	 handler.  */
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+
+      jit_pushr_p (JIT_V2); /* save the frame pointer */
+
+      jit_movi_p (JIT_R1, start);
+      jit_prepare (1);
+      jit_pusharg_p (JIT_R1);
+      jit_finish (do_scm_make_reader_smob);
+      jit_retval_p (JIT_V2);
+
+      workaround_pre_call ();
+      jit_prepare (1);
+      jit_pusharg_i (JIT_V1);
+      jit_finish (do_scm_make_char);
+      jit_retval_p (JIT_R1);
+      workaround_post_call ();
+
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+      jit_movi_p (JIT_R0, (void *)fault_handler);
+      jit_prepare (4);
+      jit_pusharg_p (JIT_V2);  /* reader */
+      jit_pusharg_p (JIT_V0);  /* port */
+      jit_pusharg_p (JIT_R1);  /* character */
+      jit_pusharg_p (JIT_R0);  /* procedure */
+      jit_finish (scm_call_3);
+
+      jit_popr_p (JIT_V2); /* restore the frame pointer */
+    }
+  else
+    {
+      /* The user did not define any method to handle this situation so
+	 return the faulty character to PORT.  */
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+      workaround_pre_call ();
+      jit_prepare (2);
+      jit_pusharg_p (JIT_V0); /* port */
+      jit_pusharg_i (JIT_V1); /* character */
+      jit_finish (scm_ungetc);
+      workaround_post_call ();
+
+      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+    }
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  return 0;
+}
+
+
+/* The top-level code-generating function.  */
+
+#undef CHECK_CODE_SIZE
+
+/* Make sure we are not producing more code than can fit in the user's
+   buffer.  This is somewhat dangerous.  (XXX)  */
+#define CHECK_CODE_SIZE(_max, _start)			\
+do							\
+{							\
+  if (jit_get_ip ().ptr - (_start) + 40 >= (_max))	\
+    {							\
+      *code_size = jit_get_ip ().ptr - (_start);	\
+      assert (*code_size <= (_max));			\
+      return NULL;					\
+    }							\
+} while (0)
+
+
 /* The guts of the system: compiles a reader to native code.  */
 scm_reader_t
 scm_c_make_reader (void *code_buffer,
 		   size_t buffer_size,
 		   const scm_token_reader_spec_t *token_readers,
 		   SCM fault_handler,
+		   int record_positions,
 		   int debug,
 		   size_t *code_size)
 {
@@ -243,31 +595,43 @@ scm_c_make_reader (void *code_buffer,
   result = (scm_reader_t) (jit_set_ip (code_buffer).iptr);
   start = jit_get_ip ().ptr;
 
-  /* Take two arguments (the port and an `int') and put them into V0 and V2
+  /* Take two arguments (the port and an `int') and put them into V0 and V1
      (preserved accross function calls).  */
   jit_prolog (2);
   arg_port = (SCM)jit_arg_p ();
   jit_getarg_p (JIT_V0, arg_port);
   arg_caller_handled = jit_arg_i ();
-  jit_getarg_i (JIT_V2, arg_caller_handled);
+  jit_getarg_i (JIT_V1, arg_caller_handled);
 
   /* The PORT argument is optional.  If not passed (i.e. equals to
      SCM_UNDEFINED), default to the current input port.  */
   ref = jit_bnei_p (jit_forward (), JIT_V0, (void *)SCM_UNDEFINED);
-  jit_calli (scm_current_input_port);
+  jit_finish (scm_current_input_port);
   jit_retval_p (JIT_V0);
   jit_patch (ref);
 
   /* FIXME:  We should check the type of PORT here.  */
 
+  /* Assuming the stack grows downwards, reserve some space for local
+     variables and store the ``frame pointer'' (i.e. the beginning of the
+     local variables array) in V2.  */
+  generate_reader_prologue (&_jit, debug, start, buffer_size);
+  CHECK_CODE_SIZE (buffer_size, start);
+
+  /* Store the CALLER_HANDLED argument (currently in V1) on the stack.  */
+  jit_stxi_p (-JIT_STACK_CALLER_HANDLED, JIT_V2, JIT_V1);
+
   do_again = jit_get_label ();
 
   /* Call `scm_getc ()'.  */
+  workaround_pre_call ();
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);
-  jit_finish (scm_getc);
+  (void)jit_finish (scm_getc);
+  workaround_post_call ();
 
-  /* Put the character just read in V1 (preserved accross function calls).  */
+  /* Put the character just read (an `int') in V1 (preserved accross function
+     calls).  */
   jit_retval_i (JIT_V1);
 
   /* Test whether we got `EOF'.  */
@@ -278,11 +642,21 @@ scm_c_make_reader (void *code_buffer,
   if (debug)
     {
       /* Print a debug message.  */
-      jit_movi_p (JIT_R0, msg_getc);
+      (void)jit_movi_p (JIT_R0, msg_getc);
+      workaround_pre_call ();
       jit_prepare (2);
       jit_pusharg_i (JIT_V1);
       jit_pusharg_p (JIT_R0);
-      jit_finish (do_like_printf);
+      (void)jit_finish (do_like_printf);
+      workaround_post_call ();
+    }
+
+  if (record_positions)
+    {
+      /* Before invoking a token reader, keep track of the current position
+	 of PORT.  */
+      generate_position_store (&_jit, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start);
     }
 
   for (tr = token_readers;
@@ -370,9 +744,8 @@ scm_c_make_reader (void *code_buffer,
 	  }
 
 	default:
-	  fprintf (stderr, "%s: unknown token type: %i\n",
-		   __FUNCTION__, (int)tr->token.type);
-	  abort ();
+	  scm_misc_error (__FUNCTION__, "unknown token type: ~A",
+			  scm_list_1 (SCM_I_MAKINUM ((int)tr->token.type)));
 	}
 
       /* The code that gets executed when the character returned by `scm_getc
@@ -380,11 +753,15 @@ scm_c_make_reader (void *code_buffer,
       CHECK_CODE_SIZE (buffer_size, start);
       if (debug)
 	{
-	  jit_movi_p (JIT_R0, msg_found_token);
+	  (void)jit_movi_p (JIT_R0, msg_found_token);
+
+	  workaround_pre_call ();
 	  jit_prepare (2);
 	  jit_pusharg_i (JIT_V1);
 	  jit_pusharg_p (JIT_R0);
-	  jit_finish (do_like_printf);
+	  (void)jit_finish (do_like_printf);
+	  workaround_post_call ();
+
 	  CHECK_CODE_SIZE (buffer_size, start);
 	}
 
@@ -406,28 +783,26 @@ scm_c_make_reader (void *code_buffer,
 		}
 
 	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_movi_p (JIT_R0, start);
+	      (void)jit_movi_p (JIT_R0, start);
+
+	      workaround_pre_call ();
 	      jit_prepare (3);
 	      jit_pusharg_p (JIT_R0); /* reader */
 	      jit_pusharg_p (JIT_V0); /* port */
 	      jit_pusharg_i (JIT_V1); /* character */
-	      jit_finish (func);
+	      (void)jit_finish (func);
+	      workaround_post_call ();
 
 	      if (debug)
 		{
 		  CHECK_CODE_SIZE (buffer_size, start);
+		  jit_pushr_i (JIT_V1);
 		  jit_movr_p (JIT_V1, JIT_RET);
 		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 				 name, JIT_R1, do_like_printf);
 		  jit_movr_p (JIT_RET, JIT_V1);
+		  jit_popr_i (JIT_V1);
 		}
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      if (!tr->escape)
-		/* When the reader returns SCM_UNSPECIFIED, then start again.
-		   This is what, for instance, comment readers do in the
-		   top-level reader.  */
-		jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
 	    }
 	  else
 	    /* The NULL reader:  simply ignore the character that was just
@@ -454,45 +829,52 @@ scm_c_make_reader (void *code_buffer,
 
 	      CHECK_CODE_SIZE (buffer_size, start);
 
+	      /* Save the current value of V1 (the char as an `int').  */
+	      jit_pushr_i (JIT_V1);
+
 	      /* Convert the character read to a Scheme char.  */
+	      workaround_pre_call ();
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_V1);
 	      jit_finish (do_scm_make_char);
+	      workaround_post_call ();
 	      jit_retval_p (JIT_V1);
 
 	      /* Same for the reader.  */
 	      jit_movi_p (JIT_R0, start);
+	      workaround_pre_call ();
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_R0);
 	      jit_finish (do_scm_make_reader_smob);
+	      workaround_post_call ();
 	      jit_retval_p (JIT_R0);
 
 	      /* Actually call the Scheme procedure.  */
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
+	      workaround_pre_call ();
 	      jit_prepare (4);
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_pusharg_p (JIT_R0); /* reader */
 	      jit_pusharg_p (JIT_V0); /* port */
-	      jit_pusharg_p (JIT_V1); /* character */
+	      jit_pusharg_p (JIT_V1); /* character (Scheme) */
 	      jit_pusharg_p (JIT_R1); /* procedure */
 	      jit_finish (scm_call_3);
+	      workaround_post_call ();
+
+	      /* Restore the C character.  */
+	      jit_popr_i (JIT_V1);
 
 	      if (debug)
 		{
 		  CHECK_CODE_SIZE (buffer_size, start);
+		  jit_pushr_i (JIT_V1);
 		  jit_retval_p (JIT_V1);
 		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 				 "spec_str", JIT_R1, do_like_printf);
 		  jit_movr_p (JIT_RET, JIT_V1);
+		  jit_popr_i (JIT_V1);
 		}
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      if (!tr->escape)
-		/* When the reader returns SCM_UNSPECIFIED, then start again.
-		   This is what, for instance, comment readers do in the
-		   top-level reader.  */
-		jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
 	    }
 	  else
 	    jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
@@ -515,25 +897,22 @@ scm_c_make_reader (void *code_buffer,
 		}
 
 	      CHECK_CODE_SIZE (buffer_size, start);
+	      workaround_pre_call ();
 	      jit_prepare (1);
 	      jit_pusharg_p (JIT_V0); /* port */
 	      jit_finish (tr->reader.value.reader);
+	      workaround_post_call ();
 
 	      if (debug)
 		{
 		  CHECK_CODE_SIZE (buffer_size, start);
+		  jit_pushr_i (JIT_V1);
 		  jit_retval_p (JIT_V1);
 		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 				 "spec_str", JIT_R1, do_like_printf);
 		  jit_movr_p (JIT_RET, JIT_V1);
+		  jit_popr_i (JIT_V1);
 		}
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      if (!tr->escape)
-		/* When the reader returns SCM_UNSPECIFIED, then start again.
-		   This is what, for instance, comment readers do in the
-		   top-level reader.  */
-		jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
 	    }
 	  else
 	    /* The NULL reader:  simply ignore the character that was just
@@ -543,12 +922,28 @@ scm_c_make_reader (void *code_buffer,
 	  break;
 
 	default:
-	  return NULL;
+	  scm_misc_error (__FUNCTION__, "unknown token reader type: ~A",
+			  scm_list_1 (SCM_I_MAKINUM ((int)tr->reader.type)));
+	}
+
+      CHECK_CODE_SIZE (buffer_size, start);
+
+      if (!tr->escape)
+	/* When the reader returns SCM_UNSPECIFIED, then start again.
+	   This is what, for instance, comment readers do in the
+	   top-level reader.  */
+	jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
+
+      if (record_positions)
+	{
+	  generate_position_set (&_jit, start, buffer_size);
+	  CHECK_CODE_SIZE (buffer_size, start);
 	}
 
       /* The reader's return value is already in JIT_RET, so we just have to
 	 return.  */
-      jit_ret ();
+      generate_reader_epilogue (&_jit, debug, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start);
     }
 
   if (jump_count)
@@ -562,65 +957,17 @@ scm_c_make_reader (void *code_buffer,
 
   /* When this point is reached, then no handler was specified for the
      character we just read.  */
-  if (scm_procedure_p (fault_handler) == SCM_BOOL_T)
-    {
-      /* Check whether the CALLER_HANDLED argument is true, in which case
-	 we'll simply return the faulty character to PORT and return.  */
-      CHECK_CODE_SIZE (buffer_size, start);
-      ref = jit_beqi_i (jit_forward (), JIT_V2, 0);
-      jit_prepare (2);
-      jit_pusharg_p (JIT_V0);
-      jit_pusharg_i (JIT_V1);
-      jit_finish (scm_ungetc);
-
-      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
-      jit_ret ();
-
-      jit_patch (ref);
-
-      /* Else, since CALLER_HANDLED is false, call the user-defined fault
-	 handler.  */
-      CHECK_CODE_SIZE (buffer_size, start);
-      jit_movi_p (JIT_R1, start);
-      jit_prepare (1);
-      jit_pusharg_p (JIT_R1);
-      jit_finish (do_scm_make_reader_smob);
-      jit_retval_p (JIT_V2);
-
-      jit_prepare (1);
-      jit_pusharg_i (JIT_V1);
-      jit_finish (do_scm_make_char);
-      jit_retval_p (JIT_R1);
-
-      CHECK_CODE_SIZE (buffer_size, start);
-      jit_movi_p (JIT_R0, (void *)fault_handler);
-      jit_prepare (4);
-      jit_pusharg_p (JIT_V2);  /* reader */
-      jit_pusharg_p (JIT_V0);  /* port */
-      jit_pusharg_p (JIT_R1);  /* character */
-      jit_pusharg_p (JIT_R0);  /* procedure */
-      jit_finish (scm_call_3);
-    }
-  else
-    {
-      /* The user did not define any method to handle this situation so
-	 return the faulty character to PORT.  */
-      CHECK_CODE_SIZE (buffer_size, start);
-      jit_prepare (2);
-      jit_pusharg_p (JIT_V0);
-      jit_pusharg_i (JIT_V1);
-      jit_finish (scm_ungetc);
-
-      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
-    }
-
+  generate_unexpected_character_handling (&_jit, fault_handler, debug,
+					  start, buffer_size);
   CHECK_CODE_SIZE (buffer_size, start);
-  jit_ret ();
+
+  generate_reader_epilogue (&_jit, debug, start, buffer_size);
+  CHECK_CODE_SIZE (buffer_size, start);
 
   /* This is where we get when `scm_getc ()' returned EOF.  */
   jit_patch (jump_to_end);
   jit_movi_p (JIT_RET, (void *)SCM_EOF_VAL);
-  jit_ret ();
+  generate_reader_epilogue (&_jit, debug, start, buffer_size);
 
   end = jit_get_ip ().ptr;
   jit_flush_code (start, end);
@@ -653,6 +1000,7 @@ scm_c_make_reader (void *code_buffer,
 		   size_t buffer_size,
 		   const scm_token_reader_spec_t *token_readers,
 		   SCM fault_handler_proc,
+		   int record_positions, -- FIXME: Unimplemented
 		   int debug,
 		   size_t *code_size)
 {
@@ -951,8 +1299,9 @@ scm_to_reader (SCM reader)
 #include "token-readers.h"
 
 
-SCM_DEFINE (scm_make_reader, "make-reader", 1, 2, 0,
-	    (SCM token_readers, SCM fault_handler_proc, SCM debug_p),
+SCM_DEFINE (scm_make_reader, "make-reader", 1, 3, 0,
+	    (SCM token_readers, SCM fault_handler_proc,
+	     SCM record_pos_p, SCM debug_p),
 	    "Create a reader.")
 #define FUNC_NAME "make-reader"
 {
@@ -1009,6 +1358,8 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 2, 0,
     {
       reader = scm_c_make_reader (code_buffer, code_size,
 				  c_specs, fault_handler_proc,
+				  (record_pos_p == SCM_UNDEFINED) ? 0
+				  : ((record_pos_p == SCM_BOOL_F) ? 0 : 1),
 				  (debug_p == SCM_UNDEFINED) ? 0
 				  : ((debug_p == SCM_BOOL_F) ? 0 : 1),
 				  &actual_size);
@@ -1327,6 +1678,7 @@ reader_apply (SCM reader, SCM port, SCM caller_handled)
   scm_reader_t c_reader;
 
   SCM_READER_SMOB_DATA (c_reader, reader);
+  debug ("%s: applying reader %p\n", __FUNCTION__, c_reader);
 
   /* Type checking and optional argument definition are checked in either
      `scm_call_reader ()' or the compiled reader's code.  */

@@ -125,6 +125,7 @@ extern scm_reader_t scm_c_make_reader (void *code_buffer,
 				       size_t buffer_size,
 				       const scm_token_reader_spec_t *specs,
 				       SCM fault_handler_proc,
+				       int record_positions,
 				       int debug,
 				       size_t *code_size);
 
@@ -136,7 +137,7 @@ extern scm_reader_t scm_c_make_reader (void *code_buffer,
    produce debugging output.  */
 extern SCM scm_make_reader (SCM token_readers,
 			    SCM fault_handler_proc,
-			    SCM debug_p);
+			    SCM record_positions_p, SCM debug_p);
 
 
 /* Return a Scheme representation of the token reader specified by TR.  If

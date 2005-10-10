@@ -2,7 +2,7 @@ SUBDIRS = module doc
 
 lib_LTLIBRARIES = libguile-reader.la
 libguile_reader_la_SOURCES = reader.c token-readers.c
-libguile_reader_la_LDFLAGS = -module -interface 0:0:0
+libguile_reader_la_LDFLAGS = -module -version-info 1:0:0
 
 readerincludedir = $(includedir)/guile-reader
 
