@@ -112,32 +112,40 @@ typedef struct scm_token_reader_spec
 typedef scm_token_reader_spec_t *scm_reader_spec_t;
 
 
+/* Flags that may be passed to `scm_c_make_reader ()'.  */
+#define SCM_READER_FLAG_DEBUG           0x01 /* output debugging info */
+#define SCM_READER_FLAG_POSITIONS       0x02 /* record source position */
+
 /* Return a pointer to a reader function compliant with the specifications in
-   TOKEN_READERS.  If DEBUG is non-zero, debugging code is generated.  If
-   FAULT_HANDLER_PROC is a procedure, then the generated reader will call it
-   whenever a character is read that is not handled (passing it the faulty
-   character, the port, and the reader).  If CODE_BUFFER, of BUFFER_SIZE
-   bytes, is too small to contain the generated code, NULL is returned and
-   CODE_SIZE is set to the size of the generated code at this point.  On
-   success, CODE_SIZE is also set to the actual size of the generated
-   code.  */
+   TOKEN_READERS.  FLAGS should be a logical or of the `SCM_READER_FLAG_'
+   macros.  If FAULT_HANDLER_PROC is a procedure, then the generated reader
+   will call it whenever a character is read that is not handled (passing it
+   the faulty character, the port, and the reader).  If CODE_BUFFER, of
+   BUFFER_SIZE bytes, is too small to contain the generated code, NULL is
+   returned and CODE_SIZE is set to the size of the generated code at this
+   point.  On success, CODE_SIZE is also set to the actual size of the
+   generated code.  */
 extern scm_reader_t scm_c_make_reader (void *code_buffer,
 				       size_t buffer_size,
 				       const scm_token_reader_spec_t *specs,
 				       SCM fault_handler_proc,
-				       int record_positions,
-				       int debug,
+				       unsigned flags,
 				       size_t *code_size);
 
 /* Scheme version of `scm_c_make_reader ()'.  TOKEN_READERS should be a list
    of token readers (returned by `make-token-reader' or
-   `standard-token-reader' for instance).  The two other arguments are
-   optional and may be, respectively, a three-argument procedure to call when
-   an unexpected character is read, and a boolean indicating whether to
-   produce debugging output.  */
+   `standard-token-reader' for instance).  The second argument is optional
+   and may be a three-argument procedure to call when an unexpected character
+   is read.  FLAGS is a rest argument which may contain a list of symbols
+   representing reader compilation flags.  */
 extern SCM scm_make_reader (SCM token_readers,
 			    SCM fault_handler_proc,
-			    SCM record_positions_p, SCM debug_p);
+			    SCM flags);
+
+/* Convert FLAGS, a list of symbols representing flags for `make-reader', to
+   their C representation (which may be passed to `scm_c_make_reader
+   ()').  */
+extern unsigned scm_to_make_reader_flags (SCM flags);
 
 
 /* Return a Scheme representation of the token reader specified by TR.  If

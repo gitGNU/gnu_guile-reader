@@ -205,17 +205,6 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
 #endif
     }
 exit:
-#if 0
-  scm_whash_insert (scm_source_whash,
-		    ans,
-		    scm_make_srcprops (line,
-				       column,
-				       SCM_FILENAME (port),
-				       SCM_COPY_SOURCE_P
-				       ? ans2 /* FIXME: Was *copy = ans2 */
-				       : SCM_UNDEFINED,
-				       SCM_EOL));
-#endif
 
   return ans;
 }
@@ -590,21 +579,6 @@ scm_read_quote (int chr, SCM port, scm_reader_t scm_reader)
     }
 
   p = scm_cons2 (p, scm_call_reader (scm_reader, port, 0), SCM_EOL);
-#if 0
-  if (SCM_RECORD_POSITIONS_P)
-    scm_whash_insert (scm_source_whash,
-		      p,
-		      scm_make_srcprops (SCM_LINUM (port),
-					 SCM_COL (port) - 1,
-					 SCM_FILENAME (port),
-					 SCM_COPY_SOURCE_P
-					 ? (/**copy = */
-					    scm_cons2 (SCM_CAR (p),
-						       SCM_CAR (SCM_CDR (p)),
-						       SCM_EOL))
-					 : SCM_UNDEFINED,
-					 SCM_EOL));
-#endif
 
   return p;
 }
@@ -695,13 +669,8 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
 	got = scm_call_2 (sharp, SCM_MAKE_CHAR (c), port);
 	if (scm_is_eq (got, SCM_UNSPECIFIED))
 	  goto handle_sharp;
-#if 0
-	if (SCM_RECORD_POSITIONS_P)
-	  return /* *copy = */ recsexpr (got, line, column,
-					 SCM_FILENAME (port));
-	else
-#endif
-	  return got;
+
+	return got;
       }
   }
  handle_sharp:
@@ -828,13 +797,8 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
 	    got = scm_call_2 (sharp, SCM_MAKE_CHAR (c), port);
 	    if (scm_is_eq (got, SCM_UNSPECIFIED))
 	      goto unkshrp;
-#if 0
-	    if (SCM_RECORD_POSITIONS_P)
-	      return /* *copy = */ recsexpr (got, line, column,
-					     SCM_FILENAME (port));
-	    else
-#endif
-	      return got;
+
+	    return got;
 	  }
       }
     unkshrp:
@@ -1196,7 +1160,7 @@ scm_load_standard_reader (void)
 	scm_c_make_reader (standard_sharp_reader_code,
 			   sizeof (standard_sharp_reader_code),
 			   scm_sharp_reader_standard_specs,
-			   scm_reader_standard_fault_handler_proc, 0, 0,
+			   scm_reader_standard_fault_handler_proc, 0,
 			   &code_size);
     }
 
@@ -1224,7 +1188,7 @@ scm_load_standard_reader (void)
 	scm_c_make_reader (standard_reader_code,
 			   sizeof (standard_reader_code),
 			   scm_reader_standard_specs,
-			   scm_reader_standard_fault_handler_proc, 0, 0,
+			   scm_reader_standard_fault_handler_proc, 0,
 			   &code_size);
     }
 }

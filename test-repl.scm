@@ -46,8 +46,7 @@ reader for Guile!~%~%")
   ;; a quoted symbol.
   (make-token-reader #\?
                      (lambda (chr port read)
-                       (format #t "got chr `~a'~%"
-                               chr)
+                       (format #t "got chr `~a'~%" chr)
                        (list quote 'magic!))))
 
 (define sharp-reader
@@ -63,8 +62,7 @@ reader for Guile!~%~%")
                               block-comment)))
                (lambda (chr port read)
                  (error "unexpected character after `#'" chr))
-	       #t ;; record positions
-	       ))
+	       'reader/record-positions))
 
 (define the-reader
   ;; The top-level reader.  It reuses the previously defined reader for `#'
@@ -81,8 +79,8 @@ reader for Guile!~%~%")
                               semicolon-comment
                               skribe-exp)))
 	       #f ;; use the default fault handler
-	       #t ;; record positions
-	       #f ;; debugging
+	       'reader/record-positions
+	       ;;'reader/debug
 	       ))
 
 
