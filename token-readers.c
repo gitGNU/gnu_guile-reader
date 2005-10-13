@@ -2,27 +2,27 @@
 
    Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
-   Part of the code in here (a few `scm_token_reader_t' functions below) is
-   based on Guile's code (file `read.c') which contain the following
-   copyright line:
+   Part of the code here (a few `scm_token_reader_t' functions below) is
+   based on Guile code released under the GNU LGPL (file `read.c') which
+   contains the following copyright line:
 
    Copyright (C) 1995,1996,1997,1999,2000,2001,2003, 2004 Free Software
    Foundation, Inc.
 
 
-   This library is free software; you can redistribute it and/or modify it
-   under the terms of the GNU Lesser General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or (at your
-   option) any later version.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2 of the License, or
+   (at your option) any later version.
 
-   This library is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
-   License for more details.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-   You should have received a copy of the GNU Lesser General Public License
-   along with this library; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA  */
 
 
 /* A library of stardard token readers that can be assembled to create a
