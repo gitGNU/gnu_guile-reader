@@ -20,8 +20,12 @@ EXTRA_DIST = test-repl.scm $(TESTS)
 
 AM_CFLAGS = -Wall -g -O0
 
+if HAVE_INSTALLED_LIGHTNING
+
 # Tell GCC to not complain about what Lightning does.
-#libguile_reader_la_CFLAGS = -Wno-unused-value
+libguile_reader_la_CFLAGS = -Wno-unused-value
+
+endif
 
 snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 

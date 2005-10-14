@@ -28,6 +28,8 @@
 #include "reader.h"
 #include "token-readers.h"
 
+#include "config.h" /* this defines `inline' among other things */
+
 #ifdef SCM_READER_USE_LIGHTNING
 # include <lightning.h>
 #endif
@@ -43,7 +45,7 @@ static void debug (const char *, ...)
 #ifdef DEBUG
 #include <stdio.h>
 
-static __inline__ void
+static inline void
 debug (const char *fmt, ...)
 {
   va_list ap;
@@ -55,7 +57,7 @@ debug (const char *fmt, ...)
 
 #else
 
-static __inline__ void
+static inline void
 debug (const char *fmt, ...)
 {
   /* Nothing.  */
@@ -147,6 +149,44 @@ token_spec_to_string (const scm_token_reader_spec_t *tr,
     }
 }
 
+static void
+do_scm_set_source_position (SCM obj, SCM line, SCM column,
+			    SCM filename)
+{
+  size_t len;
+  char *c_filename;
+
+  debug ("%s: o=%p l=%p c=%p f=%p\n",
+	  __FUNCTION__, obj, line, column, filename);
+
+  assert (scm_is_string (filename));
+  assert (scm_is_number (column));
+  assert (scm_is_number (line));
+
+  len = scm_c_string_length (filename);
+  c_filename = alloca (len + 1);
+  scm_to_locale_stringbuf (filename, c_filename, len);
+  c_filename[len] = 0;
+
+  debug ("%s (obj=%p[%s], line=%u, col=%u, file=\"%s\")\n",
+	 __FUNCTION__, (void *)obj,
+	 SCM_IMP (obj) ? "imm" : "non-imm",
+	 scm_to_uint (line), scm_to_uint (column),
+	 c_filename);
+
+  if ((SCM_NIMP (obj)) && (scm_is_pair (obj)))
+    {
+      /* FIXME:  Why does `scm_set_source_property_x ()' expect the thing to
+	 be a pair?  */
+
+      /* OBJ is a non-immediate Scheme value so we can set its source
+	 properties.  */
+      scm_set_source_property_x (obj, scm_sym_line, line);
+      scm_set_source_property_x (obj, scm_sym_column, column);
+      scm_set_source_property_x (obj, scm_sym_filename, filename);
+    }
+}
+
 #ifdef SCM_READER_USE_LIGHTNING
 
 /* The Lightning-based implementation of `scm_c_make_reader ()'.  */
@@ -187,43 +227,6 @@ do_scm_make_reader_smob (scm_reader_t reader)
   return s_reader;
 }
 
-static void
-do_scm_set_source_position (SCM obj, SCM line, SCM column,
-			    SCM filename)
-{
-  size_t len;
-  char *c_filename;
-
-  debug ("%s: o=%p l=%p c=%p f=%p\n",
-	  __FUNCTION__, obj, line, column, filename);
-
-  assert (scm_is_string (filename));
-  assert (scm_is_number (column));
-  assert (scm_is_number (line));
-
-  len = scm_c_string_length (filename);
-  c_filename = alloca (len + 1);
-  scm_to_locale_stringbuf (filename, c_filename, len);
-  c_filename[len] = 0;
-
-  debug ("%s (obj=%p[%s], line=%u, col=%u, file=\"%s\")\n",
-	 __FUNCTION__, (void *)obj,
-	 SCM_IMP (obj) ? "imm" : "non-imm",
-	 scm_to_uint (line), scm_to_uint (column),
-	 c_filename);
-
-  if ((SCM_NIMP (obj)) && (scm_is_pair (obj)))
-    {
-      /* FIXME:  Why does `scm_set_source_property_x ()' expect the thing to
-	 be a pair?  */
-
-      /* OBJ is a non-immediate Scheme value so we can set its source
-	 properties.  */
-      scm_set_source_property_x (obj, scm_sym_line, line);
-      scm_set_source_property_x (obj, scm_sym_column, column);
-      scm_set_source_property_x (obj, scm_sym_filename, filename);
-    }
-}
 
 
 /* Code generation functions.  */
@@ -326,7 +329,7 @@ do_debug_regs (unsigned line, int entering, void *sp, void *v2)
   printf ("%sregisters:%u: SP=%p V2=%p\n", indent, line, sp, v2);
 }
 
-static __inline__ int
+static inline int
 generate_debug_registers (jit_state *lightning_state,
 			  int enter, unsigned line,
 			  char *start, size_t buffer_size)
@@ -346,7 +349,7 @@ generate_debug_registers (jit_state *lightning_state,
   jit_pusharg_p (JIT_SP);
   jit_pusharg_i (JIT_R1);
   jit_pusharg_i (JIT_R0);
-  jit_finish (do_debug_regs);
+  (void)jit_finish (do_debug_regs);
 
   jit_popr_p (JIT_R2);
   jit_popr_p (JIT_R1);
@@ -361,7 +364,7 @@ generate_debug_registers (jit_state *lightning_state,
 /* Generate code that will fetch and store the current position information
    of PORT.  The relevant information is made available on the stack.  The
    usual register allocation invariants are assumed.  */
-static __inline__ int
+static inline int
 generate_position_store (jit_state *lightning_state,
 			 char *start, size_t buffer_size)
 #define _jit (* lightning_state)
@@ -407,7 +410,7 @@ generate_position_store (jit_state *lightning_state,
    read and available in register JIT_RET.  The relevant information is
    assumed to be stored on the stack.  The usual register allocation
    invariants are assumed.  */
-static __inline__ int
+static inline int
 generate_position_set (jit_state *lightning_state,
 		       char *start, size_t buffer_size)
 #define _jit (* lightning_state)
@@ -433,7 +436,7 @@ generate_position_set (jit_state *lightning_state,
   jit_pusharg_p (JIT_R1);
   jit_pusharg_p (JIT_R0);
   jit_pusharg_p (JIT_V1); /* expr */
-  jit_finish (do_scm_set_source_position);
+  (void)jit_finish (do_scm_set_source_position);
   debug_post_call ();
 
   /* Put the expression read back in JIT_RET.  */
@@ -448,7 +451,7 @@ generate_position_set (jit_state *lightning_state,
 /* Generate a prologue that reserves enough space on the stack to store the
    reader's local variables and store the original value of the stack pointer
    (which we'll refer to as the ``frame pointer'') in V2.  */
-static __inline__ int
+static inline int
 generate_reader_prologue (jit_state *lightning_state,
 			  int debug,
 			  char *start, size_t buffer_size)
@@ -484,7 +487,7 @@ generate_reader_prologue (jit_state *lightning_state,
 
 /* Generate code that restores the stack pointer from the frame pointer
    and returns.  The usual register invariants are assumed.  */
-static __inline__ int
+static inline int
 generate_reader_epilogue (jit_state *lightning_state,
 			  int debug,
 			  char *start, size_t buffer_size)
@@ -521,7 +524,7 @@ generate_reader_epilogue (jit_state *lightning_state,
    CALLER_HANDLED argument passed to the function being generated (this
    argument is expected to be on the stack) is true, then do nothing.
    Otherwise, call FAULT_HANDLER.  */
-static __inline__ int
+static inline int
 generate_unexpected_character_handling (jit_state *lightning_state,
 					SCM fault_handler, int debug,
 					char *start, size_t buffer_size)
@@ -537,11 +540,11 @@ generate_unexpected_character_handling (jit_state *lightning_state,
   jit_prepare (2);
   jit_pusharg_p (JIT_V0); /* port */
   jit_pusharg_i (JIT_V1); /* character */
-  jit_finish (scm_ungetc);
+  (void)jit_finish (scm_ungetc);
   debug_post_call ();
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
-  jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+  (void)jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
   generate_reader_epilogue (&_jit, debug, start, buffer_size);
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
@@ -555,29 +558,29 @@ generate_unexpected_character_handling (jit_state *lightning_state,
 
       jit_pushr_p (JIT_V2); /* save the frame pointer */
 
-      jit_movi_p (JIT_R1, start);
+      (void)jit_movi_p (JIT_R1, start);
       jit_prepare (1);
       jit_pusharg_p (JIT_R1);
-      jit_finish (do_scm_make_reader_smob);
+      (void)jit_finish (do_scm_make_reader_smob);
       jit_retval_p (JIT_V2);
       CHECK_CODE_SIZE (buffer_size, start, -1);
 
       debug_pre_call ();
       jit_prepare (1);
       jit_pusharg_i (JIT_V1);
-      jit_finish (do_scm_make_char);
+      (void)jit_finish (do_scm_make_char);
       jit_retval_p (JIT_R1);
       debug_post_call ();
 
       CHECK_CODE_SIZE (buffer_size, start, -1);
-      jit_movi_p (JIT_R0, (void *)fault_handler);
+      (void)jit_movi_p (JIT_R0, (void *)fault_handler);
       debug_pre_call ();
       jit_prepare (4);
       jit_pusharg_p (JIT_V2);  /* reader */
       jit_pusharg_p (JIT_V0);  /* port */
       jit_pusharg_p (JIT_R1);  /* character */
       jit_pusharg_p (JIT_R0);  /* procedure */
-      jit_finish (scm_call_3);
+      (void)jit_finish (scm_call_3);
       debug_post_call ();
 
       jit_popr_p (JIT_V2); /* restore the frame pointer */
@@ -593,10 +596,10 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       jit_prepare (2);
       jit_pusharg_p (JIT_V0); /* port */
       jit_pusharg_i (JIT_V1); /* character */
-      jit_finish (scm_ungetc);
+      (void)jit_finish (scm_ungetc);
       debug_post_call ();
 
-      jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+      (void)jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
     }
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
@@ -663,7 +666,7 @@ scm_c_make_reader (void *code_buffer,
   /* The PORT argument is optional.  If not passed (i.e. equals to
      SCM_UNDEFINED), default to the current input port.  */
   ref = jit_bnei_p (jit_forward (), JIT_V0, (void *)SCM_UNDEFINED);
-  jit_finish (scm_current_input_port);
+  (void)jit_finish (scm_current_input_port);
   jit_retval_p (JIT_V0);
   jit_patch (ref);
 
@@ -867,7 +870,7 @@ scm_c_make_reader (void *code_buffer,
 	  else
 	    /* The NULL reader:  simply ignore the character that was just
 	       read and jump to DO_AGAIN.  This is useful for whitespaces.  */
-	    jit_jmpi (do_again);
+	    (void)jit_jmpi (do_again);
 
 	  break;
 
@@ -896,12 +899,12 @@ scm_c_make_reader (void *code_buffer,
 	      debug_pre_call ();
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_V1);
-	      jit_finish (do_scm_make_char);
+	      (void)jit_finish (do_scm_make_char);
 	      debug_post_call ();
 	      jit_retval_p (JIT_V1);
 
 	      /* Same for the reader.  */
-	      jit_movi_p (JIT_R0, start);
+	      (void)jit_movi_p (JIT_R0, start);
 	      debug_pre_call ();
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_R0);
@@ -1058,7 +1061,7 @@ struct scm_reader
 {
   scm_token_reader_spec_t *token_readers;
   SCM fault_handler_proc;
-  int debug;
+  unsigned flags;
 };
 
 scm_reader_t
@@ -1066,8 +1069,7 @@ scm_c_make_reader (void *code_buffer,
 		   size_t buffer_size,
 		   const scm_token_reader_spec_t *token_readers,
 		   SCM fault_handler_proc,
-		   int record_positions, -- FIXME: Unimplemented
-		   int debug,
+		   unsigned flags,
 		   size_t *code_size)
 {
   struct scm_reader *result;
@@ -1081,7 +1083,7 @@ scm_c_make_reader (void *code_buffer,
 
   result = (struct scm_reader *)buffer;
   result->fault_handler_proc = fault_handler_proc;
-  result->debug = debug;
+  result->flags = flags;
   tr_copy = (scm_token_reader_spec_t *)(buffer + sizeof (*result));
 
   result->token_readers = tr_copy;
@@ -1184,11 +1186,27 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
 	{
 	  if (tr_handles_char (tr, c))
 	    {
+	      SCM column = SCM_BOOL_F, line = SCM_BOOL_F;
+	      SCM filename = SCM_BOOL_F;
+
+	      if (reader->flags & SCM_READER_FLAG_POSITIONS)
+		{
+		  column = scm_port_column (port);
+		  line = scm_port_line (port);
+		  filename = scm_port_filename (port);
+		}
+
 	      result = tr_invoke (tr, c, port, reader);
 	      if ((result == SCM_UNSPECIFIED) && (!tr->escape))
 		goto doit;
 	      else
-		return result;
+		{
+		  if (reader->flags & SCM_READER_FLAG_POSITIONS)
+		    do_scm_set_source_position (result, line,
+						column, filename);
+
+		  return result;
+		}
 	    }
 	}
 

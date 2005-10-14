@@ -3,10 +3,10 @@
   Hand-written Autoheader template meant to be installed.  */
 
 /* Define this if we have Lightning.  */
-#undef HAVE_LIGHTNING_H
+#undef HAVE_LIGHTNING
 
-#ifdef HAVE_LIGHTNING_H
-# define SCM_READER_USE_LIGHTNING 1
-# undef HAVE_LIGHTNING_H
-#endif /* HAVE_LIGHTNING_H */
-
+#ifdef HAVE_LIGHTNING
+# ifndef SCM_READER_USE_LIGHTNING
+#  define SCM_READER_USE_LIGHTNING 1
+# endif
+#endif /* HAVE_LIGHTNING */

@@ -38,6 +38,8 @@
 #include "reader.h"
 #include "token-readers.h"
 
+#include "config.h"
+
 
 
 /* `isblank' is only in C99.  */
@@ -52,7 +54,7 @@
 
 /* Helper function similar to `scm_read_token ()'.  Read from PORT until a
    whitespace is read.  */
-static __inline__ void
+static inline void
 read_token (SCM port, char *buf, size_t buf_size, size_t *read)
 {
   *read = 0;

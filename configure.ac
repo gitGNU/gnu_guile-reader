@@ -17,7 +17,10 @@ AC_PROG_LIBTOOL
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([stdlib.h string.h strings.h lightning.h])
+AC_CHECK_HEADERS([stdlib.h string.h strings.h])
+
+LIGHTNING_CONFIGURE_IF_NOT_FOUND([],
+  [AC_MSG_WARN([GNU Lightning not found.  Make sure it is not installable on your platform!])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
