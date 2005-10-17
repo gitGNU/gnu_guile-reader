@@ -218,6 +218,9 @@ do_scm_make_reader_smob (scm_reader_t reader)
 {
   register SCM s_reader;
 
+  if (!reader)
+    return SCM_BOOL_F;
+
   /* We return a non-freeable reader SMOB with no `deps'.  Hopefully this
      will be a short-lived SMOB.  */
   SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader, NULL, 0);
@@ -254,13 +257,16 @@ do_scm_make_reader_smob (scm_reader_t reader)
    frame pointer and going downwards.  The `JIT_STACK_' macros give the
    offset of those variables.  */
 
-#define JIT_STACK_CALLER_HANDLED      4
-#define JIT_STACK_POSITION_FILENAME   8
-#define JIT_STACK_POSITION_LINE      12
-#define JIT_STACK_POSITION_COLUMN    16
+#define JIT_WORD_SIZE                 sizeof (void *)
+
+#define JIT_STACK_CALLER_HANDLED      JIT_WORD_SIZE
+#define JIT_STACK_TOP_LEVEL_READER    (JIT_WORD_SIZE * 2)
+#define JIT_STACK_POSITION_FILENAME   (JIT_WORD_SIZE * 3)
+#define JIT_STACK_POSITION_LINE       (JIT_WORD_SIZE * 4)
+#define JIT_STACK_POSITION_COLUMN     (JIT_WORD_SIZE * 5)
 
 /* Total size needed to store local variables.  */
-#define JIT_STACK_LOCAL_VARIABLES_SIZE 32
+#define JIT_STACK_LOCAL_VARIABLES_SIZE (JIT_WORD_SIZE * 8)
 
 /* Aid in register-level debugging.  */
 
@@ -443,6 +449,50 @@ generate_position_set (jit_state *lightning_state,
   CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_movr_p (JIT_RET, JIT_V1);
   jit_popr_i (JIT_V1);
+
+  return 0;
+}
+#undef _jit
+
+/* Generate code that converts the ASCII character in V1 to upper case.  */
+static inline int
+generate_to_upper (jit_state *lightning_state,
+		   char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  jit_insn *lt_test, *gt_test;
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  lt_test = jit_blti_i (jit_forward (), JIT_V1, (int)'a');
+  gt_test = jit_bgti_i (jit_forward (), JIT_V1, (int)'z');
+  jit_movr_i (JIT_R0, JIT_V1);
+  jit_subi_i (JIT_V1, JIT_R0, (int)('a' - 'A'));
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  jit_patch (lt_test);
+  jit_patch (gt_test);
+
+  return 0;
+}
+#undef _jit
+
+/* Generate code that converts the ASCII character in V1 to lower case.  */
+static inline int
+generate_to_lower (jit_state *lightning_state,
+		   char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  jit_insn *lt_test, *gt_test;
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  lt_test = jit_blti_i (jit_forward (), JIT_V1, (int)'A');
+  gt_test = jit_bgti_i (jit_forward (), JIT_V1, (int)'Z');
+  jit_movr_i (JIT_R0, JIT_V1);
+  jit_addi_i (JIT_V1, JIT_R0, (int)('a' - 'A'));
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  jit_patch (lt_test);
+  jit_patch (gt_test);
 
   return 0;
 }
@@ -649,8 +699,7 @@ scm_c_make_reader (void *code_buffer,
   jit_insn *jumps[20], *ref, *do_again, *jump_to_end;
   size_t jump_count = 0;
   const scm_token_reader_spec_t *tr;
-  SCM arg_port;
-  int arg_caller_handled;
+  int arg_port, arg_caller_handled, arg_top_level_reader;
 
   result = (scm_reader_t) (jit_set_ip (code_buffer).iptr);
   start = jit_get_ip ().ptr;
@@ -658,19 +707,13 @@ scm_c_make_reader (void *code_buffer,
   /* Take two arguments (the port and an `int') and put them into V0 and V1
      (preserved accross function calls).  */
   jit_prolog (2);
-  arg_port = (SCM)jit_arg_p ();
+  arg_port = jit_arg_p ();
   jit_getarg_p (JIT_V0, arg_port);
   arg_caller_handled = jit_arg_i ();
   jit_getarg_i (JIT_V1, arg_caller_handled);
+  arg_top_level_reader = jit_arg_p ();
+  jit_getarg_p (JIT_R2, arg_top_level_reader);
 
-  /* The PORT argument is optional.  If not passed (i.e. equals to
-     SCM_UNDEFINED), default to the current input port.  */
-  ref = jit_bnei_p (jit_forward (), JIT_V0, (void *)SCM_UNDEFINED);
-  (void)jit_finish (scm_current_input_port);
-  jit_retval_p (JIT_V0);
-  jit_patch (ref);
-
-  /* FIXME:  We should check the type of PORT here.  */
 
   /* Assuming the stack grows downwards, reserve some space for local
      variables and store the ``frame pointer'' (i.e. the beginning of the
@@ -679,9 +722,29 @@ scm_c_make_reader (void *code_buffer,
 			    start, buffer_size);
   CHECK_CODE_SIZE (buffer_size, start);
 
-  /* Store the CALLER_HANDLED argument (currently in V1) on the stack.  */
+  /* Store the CALLER_HANDLED argument (currently in V1) and the
+     TOP_LEVEL_READER argument (in R2) on the stack.  */
   CHECK_CODE_SIZE (buffer_size, start);
   jit_stxi_i (-JIT_STACK_CALLER_HANDLED, JIT_V2, JIT_V1);
+  {
+    /* If TOP_LEVEL_READER is NULL, then we'll advertise ourself as the
+       top-level reader.  */
+    jit_insn *ref;
+    ref = jit_bnei_p (jit_forward (), JIT_R2, NULL);
+    jit_movi_p (JIT_R2, start);
+    jit_patch (ref);
+    jit_stxi_p (-JIT_STACK_TOP_LEVEL_READER, JIT_V2, JIT_R2);
+    CHECK_CODE_SIZE (buffer_size, start);
+  }
+
+  /* FIXME:  We should check the type of PORT here.  */
+
+  /* The PORT argument is optional.  If not passed (i.e. equals to
+     SCM_UNDEFINED), default to the current input port.  */
+  ref = jit_bnei_p (jit_forward (), JIT_V0, (void *)SCM_UNDEFINED);
+  (void)jit_finish (scm_current_input_port);
+  jit_retval_p (JIT_V0);
+  jit_patch (ref);
 
   CHECK_CODE_SIZE (buffer_size, start);
   do_again = jit_get_label ();
@@ -701,6 +764,17 @@ scm_c_make_reader (void *code_buffer,
   jump_to_end = jit_beqi_i (jit_forward (), JIT_V1, (int)EOF);
 
   CHECK_CODE_SIZE (buffer_size, start);
+
+  if (flags & SCM_READER_FLAG_UPPER_CASE)
+    {
+      generate_to_upper (&_jit, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start);
+    }
+  else if (flags & SCM_READER_FLAG_LOWER_CASE)
+    {
+      generate_to_lower (&_jit, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start);
+    }
 
   if (flags & SCM_READER_FLAG_DEBUG)
     {
@@ -722,6 +796,11 @@ scm_c_make_reader (void *code_buffer,
       CHECK_CODE_SIZE (buffer_size, start);
     }
 
+  /* XXX: Instead of testing whether the character is handled by each TR, we
+     could instead just build a 256-byte array of jumps and directly use that
+     at run-time, therefore making dispatching O(1).  However, one good
+     reason not to do it is that (i) ports return `int's and (ii) ports may
+     well return wide characters in the foreseeable future.  */
   for (tr = token_readers;
        tr->token.type != SCM_TOKEN_UNDEF;
        tr++)
@@ -835,7 +914,8 @@ scm_c_make_reader (void *code_buffer,
 	    {
 	      /* Call the C reader function associated with this
 		 character.  */
-	      const char *name = (tr->name ? tr->name : "<nameless>");
+	      static const char *nameless = "<nameless>";
+	      const char *name = (tr->name ? tr->name : nameless);
 	      void *func = (void *)tr->reader.value.c_reader;
 
 	      if (flags & SCM_READER_FLAG_DEBUG)
@@ -847,9 +927,11 @@ scm_c_make_reader (void *code_buffer,
 
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      (void)jit_movi_p (JIT_R0, start);
+	      jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
 
 	      debug_pre_call ();
-	      jit_prepare (3);
+	      jit_prepare (4);
+	      jit_pusharg_p (JIT_R1); /* top-level reader */
 	      jit_pusharg_p (JIT_R0); /* reader */
 	      jit_pusharg_p (JIT_V0); /* port */
 	      jit_pusharg_i (JIT_V1); /* character */
@@ -912,17 +994,29 @@ scm_c_make_reader (void *code_buffer,
 	      debug_post_call ();
 	      jit_retval_p (JIT_R0);
 
+	      /* Same for the top-level reader.  */
+	      jit_pushr_p (JIT_R0);
+	      jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+	      debug_pre_call ();
+	      jit_prepare (1);
+	      jit_pusharg_i (JIT_R2);
+	      jit_finish (do_scm_make_reader_smob);
+	      debug_post_call ();
+	      jit_retval_p (JIT_R2);
+	      jit_popr_p (JIT_R0);
+
 	      /* Actually call the Scheme procedure.  */
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
 	      debug_pre_call ();
-	      jit_prepare (4);
+	      jit_prepare (5);
 	      CHECK_CODE_SIZE (buffer_size, start);
+	      jit_pusharg_p (JIT_R2); /* top-level reader */
 	      jit_pusharg_p (JIT_R0); /* reader */
 	      jit_pusharg_p (JIT_V0); /* port */
 	      jit_pusharg_p (JIT_V1); /* character (Scheme) */
 	      jit_pusharg_p (JIT_R1); /* procedure */
-	      jit_finish (scm_call_3);
+	      jit_finish (scm_call_4);
 	      debug_post_call ();
 
 	      /* Restore the C character.  */
@@ -960,9 +1054,11 @@ scm_c_make_reader (void *code_buffer,
 		}
 
 	      CHECK_CODE_SIZE (buffer_size, start);
+	      jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
 	      jit_movi_i (JIT_R0, 0); /* let the callee handle its things */
 	      debug_pre_call ();
-	      jit_prepare (2);
+	      jit_prepare (3);
+	      jit_pusharg_p (JIT_R2);
 	      jit_pusharg_i (JIT_R0); /* caller_handled */
 	      jit_pusharg_p (JIT_V0); /* port */
 	      jit_finish (tr->reader.value.reader);
@@ -1132,28 +1228,35 @@ tr_handles_char (const scm_token_reader_spec_t *tr, char c)
 
 static SCM
 tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
-	   scm_reader_t reader)
+	   scm_reader_t reader, scm_reader_t top_level_reader)
 {
   switch (tr->reader.type)
     {
     case SCM_TOKEN_READER_C:
       if (tr->reader.value.c_reader)
-	return tr->reader.value.c_reader (c, port, reader);
+	return tr->reader.value.c_reader (c, port, reader,
+					  top_level_reader);
       else
 	return SCM_UNSPECIFIED;
 
     case SCM_TOKEN_READER_SCM:
       {
-	SCM s_reader;
+	SCM s_reader, s_top_level_reader;
+
 	SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader,
 			     NULL, 0);
-	return scm_call_3 (tr->reader.value.scm_reader,
-			   SCM_MAKE_CHAR (c), port, s_reader);
+	SCM_NEW_READER_SMOB (s_top_level_reader, scm_reader_type,
+			     top_level_reader, NULL, 0);
+
+	return scm_call_4 (tr->reader.value.scm_reader,
+			   SCM_MAKE_CHAR (c), port, s_reader,
+			   s_top_level_reader);
       }
 
     case SCM_TOKEN_READER_READER:
       if (tr->reader.value.reader)
-	return scm_call_reader (tr->reader.value.reader, port, 0);
+	return scm_call_reader (tr->reader.value.reader, port, 0,
+				top_level_reader);
       else
 	return SCM_UNSPECIFIED;
 
@@ -1165,7 +1268,8 @@ tr_invoke (const scm_token_reader_spec_t *tr, char c, SCM port,
 }
 
 SCM
-scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
+scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
+		 scm_reader_t top_level_reader)
 #define FUNC_NAME "%call-reader"
 {
   int c = 0;
@@ -1180,6 +1284,11 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
  doit:
   while ((c = scm_getc (port)) != EOF)
     {
+      if (reader->flags & SCM_READER_FLAG_LOWER_CASE)
+	c = tolower (c);
+      else if (reader->flags & SCM_READER_FLAG_UPPER_CASE)
+	c = toupper (c);
+
       for (tr = reader->token_readers;
 	   tr->token.type != SCM_TOKEN_UNDEF;
 	   tr++)
@@ -1196,7 +1305,8 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled)
 		  filename = scm_port_filename (port);
 		}
 
-	      result = tr_invoke (tr, c, port, reader);
+	      result = tr_invoke (tr, c, port, reader,
+				  top_level_reader);
 	      if ((result == SCM_UNSPECIFIED) && (!tr->escape))
 		goto doit;
 	      else
@@ -1331,6 +1441,26 @@ scm_from_token_reader (const scm_token_reader_spec_t *token_reader,
   return (s_token_reader);
 }
 
+SCM
+scm_from_reader_spec (const scm_token_reader_spec_t *spec,
+		      int caller_owned)
+{
+  SCM s_result = SCM_EOL;
+  const scm_token_reader_spec_t *tr;
+
+  for (tr = spec;
+       tr->token.type != SCM_TOKEN_UNDEF;
+       tr++)
+    {
+      SCM s_token_reader;
+
+      s_token_reader = scm_from_token_reader (tr, caller_owned);
+      s_result = scm_cons (s_token_reader, s_result);
+    }
+
+  return scm_reverse_x (s_result, SCM_EOL);
+}
+
 scm_token_reader_spec_t *
 scm_to_token_reader (SCM tr)
 #define FUNC_NAME "scm_to_token_reader"
@@ -1385,6 +1515,8 @@ scm_to_reader (SCM reader)
 /* These are initialized at module load time.  */
 static SCM scm_sym_reader_debug = SCM_BOOL_F;
 static SCM scm_sym_reader_record_positions = SCM_BOOL_F;
+static SCM scm_sym_reader_lower_case = SCM_BOOL_F;
+static SCM scm_sym_reader_upper_case = SCM_BOOL_F;
 
 unsigned
 scm_to_make_reader_flags (SCM flags)
@@ -1406,6 +1538,10 @@ scm_to_make_reader_flags (SCM flags)
 	c_flags |= SCM_READER_FLAG_DEBUG;
       else if (scm_is_eq (f, scm_sym_reader_record_positions))
 	c_flags |= SCM_READER_FLAG_POSITIONS;
+      else if (scm_is_eq (f, scm_sym_reader_lower_case))
+	c_flags |= SCM_READER_FLAG_LOWER_CASE;
+      else if (scm_is_eq (f, scm_sym_reader_upper_case))
+	c_flags |= SCM_READER_FLAG_UPPER_CASE;
       else
 	scm_misc_error (FUNC_NAME, "unknown `make-reader' flag: ~A",
 			scm_list_1 (f));
@@ -1507,6 +1643,37 @@ SCM_DEFINE (scm_default_reader, "default-reader", 0, 0, 0,
   SCM_NEW_READER_SMOB (s_reader, scm_reader_type, scm_standard_reader,
 		       NULL, 0);
   return (s_reader);
+}
+
+SCM_DEFINE (scm_default_sharp_reader, "default-sharp-reader", 0, 0, 0,
+	    (void),
+	    "Returns Guile's default reader for the @code{#} character.")
+{
+  SCM s_reader;
+
+  /* This one may _not_ be freed by Scheme code at GC time.  */
+  SCM_NEW_READER_SMOB (s_reader, scm_reader_type,
+		       scm_standard_sharp_reader, NULL, 0);
+  return (s_reader);
+}
+
+SCM_DEFINE (scm_default_reader_token_readers,
+	    "default-reader-token-readers", 0, 0, 0,
+	    (void),
+	    "Return the list of token readers that comprise "
+	    "Guile's default reader.")
+{
+  return scm_from_reader_spec (scm_reader_standard_specs, 1);
+}
+
+SCM_DEFINE (scm_default_sharp_reader_token_readers,
+	    "default-sharp-reader-token-readers", 0, 0, 0,
+	    (void),
+	    "Return the list of token readers that comprise "
+	    "Guile's default reader for the @code{#} character.")
+
+{
+  return scm_from_reader_spec (scm_sharp_reader_standard_specs, 1);
 }
 
 SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
@@ -1725,6 +1892,21 @@ SCM_DEFINE (scm_token_reader_escape_p, "token-reader-escape?", 1, 0, 0,
 }
 #undef FUNC_NAME
 
+SCM_DEFINE (scm_guile_reader_uses_lightning,
+	    "%guile-reader-uses-lightning?", 0, 0, 0,
+	    (void),
+	    "Return @code{#t} is guile-reader was compiled with "
+	    "GNU Lightning support, @code{#f} otherwise.")
+#define FUNC_NAME s_scm_guile_reader_uses_lightning
+{
+#ifdef SCM_READER_USE_LIGHTNING
+  return SCM_BOOL_T;
+#else
+  return SCM_BOOL_F;
+#endif
+}
+#undef FUNC_NAME
+
 
 
 /* SMOB types.  */
@@ -1786,18 +1968,28 @@ generic_reader_smob_free (SCM reader_smob)
 }
 
 static SCM
-reader_apply (SCM reader, SCM port, SCM caller_handled)
+reader_apply (SCM reader, SCM port, SCM caller_handled,
+	      SCM top_level_reader)
 {
-  scm_reader_t c_reader;
+  scm_reader_t c_reader, c_top_level_reader;
 
   SCM_READER_SMOB_DATA (c_reader, reader);
   debug ("%s: applying reader %p\n", __FUNCTION__, c_reader);
+
+  if (top_level_reader != SCM_UNDEFINED)
+    {
+      scm_assert_smob_type (scm_reader_type, top_level_reader);
+      SCM_READER_SMOB_DATA (c_top_level_reader, top_level_reader);
+    }
+  else
+    c_top_level_reader = c_reader;
 
   /* Type checking and optional argument definition are checked in either
      `scm_call_reader ()' or the compiled reader's code.  */
 
   return (scm_call_reader (c_reader, port,
-			   (caller_handled == SCM_BOOL_T) ? 1 :0));
+			   (caller_handled == SCM_BOOL_T) ? 1 :0,
+			   c_top_level_reader));
 }
 
 static SCM
@@ -1822,12 +2014,18 @@ static SCM
 token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
 #define FUNC_NAME "%token-reader-proc-apply"
 {
+  /* XXX: Guile only supports up to 3 compulsory arguments for SMOB `apply'.
+     So we have to forget about the TOP_LEVEL_READER argument: let's set it
+     to READER, which should be good enough.  */
+
   int c_chr;
-  scm_reader_t c_reader;
+  size_t rest_len;
+  scm_reader_t c_reader, c_top_level_reader;
   scm_token_reader_t c_tr_proc;
 
   SCM_VALIDATE_CHAR (1, chr);
   SCM_VALIDATE_PORT (2, port);
+
   /* FIXME:  We should be able to accept arbitrary Scheme procs as well.  */
   scm_assert_smob_type (scm_reader_type, reader);
 
@@ -1835,7 +2033,7 @@ token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
   SCM_READER_SMOB_DATA (c_reader, reader);
   c_chr = SCM_CHAR (chr);
 
-  return (c_tr_proc (c_chr, port, c_reader));
+  return (c_tr_proc (c_chr, port, c_reader, c_reader /* top-level */));
 }
 #undef FUNC_NAME
 
@@ -1848,7 +2046,7 @@ scm_reader_init_bindings (void)
   scm_reader_type = scm_make_smob_type ("reader", 0);
   scm_set_smob_mark (scm_reader_type, generic_reader_smob_mark);
   scm_set_smob_free (scm_reader_type, generic_reader_smob_free);
-  scm_set_smob_apply (scm_reader_type, reader_apply, 0, 2, 0);
+  scm_set_smob_apply (scm_reader_type, reader_apply, 0, 3, 0);
 
   scm_token_reader_type = scm_make_smob_type ("token-reader", 0);
   scm_set_smob_mark (scm_token_reader_type, generic_reader_smob_mark);
@@ -1857,13 +2055,18 @@ scm_reader_init_bindings (void)
   scm_token_reader_proc_type = scm_make_smob_type ("token-reader-proc", 0);
   scm_set_smob_mark (scm_token_reader_proc_type, token_reader_proc_mark);
   scm_set_smob_free (scm_token_reader_proc_type, token_reader_proc_free);
-  scm_set_smob_apply (scm_token_reader_proc_type, token_reader_proc_apply,
-		      3, 0, 0);
+ scm_set_smob_apply (scm_token_reader_proc_type, token_reader_proc_apply,
+		      3, 0, 0); /* unfortunately, we are limited to 3
+				   compulsory arguments...  */
 
   scm_sym_reader_debug =
     scm_permanent_object (scm_from_locale_symbol ("reader/debug"));
   scm_sym_reader_record_positions =
     scm_permanent_object (scm_from_locale_symbol ("reader/record-positions"));
+  scm_sym_reader_lower_case =
+    scm_permanent_object (scm_from_locale_symbol ("reader/lower-case"));
+  scm_sym_reader_upper_case =
+    scm_permanent_object (scm_from_locale_symbol ("reader/upper-case"));
 
 #include "reader.c.x"
 

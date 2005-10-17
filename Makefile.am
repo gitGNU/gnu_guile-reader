@@ -16,7 +16,7 @@ noinst_PROGRAMS = guile
 guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
 
 TESTS = testsuite.scm
-EXTRA_DIST = test-repl.scm $(TESTS)
+EXTRA_DIST = symbol-token-reader.c test-repl.scm $(TESTS)
 
 AM_CFLAGS = -Wall -g -O0
 

@@ -21,11 +21,17 @@
    #:export (make-reader make-token-reader
 
 	     ;; helpers
-	     standard-token-reader default-reader
+	     standard-token-reader
+	     default-reader default-sharp-reader
+	     default-reader-token-readers
+	     default-sharp-reader-token-readers
 
 	     ;; accessors
 	     token-reader-procedure token-reader-specification
-             token-reader-escape?))
+             token-reader-escape?
+
+	     ;; internals
+	     %guile-reader-uses-lightning?))
 
 ;;; Author:  Ludovic Courtès
 ;;;

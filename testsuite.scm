@@ -108,6 +108,8 @@ encountered."
     (symbol-percent . "%symbol")
     (symbol-star . "*symbol*")
     (symbol-at . "@symbol@")
+    (symbol-brace . "{symbol}")
+    (symbol-square-brackets . "[symbol]")
     (symbol-dot . ".")
     (symbol-lower-than . "<")
     (symbol-greater-than-or-equal . ">=")
@@ -128,10 +130,6 @@ encountered."
     (quasiquote-unquote-splicing . "`(a ,@b)")
     (line-comment . ";;; line comment\n777")
 
-    ;; this is not the default in Guile but here it is, hence the `read-set!'
-    ;; that must be called before running the test-suite
-    (colon-keyword . ":keyword")
-
     ;; the sharp reader
     (false . "#f")
     (true . "#t")
@@ -146,6 +144,7 @@ encountered."
     (character-bracket . "#\\)")
     (keyword . "#:kw")
     (guile-extended-symbol . "#{extended symbol}#")
+    (vector . "#(1 symbol \"string\")")
     (srfi-4-vector . "#u8(1 2 3 4 5)")
     (srfi-4-floating-point-vector . "#f32(3.14 1.7 14.11 11.02)")
     (hex-number . "#x10")
@@ -167,7 +166,7 @@ encountered."
 
 
 (define-public (testsuite . args)
-  (read-set! keywords 'prefix)
+  (read-enable 'positions)
   (let ((total 0) (failed 0))
     (catch #t
       (lambda ()

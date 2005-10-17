@@ -20,7 +20,8 @@
 ;;; arch-tag: test-repl.scm
 
 
-(use-modules (system reader))
+(use-modules (system reader)
+	     (srfi srfi-1))
 
 ;;(kill (getpid) SIGTSTP)
 ;;(do-stuff (current-input-port))
@@ -44,8 +45,9 @@ reader for Guile!~%~%")
   ;; A simple token reader, implemented in Scheme, such that `#?' will return
   ;; a quoted symbol.
   (make-token-reader #\?
-                     (lambda (chr port read)
-                       (format #t "got chr `~a'~%" chr)
+                     (lambda (chr port read top-level-read)
+                       (format #t "got chr `~a', read=~a, top-level-read=~a~%"
+			       chr read top-level-read)
                        (list quote 'magic!))))
 
 (define sharp-reader
@@ -55,7 +57,7 @@ reader for Guile!~%~%")
   (make-reader (append (list whitespace-token-reader
                              test-token-reader)
                        (map standard-token-reader
-                            '(character srfi-4 number+radix
+                            '(character srfi-4 vector number+radix
                               extended-symbol
                               boolean keyword
                               block-comment)))
@@ -63,23 +65,49 @@ reader for Guile!~%~%")
                  (error "unexpected character after `#'" chr))
 	       'reader/record-positions))
 
+(define colon-keyword-token-reader
+  ;; Reading `:kw'-style keywords.
+  (make-token-reader #\:
+		     (token-reader-procedure
+		      (standard-token-reader 'keyword))))
+
+(define brace-free-symbol-token-reader
+  ;; Since we want to support the `curly-brace-sexp' token reader, we must
+  ;; make can't use the `symbol-misc-chars' token reader because it would
+  ;; interpret `}' as a symbol.  So we have to create our own brace-free
+  ;; symbol token reader.
+  (let ((char-set (token-reader-specification
+		   (standard-token-reader 'brace-free-symbol-misc-chars))))
+    (make-token-reader (filter (lambda (chr)
+				 (not
+				  (or (char=? chr #\})
+				      (char=? chr #\{)
+				      (char=? chr #\])
+				      (char=? chr #\[))))
+			       char-set)
+		       (token-reader-procedure
+			(standard-token-reader
+			 'brace-free-symbol-misc-chars)))))
+
 (define the-reader
   ;; The top-level reader.  It reuses the previously defined reader for `#'
   ;; as well as a number of standard built-in token readers.
   (make-reader (append (list (make-token-reader #\# sharp-reader)
-                             whitespace-token-reader)
+                             whitespace-token-reader
+			     colon-keyword-token-reader
+			     brace-free-symbol-token-reader)
                        (map standard-token-reader
-                            `(sexp string number
-                              symbol-lower-case
-                              symbol-upper-case
-                              symbol-misc-chars
-                              colon-keyword
+                            `(sexp string brace-free-number
+                              brace-free-symbol-lower-case
+                              brace-free-symbol-upper-case
                               quote-quasiquote-unquote
                               semicolon-comment
-                              skribe-exp)))
+                              skribe-exp
+			      curly-brace-sexp)))
 	       #f ;; use the default fault handler
 	       'reader/record-positions
 	       ;;'reader/debug
+	       ;;'reader/upper-case
 	       ))
 
 

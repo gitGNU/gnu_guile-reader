@@ -29,7 +29,8 @@
 
 #include <lightning.h>
 
-typedef SCM (* scm_reader_t) (SCM port, int caller_handled);
+typedef SCM (* scm_reader_t) (SCM port, int caller_handled,
+			      void *top_level /* really an `scm_reader_t' */);
 
 /* Invoke READER reading from port PORT.  If CALLER_HANDLED is non-zero, then
    read faults (reading an unhandled character) will be handled by the caller
@@ -37,8 +38,8 @@ typedef SCM (* scm_reader_t) (SCM port, int caller_handled);
 
    Readers should *always* be called using the `scm_call_reader ()' macro
    since this may be done differently in the non-Lightning case.  */
-#define scm_call_reader(_reader, _port, _caller_handled)	\
-  ((_reader) ((_port), (_caller_handled)))
+#define scm_call_reader(_reader, _port, _caller_handled, _top_level)	\
+  ((_reader) ((_port), (_caller_handled), NULL))
 
 #else
 
@@ -47,12 +48,14 @@ typedef struct scm_reader *scm_reader_t;
 /* In the non-Lightning case, reader invocation relies on a slower, generic,
    support function.  */
 extern SCM scm_call_reader (scm_reader_t reader, SCM port,
-			    int caller_handled);
+			    int caller_handled,
+			    scm_reader_t top_level_reader);
 
 #endif
 
 
-typedef SCM (* scm_token_reader_t) (int chr, SCM port, scm_reader_t reader);
+typedef SCM (* scm_token_reader_t) (int chr, SCM port, scm_reader_t reader,
+				    scm_reader_t top_level);
 
 /* The way a token is defined.  */
 typedef enum
@@ -115,6 +118,8 @@ typedef scm_token_reader_spec_t *scm_reader_spec_t;
 /* Flags that may be passed to `scm_c_make_reader ()'.  */
 #define SCM_READER_FLAG_DEBUG           0x01 /* output debugging info */
 #define SCM_READER_FLAG_POSITIONS       0x02 /* record source position */
+#define SCM_READER_FLAG_LOWER_CASE      0x04 /* lower case everything */
+#define SCM_READER_FLAG_UPPER_CASE      0x08 /* upper case everything */
 
 /* Return a pointer to a reader function compliant with the specifications in
    TOKEN_READERS.  FLAGS should be a logical or of the `SCM_READER_FLAG_'
@@ -160,6 +165,12 @@ extern SCM scm_from_token_reader (const scm_token_reader_spec_t *tr,
    The returned object may eventually be freed using `free ()', as well as
    the `token.value.set' pointer if `token.type' is SCM_TOKEN_SET.  */
 extern scm_token_reader_spec_t *scm_to_token_reader (SCM tr);
+
+/* Return a list representing the token readers specified by SPEC, a
+   zero-terminated token reader array.  The semantics of CALLER_OWNED as the
+   same as for `scm_from_token_reader ()'.  */
+extern SCM scm_from_reader_spec (const scm_token_reader_spec_t *spec,
+				 int caller_owned);
 
 /* Create a token reader and return its Scheme representation.  SPEC
    represents its specifications, i.e. when this token reader should be

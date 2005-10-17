@@ -52,6 +52,10 @@
   (CHAR_IS_BLANK (c)						\
    || (c == ')') || (c == '(') || (c == ';') || (c == '"'))
 
+#define CHAR_IS_R6RS_DELIMITER(c)				\
+  (CHAR_IS_R5RS_DELIMITER (c) || (c == '[') || (c == ']'))
+
+
 /* Helper function similar to `scm_read_token ()'.  Read from PORT until a
    whitespace is read.  */
 static inline void
@@ -129,7 +133,8 @@ _flush_ws (SCM port, const char *eoferr)
 #define scm_flush_ws _flush_ws
 
 SCM
-scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_sexp (int chr, SCM port, scm_reader_t reader,
+	       scm_reader_t top_level_reader)
 #define FUNC_NAME "scm_read_sexp"
 {
   /* Note:  We rely here on the ability for SCM_READER to read `.' as a
@@ -138,16 +143,42 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
   register SCM tmp;
   register SCM tl, tl2 = SCM_EOL;
   SCM ans, ans2 = SCM_EOL;
+  int terminating_char = 0;
+
+  switch (chr)
+    {
+      /* We allow for several ways to write S-exps, notably `[' which is
+	 going to be supported by R6RS.  */
+    case '(':
+      terminating_char = ')';
+      break;
+
+    case '[':
+      terminating_char = ']';
+      break;
+
+    case '{':
+      terminating_char = '}';
+      break;
+
+    default:
+      scm_ungetc (chr, port);
+      scm_i_input_error (FUNC_NAME, port, "invalid list starting character",
+			 scm_list_1 (SCM_MAKE_CHAR (chr)));
+      return SCM_BOOL_F;
+    }
 
   c = scm_flush_ws (port, "scm_read_sexp");
-  if (')' == c)
+  if (terminating_char == c)
     return SCM_EOL;
 
   scm_ungetc (c, port);
-  if (scm_is_eq (scm_sym_dot, (tmp = scm_call_reader (scm_reader, port, 0))))
+  if (scm_is_eq (scm_sym_dot,
+		 (tmp = scm_call_reader (top_level_reader, port, 0,
+					 top_level_reader))))
     {
-      ans = scm_call_reader (scm_reader, port, 1);
-      if (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
+      ans = scm_call_reader (top_level_reader, port, 1, top_level_reader);
+      if (terminating_char != (c = scm_flush_ws (port, "scm_read_sexp")))
 	scm_i_input_error (FUNC_NAME, port, "missing closing paren",
 			   SCM_EOL);
       return ans;
@@ -163,15 +194,17 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
 			   SCM_EOL);
 #endif
 
-  while (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
+  while (terminating_char != (c = scm_flush_ws (port, "scm_read_sexp")))
     {
       SCM new_tail;
 
       scm_ungetc (c, port);
       if (scm_is_eq (scm_sym_dot,
-		     (tmp = scm_call_reader (scm_reader, port, 1))))
+		     (tmp = scm_call_reader (top_level_reader, port, 1,
+					     top_level_reader))))
 	{
-	  SCM_SETCDR (tl, tmp = scm_call_reader (scm_reader, port, 0));
+	  SCM_SETCDR (tl, tmp = scm_call_reader (top_level_reader, port, 0,
+						 top_level_reader));
 #if 0
 	  if (SCM_COPY_SOURCE_P)
 	    SCM_SETCDR (tl2, scm_cons (scm_is_pair (tmp)
@@ -180,7 +213,7 @@ scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader)
 				       SCM_EOL));
 #endif
 
-	  if (')' != (c = scm_flush_ws (port, "scm_read_sexp")))
+	  if (terminating_char != (c = scm_flush_ws (port, "scm_read_sexp")))
 	    scm_i_input_error (FUNC_NAME, port,
 			       "in pair:  missing closing paren", SCM_EOL);
 	  goto exit;
@@ -215,7 +248,8 @@ exit:
 #undef scm_flush_ws
 
 SCM
-scm_read_string (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
+		 scm_reader_t top_level_reader)
 #define FUNC_NAME "scm_read_string"
 {
   SCM tok_buf;
@@ -309,67 +343,85 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader)
 }
 #undef FUNC_NAME
 
+
+/* Produce several flavors of symbol and number token readers: with or
+   without case-sensitivity, and with various sets of allowed characters in a
+   symbol name.  Note that the ``number TR'' may as well return a symbol, in
+   cases like `123.123.123'.
 
+   Both the symbol TR and the number TR rely on the definition of delimiter
+   characters which varies, for instance, between R5RS and R6RS.  So we'll
+   generate both of them here.  */
+
+
+#define SYMBOL_TR_NAME scm_read_guile_mixed_case_symbol
+#define NUMBER_TR_NAME scm_read_guile_number
+#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
+#define CHAR_IS_DELIMITER(_c)   (CHAR_IS_R5RS_DELIMITER (_c))
+
+#include "symbol-token-reader.c"
+
+#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef NUMBER_TR_NAME
+#undef SYMBOL_TR_NAME
+
+/* FIXME: Check whether this really corresponds to R5RS.  */
+
+#define SYMBOL_TR_NAME scm_read_r5rs_lower_case_symbol
+#define NUMBER_TR_NAME scm_read_r5rs_lower_case_number
+#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)	\
+  do { (_c) = tolower (_c); } while (0)
+
+#include "symbol-token-reader.c"
+
+#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef NUMBER_TR_NAME
+#undef SYMBOL_TR_NAME
+
+#define SYMBOL_TR_NAME scm_read_r5rs_upper_case_symbol
+#define NUMBER_TR_NAME scm_read_r5rs_upper_case_number
+#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)	\
+  do { (_c) = toupper (_c); } while (0)
+
+#include "symbol-token-reader.c"
+
+#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef NUMBER_TR_NAME
+#undef SYMBOL_TR_NAME
+#undef CHAR_IS_DELIMITER
+
+/* FIXME: Check whether this really corresponds to R6RS.  */
+
+#define SYMBOL_TR_NAME scm_read_r6rs_symbol
+#define NUMBER_TR_NAME scm_read_r6rs_number
+#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
+#define CHAR_IS_DELIMITER(_c)   (CHAR_IS_R6RS_DELIMITER (_c))
+#include "symbol-token-reader.c"
+
+#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef NUMBER_TR_NAME
+#undef SYMBOL_TR_NAME
+#undef CHAR_IS_DELIMITER
+
+#define SYMBOL_TR_NAME scm_read_brace_free_symbol
+#define NUMBER_TR_NAME scm_read_brace_free_number
+#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
+#define CHAR_IS_DELIMITER(_c)			\
+  ((CHAR_IS_R5RS_DELIMITER (_c))		\
+   || ((_c) == '}') || ((_c) == '{'))
+
+#include "symbol-token-reader.c"
+
+#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef NUMBER_TR_NAME
+#undef SYMBOL_TR_NAME
+#undef SYMBOL_TR_VALID_CHARACTER
+
+
+
 SCM
-scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader)
-{
-  int c;
-  SCM result;
-  char c_id[1024];
-  size_t c_id_len = 0;
-
-  result = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
-  c = chr;
-  while (c != EOF)
-    {
-      /* Note: for pratical reasons (read: laziness), we exclude brackets
-	 from the list of allowed characters for symbols.  */
-      if ((isalnum (c) || (isgraph (c)))
-	  && (c != '(') && (c != ')') && (c != '[') && (c != ']'))
-	c_id[c_id_len++] = (char)c;
-      else
-	{
-	  scm_ungetc (c, port);
-	  break;
-	}
-
-      if (c_id_len == 2)
-	{
-	  /* Are we actually reading a number rather than a symbol? */
-	  if (((c_id[0] == '+') || (c_id[0] == '-'))
-	      && ((isdigit (c_id[1])) || (tolower (c_id[1]) == 'i')))
-	    {
-	      /* Well, yes, this is a number:  call `scm_read_number ()' to
-		 the rescue.  XXX:  This is a bit hackish, indeed.  */
-	      scm_ungetc (c_id[1], port);
-	      return scm_read_number (chr, port, scm_reader);
-	    }
-	}
-
-      if (c_id_len + 1 >= sizeof (c_id))
-	{
-	  result =
-	    scm_string_append (scm_list_2
-			       (result,
-				scm_from_locale_stringn (c_id, c_id_len)));
-	  c_id_len = 0;
-	}
-
-      c = scm_getc (port);
-    }
-
-  if (c_id_len)
-    result =
-      scm_string_append (scm_list_2
-			 (result,
-			  scm_from_locale_stringn (c_id, c_id_len)));
-
-  return (scm_string_to_symbol (result));
-}
-
-
-SCM
-scm_read_number_and_radix (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_number_and_radix (int chr, SCM port, scm_reader_t scm_reader,
+			   scm_reader_t top_level_reader)
 {
   int c;
   char c_num[1024];
@@ -450,102 +502,8 @@ scm_read_number_and_radix (int chr, SCM port, scm_reader_t scm_reader)
 }
 
 SCM
-scm_read_number (int chr, SCM port, scm_reader_t scm_reader)
-{
-  int c;
-  SCM result, result_str;
-  char c_num[1024];
-  size_t c_num_len = 0;
-  unsigned saw_point = 0, saw_plus_or_minus = 0, saw_leading_sign = 0;
-  unsigned last_char_is_i = 0;
-  unsigned return_symbol = 0;
-
-  result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
-  c = chr;
-
-  if ((c == '+') || (c == '-'))
-    saw_leading_sign = 1;
-
-  while (c != EOF)
-    {
-      if ((CHAR_IS_BLANK (c)) || (c == EOF)
-	  || (CHAR_IS_R5RS_DELIMITER (c)))
-	{
-	  /* We need to special-case characters that cannot normally be part
-	     of a symbol name.  There are actually few of them (see R5RS,
-	     section 7.1.1, ``Lexical structure'').  */
-	  if (c != EOF)
-	    scm_ungetc (c, port);
-	  break;
-	}
-
-      last_char_is_i = ((c == 'i') || (c == 'I')) ? 1 : 0;
-
-      if (c == '.')
-	{
-	  if (saw_point)
-	    /* We've already seen a point before.  */
-	    return_symbol = 1;
-	  else
-	    saw_point = 1;
-	}
-      else if ((c == '+') || (c == '-'))
-	saw_plus_or_minus++;
-      else if (!isdigit (c))
-	return_symbol = 1;
-
-      c_num[c_num_len++] = (char)c;
-
-      if (c_num_len + 1 >= sizeof (c_num))
-	{
-	  result_str =
-	    scm_string_append (scm_list_2
-			       (result_str,
-				scm_from_locale_stringn (c_num, c_num_len)));
-	  c_num_len = 0;
-	}
-
-      c = scm_getc (port);
-    }
-
-  if (last_char_is_i)
-    {
-      if ((saw_plus_or_minus >= 1) && (saw_plus_or_minus <= 2))
-	/* Oh, this is a complex number!  */
-	return_symbol = 0;
-      else
-	return_symbol = 1;
-    }
-  else
-    {
-      if ((saw_plus_or_minus) && (!saw_leading_sign))
-	return_symbol = 1;
-      else if (saw_plus_or_minus > 1)
-	return_symbol = 1;
-    }
-
-  result_str =
-    scm_string_append (scm_list_2
-		       (result_str,
-			scm_from_locale_stringn (c_num, c_num_len)));
-
-  if (scm_c_string_length (result_str) == 0)
-    scm_i_input_error(__FUNCTION__, port,
-		      "invalid number syntax", SCM_EOL);
-
-  if (return_symbol)
-    /* The token wasn't actually a number so we'll return a symbol, just like
-       Guile's default reader does (e.g. it reads `123.123.123' as a
-       symbol).  */
-    return (scm_string_to_symbol (result_str));
-
-  result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
-
-  return result;
-}
-
-SCM
-scm_read_quote (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_quote (int chr, SCM port, scm_reader_t scm_reader,
+		scm_reader_t top_level_reader)
 {
   SCM p;
 
@@ -580,13 +538,15 @@ scm_read_quote (int chr, SCM port, scm_reader_t scm_reader)
       abort ();
     }
 
-  p = scm_cons2 (p, scm_call_reader (scm_reader, port, 0), SCM_EOL);
+  p = scm_cons2 (p, scm_call_reader (scm_reader, port, 0, top_level_reader),
+		 SCM_EOL);
 
   return p;
 }
 
 SCM
-scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader,
+			    scm_reader_t top_level_reader)
 {
   int c;
 
@@ -653,7 +613,8 @@ scm_get_hash_procedure (int c)
 
 #if 0  /* XXX This function is being replaced by `scm_sharp_reader'.  */
 SCM
-scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader,
+		scm_reader_t top_level_reader)
 #define FUNC_NAME "scm_read_sharp"
 {
   int c = scm_getc (port);
@@ -818,7 +779,8 @@ scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader)
 /* Sharp readers, i.e. readers called after a `#' sign has been read.  */
 
 SCM
-scm_read_boolean (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_boolean (int chr, SCM port, scm_reader_t scm_reader,
+		  scm_reader_t top_level_reader)
 {
   switch (chr)
     {
@@ -835,7 +797,8 @@ scm_read_boolean (int chr, SCM port, scm_reader_t scm_reader)
 }
 
 SCM
-scm_read_character (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_character (int chr, SCM port, scm_reader_t reader,
+		    scm_reader_t top_level_reader)
 {
   unsigned c;
   char charname[100];
@@ -882,32 +845,49 @@ scm_read_character (int chr, SCM port, scm_reader_t scm_reader)
 }
 
 SCM
-scm_read_keyword (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_keyword (int chr, SCM port, scm_reader_t reader,
+		  scm_reader_t top_level_reader)
 {
   /* Initially, I was tempted to call SCM_READER below, thinking that it was
      likely to result in a call to `scm_read_symbol ()'.  However,
      `scm_read_keyword ()' may typically be used either in the top-level
      reader or in the sharp reader.  In the latter case, calling SCM_READER
      just wouldn't work since the sharp reader doesn't handle symbols.  */
-  return (scm_symbol_to_keyword (scm_read_symbol (scm_getc (port), port,
-						  scm_reader)));
+  return (scm_symbol_to_keyword
+	  (scm_read_guile_mixed_case_symbol (scm_getc (port), port,
+					     reader, top_level_reader)));
 }
 
 SCM
-scm_read_srfi4_vector (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_vector (int chr, SCM port, scm_reader_t reader,
+		 scm_reader_t top_level_reader)
+{
+  /* Note: We call `scm_read_sexp ()' rather than READER here in order to
+     guarantee that it's going to do what we want.  After all, this is an
+     implementation detail of `scm_read_vector ()', not a desirable
+     property.  */
+  return scm_vector (scm_read_sexp (chr, port, reader,
+				    top_level_reader));
+}
+
+SCM
+scm_read_srfi4_vector (int chr, SCM port, scm_reader_t scm_reader,
+		       scm_reader_t top_level_reader)
 {
   return scm_i_read_array (port, chr);
 }
 
 SCM
-scm_read_block_comment (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_block_comment (int chr, SCM port, scm_reader_t scm_reader,
+			scm_reader_t top_level_reader)
 {
   skip_scsh_block_comment (port);
   return SCM_UNSPECIFIED;
 }
 
 SCM
-scm_read_extended_symbol (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_extended_symbol (int chr, SCM port, scm_reader_t scm_reader,
+			  scm_reader_t top_level_reader)
 {
   /* Guile's extended symbol read syntax looks like this:
 
@@ -964,7 +944,8 @@ scm_read_extended_symbol (int chr, SCM port, scm_reader_t scm_reader)
 
 /* Skribe's read syntax.  So-called sk-exps.  */
 SCM
-scm_read_skribe_exp (int chr, SCM port, scm_reader_t scm_reader)
+scm_read_skribe_exp (int chr, SCM port, scm_reader_t reader,
+		     scm_reader_t top_level_reader)
 {
   int c;
   char c_literal[1024];
@@ -988,7 +969,9 @@ scm_read_skribe_exp (int chr, SCM port, scm_reader_t scm_reader)
 	      c_literal_len = 0;
 	      scm_ungetc (c, port);
 	      subexp = scm_cons2 (scm_sym_unquote,
-				  scm_call_reader (scm_reader, port, 0),
+				  scm_call_reader (top_level_reader,
+						   port, 0,
+						   top_level_reader),
 				  SCM_EOL);
 	      result = scm_cons (subexp, result);
 	    }
@@ -1054,6 +1037,7 @@ scm_token_reader_lookup (const char *name)
 const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
   {
     SCM_DEFTOKEN_SINGLE ('\\', "character",      scm_read_character, 0),
+    SCM_DEFTOKEN_SINGLE ('(',  "vector",         scm_read_vector, 0),
     SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector, 0),
     SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean, 0),
     SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword, 0),
@@ -1083,27 +1067,26 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
     SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string, 0),
 
     /* Both numbers and symbols can start with `+' or `-'.  */
-    SCM_DEFTOKEN_RANGE ('0', '9', "number", scm_read_number, 0),
+    SCM_DEFTOKEN_RANGE ('0', '9', "guile-number", scm_read_guile_number, 0),
 
     /* Let's define symbols as two ranges plus one set of triggering
        characters.  Note that the sexp reader relies on the ability to read
        `.' as a symbol.  */
-    SCM_DEFTOKEN_RANGE ('a', 'z', "symbol-lower-case", scm_read_symbol, 0),
-    SCM_DEFTOKEN_RANGE ('A', 'Z', "symbol-upper-case", scm_read_symbol, 0),
-    SCM_DEFTOKEN_SET (".+-/*%&@_<>!=?$",
-		      "symbol-misc-chars",  scm_read_symbol, 0),
+    SCM_DEFTOKEN_RANGE ('a', 'z', "guile-symbol-lower-case",
+			scm_read_guile_mixed_case_symbol, 0),
+    SCM_DEFTOKEN_RANGE ('A', 'Z', "guile-symbol-upper-case",
+			scm_read_guile_mixed_case_symbol, 0),
+    SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",
+		      "guile-symbol-misc-chars",
+		      scm_read_guile_mixed_case_symbol, 0),
 
     SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote", scm_read_quote, 0),
 
-    /* Although `:kw'-style keywords are not allowed by default in Guile (one
-       must use `read-set!'), we'll make it the default here.  */
-    SCM_DEFTOKEN_SINGLE (':', "colon-keyword", scm_read_keyword, 0),
+    SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",
+			 scm_read_semicolon_comment, 0),
 
     /* This one is defined at reader's compile-time.  */
     SCM_DEFTOKEN_SINGLE ('#', "sharp",                   NULL, 0),
-
-    SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",
-			 scm_read_semicolon_comment, 0),
 
     SCM_END_TOKENS
   };
@@ -1112,9 +1095,64 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
    looked up with `scm_token_reader_lookup ()'.  */
 const scm_token_reader_spec_t scm_reader_misc_specs[] =
   {
-    /* Skribe/Skribilo literal sequences.  In R6RS, `[' would rather be
-       associated to `scm_read_sexp ()'.  */
+    /* Skribe/Skribilo literal sequences.  */
     SCM_DEFTOKEN_SINGLE ('[', "skribe-exp", scm_read_skribe_exp, 0),
+
+
+    /* S-exp alternative syntaxes.  Note that this requires the symbol token
+       reader to not handle the corresponding character (`}' and `]' for
+       instance).  */
+
+    /* Square-bracket S-exps as will be allowed by R6RS and is already
+       implemented by many Scheme implementations.  */
+    SCM_DEFTOKEN_SINGLE ('[', "square-bracket-sexp", scm_read_sexp, 0),
+
+    /* Curly-brace S-exps: why not?  :-)  */
+    SCM_DEFTOKEN_SINGLE ('{', "curly-brace-sexp",  scm_read_sexp, 0),
+
+
+    /* Various flavors of symbols.  */
+
+    SCM_DEFTOKEN_RANGE ('a', 'z', "r5rs-lower-case-symbol-lower-case",
+			scm_read_r5rs_lower_case_symbol, 0),
+    SCM_DEFTOKEN_RANGE ('A', 'Z', "r5rs-lower-case-symbol-upper-case",
+			scm_read_r5rs_lower_case_symbol, 0),
+    SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",
+		      "r5rs-lower-case-symbol-misc-chars",
+		      scm_read_r5rs_lower_case_symbol, 0),
+
+    SCM_DEFTOKEN_RANGE ('a', 'z', "r5rs-upper-case-symbol-lower-case",
+			scm_read_r5rs_upper_case_symbol, 0),
+    SCM_DEFTOKEN_RANGE ('A', 'Z', "r5rs-upper-case-symbol-upper-case",
+			scm_read_r5rs_upper_case_symbol, 0),
+    SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",
+		      "r5rs-upper-case-symbol-misc-chars",
+		      scm_read_r5rs_upper_case_symbol, 0),
+
+    SCM_DEFTOKEN_RANGE ('a', 'z', "r6rs-symbol-lower-case",
+			scm_read_r6rs_symbol, 0),
+    SCM_DEFTOKEN_RANGE ('A', 'Z', "r6rs-symbol-upper-case",
+			scm_read_r6rs_symbol, 0),
+    SCM_DEFTOKEN_SET ("{}:.+-/*%&@_<>!=?$",
+		      "r6rs-symbol-misc-chars", scm_read_r6rs_symbol, 0),
+
+    SCM_DEFTOKEN_RANGE ('a', 'z', "brace-free-symbol-lower-case",
+			scm_read_brace_free_symbol, 0),
+    SCM_DEFTOKEN_RANGE ('A', 'Z', "brace-free-symbol-upper-case",
+			scm_read_brace_free_symbol, 0),
+    SCM_DEFTOKEN_SET ("[]:.+-/*%&@_<>!=?$",
+		      "brace-free-symbol-misc-chars",
+		      scm_read_brace_free_symbol, 0),
+
+    /* Likewise, various flavours of numbers.  */
+    SCM_DEFTOKEN_RANGE ('0', '9', "guile-number", scm_read_guile_number, 0),
+    SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-lower-case-number",
+			scm_read_r5rs_lower_case_number, 0),
+    SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-upper-case-number",
+			scm_read_r5rs_upper_case_number, 0),
+    SCM_DEFTOKEN_RANGE ('0', '9', "r6rs-number", scm_read_r6rs_number, 0),
+    SCM_DEFTOKEN_RANGE ('0', '9', "brace-free-number",
+			scm_read_brace_free_number, 0),
 
     SCM_END_TOKENS
   };

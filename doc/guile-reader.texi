@@ -8,7 +8,7 @@
 @c %**end of header
 
 @set EDITION 1
-@set VERSION 0.1
+@set VERSION 0.2
 @c @set UPDATED 2005-04-26
 
 
@@ -121,6 +121,11 @@ Reader comes with a library of components that can typically be used
 to construct a reader for the Scheme syntax.  And each one of this
 components may be reused at will when creating other readers.
 
+Note that Common Lisp has a similar mechanism, the @dfn{read table}.
+It is, however, less powerful in that it assumes a single reader
+instance (which is @emph{not} a good assumption for an interpreter).
+
+
 
 @node Overview, API Reference, Introduction, Top
 @chapter Overview
@@ -148,15 +153,14 @@ token reader for symbols.
 In guile-reader, TRs may be written either in Scheme or in C, and they
 can even be a reader produced by guile-reader itself.  Unless it is a
 reader, the procedure (or C function) used to create a TR will receive
-three arguments:
+four arguments:
 
 @itemize
 @item the character that was read and which triggered its call;  in
 the S-exp example, this would be @code{(};
 @item the port to read from;
-@item the reader which performed this invocation;  this may be useful,
-like in the S-exp example, if the TR itself does not have enough
-knowledge to read and interpret everything.
+@item the reader which performed this invocation;
+@item the top-level reader which yielded this invocation.
 @end itemize
 
 The next section will provide details about the API.
@@ -193,10 +197,12 @@ ones.
 
 @menu
 * Defining a New Token Reader::  
+* TR Calling Convention::       
+* Invoking a Reader from a TR::  
 * Token Reader Library::        
 @end menu
 
-@node Defining a New Token Reader, Token Reader Library, Token Readers, Token Readers
+@node Defining a New Token Reader, TR Calling Convention, Token Readers, Token Readers
 @subsection Defining a New Token Reader
 
 A new token reader object can be created by calling the
@@ -212,15 +218,35 @@ corresponding procedure.  The character specification may be either:
 characters.
 @end itemize
 
-The procedure itself will be passed three arguments:
+The procedure passed to @var{make-token-reader} may actually be either
+a C function or Scheme procedure that takes four arguments (@pxref{TR
+Calling Convention}), any ``object'' returned by
+@code{token-reader-procedure}, or a reader.  This last option turns
+out to be quite helpful.  For example, this turns out to be convenient
+when implementing the various Scheme read syntaxes prefixed by the
+@code{#} character: one can create a reader for @code{#}, and then
+turn it into a token reader that is part of the top-level reader.
+
+The next section explains the token reader calling convention.
+
+
+@node TR Calling Convention, Invoking a Reader from a TR, Defining a New Token Reader, Token Readers
+@subsection Token Reader Calling Convention
+
+A token reader's procedure is passed four arguments:
 
 @itemize
 @item the character that was read and which triggered its call;  in
 the S-exp example, this would be @code{(};
 @item the port to read from;
-@item the reader which performed this invocation;  this may be useful,
-like in the S-exp example, if the TR itself does not have enough
-knowledge to read and interpret everything.
+@item the reader which performed this invocation, i.e. either an
+@code{scm_reader_t} object (if the token reader is written in C) or a
+four-argument Scheme procedure (if the token reader is written in
+Scheme);
+@item the top-level reader which yielded this invocation and which may
+be different from the previous argument in the case a token reader was
+made from a reader; the next section, @xref{Invoking a Reader from a
+TR}, will detail the use of these two arguments.
 @end itemize
 
 It must return a Scheme object resulting from the interpretation of
@@ -247,9 +273,9 @@ This behavior may, however, be overridden by passing
 A reader that includes this TR will return @code{*unspecified*} once a
 line comment has been read.  This is particularly useful, for
 instance, when implementing @code{#!} block comments (@inforef{Block
-Comments, SCSH block comments, guile}, for more information) as a
-TR attached to @code{#\!} within the @code{#\#} sub-reader (see
-example below, @pxref{Token Reader Library}).
+Comments, SCSH block comments, guile}, for more information) as a TR
+attached to @code{#\!} within the @code{#\#} sub-reader
+(@pxref{Defining a New Token Reader}).
 
 Finally, the procedure passed to @code{make-token-reader} may be
 @code{#f}, in which case the resulting TR will just have the effect of
@@ -263,8 +289,46 @@ handling white spaces may be done by defining a TR like this:
 @code{make-token-reader}
 FIXME:  Snarf doc from `reader.c'.
 
+@node Invoking a Reader from a TR, Token Reader Library, TR Calling Convention, Token Readers
+@subsection Invoking a Reader from a Token Reader
 
-@node Token Reader Library,  , Defining a New Token Reader, Token Readers
+As seen in section @xref{Defining a New Token Reader}, token readers
+are systematically passed to readers when invoked.  The reason why
+this may be useful may not be obvious at first sight.
+
+Consider an S-exp token reader.  The TR itself doesn't have sufficient
+knowledge to read the objects that comprise an S-exp.  So it needs to
+be able to call the reader that is being used to actually read those
+objects.
+
+The need for the @var{top-level-reader} argument passed to token
+readers may be illustrated looking at the implementation of vectors
+read syntax, @inforef{Vector Syntax, , guile}.  One may implement the
+vector reader as a token reader of the @code{#} sub-reader
+(@pxref{Defining a New Token Reader}).  The vector token reader may be
+implemented like this:
+
+@example
+(lambda (chr port reader top-level-reader)
+  ;; At this point, `#' as already been read and CHR is `(',
+  ;; so we can directly call the regular S-expression reader
+  ;; and convert its result into a vector.
+  (let ((sexp-read (token-reader-procedure
+                    (standard-token-reader 'sexp))))
+    (apply vector
+           (sexp-read chr port reader top-level-reader))))
+@end example
+
+When this procedure is invoked, @var{reader} points to the @code{#}
+sub-reader.  Clearly, in order to read the symbols that comprise the
+list, @var{sexp-read} should @emph{not} invoke @var{reader} because
+@var{reader} only knows about @code{#}-prefixed object syntaxes.  For
+this reason, in order to be consistent in re-usable, the S-exp reader
+must call @var{top-level-reader} which points to the top-level reader,
+i.e. the reader which yielded the invocation of the @code{#}
+sub-reader.
+
+@node Token Reader Library,  , Invoking a Reader from a TR, Token Readers
 @subsection Token Reader Library
 
 Guile-reader comes with a number of re-usable token readers.
@@ -282,7 +346,11 @@ found).  Among those TRs are:
 upper-case letter;
 @item @code{string}, which reads strings;
 @item @code{number}, which reads a number;
-@item @code{sexp}, which reads an S-expression.
+@item @code{sexp}, which reads an S-expression; the S-exp may either
+be delimited by regular parentheses, or by square brackets (à la
+R6RS), or by curly braces; note that you'll have to make sure that the
+symbol readers do not interpret square brackets are curly braces as
+part of a symbol if you got for one of the two last options.
 @end itemize
 
 A few @dfn{sharp TRs}, i.e. TRs which expect the @code{#} character to
@@ -370,11 +438,11 @@ example:
 @end example
 
 However, the procedure returned by @code{make-reader} is different
-from the hand-written one above in that in takes an additional
-optional argument which makes it look like this:
+from the hand-written one above in that in takes two additional
+optional arguments which makes it look like this:
 
 @example
-(define (my-reader port faults-caller-handled?)
+(define (my-reader port faults-caller-handled? top-level-reader)
   (let loop ((the-char (getc port)))
     (case the-char
       ...
@@ -402,6 +470,31 @@ the reader.
 @code{make-reader}
 FIXME:  Snarf doc from `reader.c'.
 
+Currently, the flags that may be passed to token readers are the
+following:
+
+@itemize
+
+@item @code{reader/record-positions} will yield a reader that records
+the position of the expression read, which is mostly useful for
+debugging purposes; this information may then be accessed via source
+properties @inforef{Procedure Properties, source properties, guile}.
+
+@item @code{reader/lower-case} will have the yielded reader convert to
+lower-case all the letters that it reads; note that this is not
+sufficient to implement symbol case-insensitivity as shown
+@inforef{Reader options, here, guile}.  For this, the token reader(s)
+that read symbols must also convert all subsequent characters to
+lower-case.
+
+@item @code{reader/upper-case} will have the yielded reader convert to
+upper-case all the letters that it reads; again, that is not
+sufficient to implement case-insensitivity.
+
+@item @code{reader/debug} causes the generated reader to produce
+debugging output.
+
+@end itemize
 
 @node Reader Library,  , Defining a New Reader, Readers
 @subsection Reader Library
@@ -412,6 +505,11 @@ default reader made of re-usable token readers written in C
 (@pxref{Token Reader Library}).
 
 @code{default-reader}
+
+@code{default-reader-token-readers}
+
+@code{default-sharp-reader-token-readers}
+
 FIXME:  Snarf doc from `reader.c'.
 
 

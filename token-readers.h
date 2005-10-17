@@ -29,22 +29,35 @@
 
 /* Main token readers.  */
 
-extern SCM scm_read_sexp (int chr, SCM port, scm_reader_t scm_reader);
+extern SCM scm_read_sexp (int, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_string (int chr, SCM port, scm_reader_t scm_reader);
+extern SCM scm_read_string (int, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_symbol (int chr, SCM port, scm_reader_t scm_reader);
+extern SCM scm_read_guile_number (int, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_number (int chr, SCM port, scm_reader_t scm_reader);
+extern SCM scm_read_quote (int, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_quote (int chr, SCM port, scm_reader_t scm_reader);
+extern SCM scm_read_skribe_literal (int, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_skribe_literal (int chr, SCM port,
-				    scm_reader_t scm_reader);
+
+/* Symbol token readers.  */
+extern SCM scm_read_guile_mixed_case_symbol (int, SCM, scm_reader_t,
+					     scm_reader_t);
+
+extern SCM scm_read_r5rs_lower_case_symbol (int, SCM, scm_reader_t,
+					    scm_reader_t);
+
+extern SCM scm_read_r5rs_upper_case_symbol (int, SCM, scm_reader_t,
+					    scm_reader_t);
+
+extern SCM scm_read_r6rs_symbol (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_brace_free_symbol (int, SCM, scm_reader_t, scm_reader_t);
+
 
 /* Sharp token readers, should be called after `#' has been read.  */
 
-extern SCM scm_read_extended_symbol (int chr, SCM port, scm_reader_t);
+extern SCM scm_read_extended_symbol (int, SCM, scm_reader_t, scm_reader_t);
 
 
 
