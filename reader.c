@@ -27,6 +27,7 @@
 
 #include "reader.h"
 #include "token-readers.h"
+#include "reader-lib.h"
 
 #include "config.h" /* this defines `inline' among other things */
 
@@ -65,52 +66,6 @@ debug (const char *fmt, ...)
 
 #endif /* DEBUG */
 
-
-
-/* SMOB helper data structures and macros.  */
-
-/* The structure that bridges SMOB and C objects.  The point of this
-   structure is to have knowledge as to whether the SMOB's underlying C
-   object is was created from Scheme (and is therefore freeable) or not.  */
-typedef struct
-{
-  void *c_object;   /* the underlying C object */
-  int   freeable;   /* whether the underlying C object should be freed when
-		       the SMOB is GC'd */
-  SCM  *deps;       /* #f-terminated array of objects the current SMOB
-		       depends on and that should be marked by the GC */
-} scm_reader_smob_t;
-
-
-#define SCM_NEW_READER_SMOB(_smob, _smobtype, _c_obj, _deps, _freeable)	\
-do									\
-{									\
-  scm_reader_smob_t *_smobinfo;						\
-  _smobinfo = scm_malloc (sizeof (*_smobinfo));				\
-  _smobinfo->c_object = (void *)(_c_obj);				\
-  _smobinfo->freeable = (_freeable);					\
-  _smobinfo->deps = (_deps);						\
-  SCM_NEWSMOB (_smob, _smobtype, _smobinfo);				\
-}									\
-while (0)
-
-#define SCM_READER_SMOB_DATA(_data, _smob)			\
-do								\
-{								\
-  scm_reader_smob_t *_smobinfo;					\
-  _smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (_smob);	\
-  (_data) = (scm_reader_t)_smobinfo->c_object;			\
-}								\
-while(0)
-
-#define SCM_TOKEN_READER_SMOB_DATA(_data, _smob)		\
-do								\
-{								\
-  scm_reader_smob_t *_smobinfo;					\
-  _smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (_smob);	\
-  (_data) = (scm_token_reader_spec_t *)_smobinfo->c_object;	\
-}								\
-while(0)
 
 
 
@@ -1633,48 +1588,6 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 1,
 }
 #undef FUNC_NAME
 
-SCM_DEFINE (scm_default_reader, "default-reader", 0, 0, 0,
-	    (void),
-	    "Returns Guile's default reader.")
-{
-  SCM s_reader;
-
-  /* This one may _not_ be freed by Scheme code at GC time.  */
-  SCM_NEW_READER_SMOB (s_reader, scm_reader_type, scm_standard_reader,
-		       NULL, 0);
-  return (s_reader);
-}
-
-SCM_DEFINE (scm_default_sharp_reader, "default-sharp-reader", 0, 0, 0,
-	    (void),
-	    "Returns Guile's default reader for the @code{#} character.")
-{
-  SCM s_reader;
-
-  /* This one may _not_ be freed by Scheme code at GC time.  */
-  SCM_NEW_READER_SMOB (s_reader, scm_reader_type,
-		       scm_standard_sharp_reader, NULL, 0);
-  return (s_reader);
-}
-
-SCM_DEFINE (scm_default_reader_token_readers,
-	    "default-reader-token-readers", 0, 0, 0,
-	    (void),
-	    "Return the list of token readers that comprise "
-	    "Guile's default reader.")
-{
-  return scm_from_reader_spec (scm_reader_standard_specs, 1);
-}
-
-SCM_DEFINE (scm_default_sharp_reader_token_readers,
-	    "default-sharp-reader-token-readers", 0, 0, 0,
-	    (void),
-	    "Return the list of token readers that comprise "
-	    "Guile's default reader for the @code{#} character.")
-
-{
-  return scm_from_reader_spec (scm_sharp_reader_standard_specs, 1);
-}
 
 SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
 	    (SCM spec, SCM proc, SCM escape_p),
@@ -1892,6 +1805,25 @@ SCM_DEFINE (scm_token_reader_escape_p, "token-reader-escape?", 1, 0, 0,
 }
 #undef FUNC_NAME
 
+SCM_DEFINE (scm_token_reader_documentation,
+	    "token-reader-documentation", 1, 0, 0,
+	    (SCM tr),
+	    "Return a string containing the Texinfo documentation of "
+	    "token reader @var{tr} or @code{#f} if @code{tr} is "
+	    "undocumented.")
+#define FUNC_NAME s_scm_token_reader_documentation
+{
+  scm_token_reader_spec_t *c_tr;
+
+  scm_assert_smob_type (scm_token_reader_type, tr);
+  SCM_TOKEN_READER_SMOB_DATA (c_tr, tr);
+
+  return (c_tr->documentation
+	  ? scm_from_locale_string (c_tr->documentation)
+	  : SCM_BOOL_F);
+}
+#undef FUNC_NAME
+
 SCM_DEFINE (scm_guile_reader_uses_lightning,
 	    "%guile-reader-uses-lightning?", 0, 0, 0,
 	    (void),
@@ -2019,8 +1951,7 @@ token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
      to READER, which should be good enough.  */
 
   int c_chr;
-  size_t rest_len;
-  scm_reader_t c_reader, c_top_level_reader;
+  scm_reader_t c_reader;
   scm_token_reader_t c_tr_proc;
 
   SCM_VALIDATE_CHAR (1, chr);
@@ -2036,6 +1967,19 @@ token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
   return (c_tr_proc (c_chr, port, c_reader, c_reader /* top-level */));
 }
 #undef FUNC_NAME
+
+
+
+/* The standard fault handler proc.  */
+SCM scm_reader_standard_fault_handler_proc = SCM_BOOL_F;
+
+static SCM
+scm_reader_standard_fault_handler (SCM chr, SCM port, SCM reader)
+{
+  scm_i_input_error ("%reader-standard-fault-handler",
+		     port, "unhandled character: ~S", scm_list_1 (chr));
+  return SCM_UNSPECIFIED;
+}
 
 
 
@@ -2055,8 +1999,8 @@ scm_reader_init_bindings (void)
   scm_token_reader_proc_type = scm_make_smob_type ("token-reader-proc", 0);
   scm_set_smob_mark (scm_token_reader_proc_type, token_reader_proc_mark);
   scm_set_smob_free (scm_token_reader_proc_type, token_reader_proc_free);
- scm_set_smob_apply (scm_token_reader_proc_type, token_reader_proc_apply,
-		      3, 0, 0); /* unfortunately, we are limited to 3
+  scm_set_smob_apply (scm_token_reader_proc_type, token_reader_proc_apply,
+		      3, 0, 0); /* XXX unfortunately, we are limited to 3
 				   compulsory arguments...  */
 
   scm_sym_reader_debug =
@@ -2068,8 +2012,17 @@ scm_reader_init_bindings (void)
   scm_sym_reader_upper_case =
     scm_permanent_object (scm_from_locale_symbol ("reader/upper-case"));
 
+  scm_reader_standard_fault_handler_proc =
+    scm_permanent_object (scm_c_define_gsubr
+			  ("%reader-standard-fault-handler", 3, 0, 0,
+			   scm_reader_standard_fault_handler));
+
 #include "reader.c.x"
 
-  /* Compile/load the standard reader.  */
+  /* Initialize the other subsystems.  */
+  scm_initialize_token_reader_library ();
+  scm_initialize_reader_library ();
+
+  /* Compile the standard reader.  */
   scm_load_standard_reader ();
 }

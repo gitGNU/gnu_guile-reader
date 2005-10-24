@@ -58,9 +58,9 @@ reader for Guile!~%~%")
                              test-token-reader)
                        (map standard-token-reader
                             '(character srfi-4 vector number+radix
-                              extended-symbol
+                              guile-extended-symbol
                               boolean keyword
-                              block-comment)))
+                              scsh-block-comment)))
                (lambda (chr port read)
                  (error "unexpected character after `#'" chr))
 	       'reader/record-positions))

@@ -10,12 +10,12 @@ then
   echo '#include "token-readers.h"'
   echo '%}'
   echo
-  echo 'struct scm_token_reader_entry { const char *name; const void *reader; };'
+  echo 'struct scm_token_reader_entry { const char *name; scm_token_reader_spec_t reader; };'
   echo '%%'
 else
   shift
 fi
 
-cat $@ | \
-grep '^ *SCM_DEFTOKEN' | \
-sed -es'/^ *SCM_DEFTOKEN_\([A-Z_]\+\) *(.\+, *"\([^"]\+\)", *\([a-zA-Z0-9_]\+\).*$/\2, \3/g'
+cat "token-readers.h" | \
+grep '^#define SCM_TR_' | \
+sed -es'/^#define SCM_TR_\([A-Z0-9_]\+\) \/\* \([^ ]\+\) \*\/.*$/\2, SCM_TR_\1/g'

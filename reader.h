@@ -93,6 +93,7 @@ typedef struct scm_token_reader_spec
     } value;
   } token;
   const char *name;
+  const char *documentation;
 
   struct
   {
@@ -182,46 +183,106 @@ extern SCM scm_from_reader_spec (const scm_token_reader_spec_t *spec,
 extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
 
 
-/* Convenience macros for statically specifying C token readers.  */
+/* Convenience macros for static initialization of C token readers.  */
 
-#define SCM_DEFTOKEN_SINGLE(_chr, _name, _func, _escape)		\
+/* Defines what to do with token reader doc strings.  This may be redefined,
+   for instance, to disable duplication of docstrings.  */
+#define SCM_DEFTOKEN_MAKE_DOC(_doc)  (_doc)
+
+#define SCM_DEFTOKEN_SINGLE(_chr, _name, _func, _escape, _doc)		\
   {									\
     { .type = SCM_TOKEN_SINGLE, .value = { .single = (_chr) } },	\
     .name = (_name),							\
     .reader = { .type = SCM_TOKEN_READER_C,				\
 		.value.c_reader = (_func) },				\
-    .escape = _escape							\
+    .escape = _escape,							\
+    .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)			\
   }
 
-#define SCM_DEFTOKEN_RANGE(_lo, _hi, _name, _func, _escape)	\
-  {								\
-    { .type = SCM_TOKEN_RANGE,					\
-      .value = { .range = { .low = (_lo), .high = (_hi) } } },	\
-    .name = (_name),						\
-    .reader = { .type = SCM_TOKEN_READER_C,			\
-		.value.c_reader = (_func) },			\
-    .escape = _escape						\
+#define SCM_DEFTOKEN_RANGE(_lo, _hi, _name, _func, _escape, _doc)	\
+  {									\
+    { .type = SCM_TOKEN_RANGE,						\
+      .value = { .range = { .low = (_lo), .high = (_hi) } } },		\
+    .name = (_name),							\
+    .reader = { .type = SCM_TOKEN_READER_C,				\
+		.value.c_reader = (_func) },				\
+    .escape = _escape,							\
+    .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)			\
   }
 
-#define SCM_DEFTOKEN_SET(_set, _name, _func, _escape)		\
-  {								\
-    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },	\
-    .name = (_name),						\
-   .reader = { .type = SCM_TOKEN_READER_C,			\
-	       .value.c_reader = (_func) },			\
-   .escape = _escape						\
+#define SCM_DEFTOKEN_SET(_set, _name, _func, _escape, _doc)		\
+  {									\
+    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },		\
+    .name = (_name),							\
+    .reader = { .type = SCM_TOKEN_READER_C,				\
+	        .value.c_reader = (_func) },				\
+    .escape = _escape,							\
+    .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)		     	\
   }
 
-#define SCM_END_TOKENS							   \
-  { { .type = SCM_TOKEN_UNDEF },					   \
-    .name = NULL,							   \
-    .reader = { .type = SCM_TOKEN_READER_UNDEF, .value.c_reader = NULL } }
+#define SCM_END_TOKENS							  \
+  {									  \
+    { .type = SCM_TOKEN_UNDEF },					  \
+    .name = NULL,							  \
+    .reader = { .type = SCM_TOKEN_READER_UNDEF, .value.c_reader = NULL }, \
+    .documentation = NULL						  \
+  }
 
+
+/* A standard reader fault handler.  */
+extern SCM scm_reader_standard_fault_handler_proc;
 
 /* The SMOB type associated to `scm_reader_t', `scm_token_reader_spec_t', and
    `scm_token_reader_t'.  */
 extern scm_t_bits scm_reader_type, scm_token_reader_type,
   scm_token_reader_proc_type;
+
+
+/* SMOB helper data structures and macros.  Only meant to be used
+   internally.  */
+
+/* The structure that bridges SMOB and C objects.  The point of this
+   structure is to have knowledge as to whether the SMOB's underlying C
+   object is was created from Scheme (and is therefore freeable) or not.  */
+typedef struct
+{
+  void *c_object;   /* the underlying C object */
+  int   freeable;   /* whether the underlying C object should be freed when
+		       the SMOB is GC'd */
+  SCM  *deps;       /* #f-terminated array of objects the current SMOB
+		       depends on and that should be marked by the GC */
+} scm_reader_smob_t;
+
+
+#define SCM_NEW_READER_SMOB(_smob, _smobtype, _c_obj, _deps, _freeable)	\
+do									\
+{									\
+  scm_reader_smob_t *_smobinfo;						\
+  _smobinfo = scm_malloc (sizeof (*_smobinfo));				\
+  _smobinfo->c_object = (void *)(_c_obj);				\
+  _smobinfo->freeable = (_freeable);					\
+  _smobinfo->deps = (_deps);						\
+  SCM_NEWSMOB (_smob, _smobtype, _smobinfo);				\
+}									\
+while (0)
+
+#define SCM_READER_SMOB_DATA(_data, _smob)			\
+do								\
+{								\
+  scm_reader_smob_t *_smobinfo;					\
+  _smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (_smob);	\
+  (_data) = (scm_reader_t)_smobinfo->c_object;			\
+}								\
+while(0)
+
+#define SCM_TOKEN_READER_SMOB_DATA(_data, _smob)		\
+do								\
+{								\
+  scm_reader_smob_t *_smobinfo;					\
+  _smobinfo = (scm_reader_smob_t *)SCM_SMOB_DATA (_smob);	\
+  (_data) = (scm_token_reader_spec_t *)_smobinfo->c_object;	\
+}								\
+while(0)
 
 
 #endif

@@ -878,8 +878,8 @@ scm_read_srfi4_vector (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 SCM
-scm_read_block_comment (int chr, SCM port, scm_reader_t scm_reader,
-			scm_reader_t top_level_reader)
+scm_read_scsh_block_comment (int chr, SCM port, scm_reader_t scm_reader,
+			     scm_reader_t top_level_reader)
 {
   skip_scsh_block_comment (port);
   return SCM_UNSPECIFIED;
@@ -1002,133 +1002,59 @@ scm_read_skribe_exp (int chr, SCM port, scm_reader_t reader,
 
 /* Directory of standard token readers.  */
 
+extern const struct scm_token_reader_entry *
+_scm_token_reader_lookup (const char *, unsigned int);
+
 #include <string.h>
-/* #include "token-reader-lookup.c" */
+#include "token-reader-lookup.c"
 
 const scm_token_reader_spec_t *
 scm_token_reader_lookup (const char *name)
 {
-#if 0
   const struct scm_token_reader_entry *entry;
 
   entry = _scm_token_reader_lookup (name, strlen (name));
-#endif
 
-  const scm_token_reader_spec_t **group, *spec;
-  const scm_token_reader_spec_t *specs[] =
-    { scm_reader_standard_specs, scm_sharp_reader_standard_specs,
-      scm_reader_misc_specs, NULL };
+  return (&entry->reader);
+}
 
-  for (group = specs; *group != NULL; group++)
+/* A NULL-terminated array of token reader names.  */
+const char *scm_standard_token_reader_list[] =
+  {
+#include "token-reader-list.c"
+    NULL
+  };
+
+SCM_DEFINE (scm_standard_token_reader_names,
+	    "standard-token-reader-names", 0, 0, 0,
+	    (void),
+	    "Return a list of symbols where each symbol is the name "
+	    "of a standard token reader that may be obtained using "
+	    "@code{standard-token-reader}.")
+{
+  SCM lst;
+  const char **p;
+
+  for (p = scm_standard_token_reader_list, lst = SCM_EOL;
+       *p;
+       p++)
     {
-      for (spec = *group; spec->name != NULL; spec++)
-	{
-	  if (!strcmp (spec->name, name))
-	    return (spec);
-	}
+      lst = scm_cons (scm_from_locale_symbol (*p), lst);
     }
 
-  return NULL;
+  return lst;
 }
 
 
-/* Sample Scheme reader.  */
+/* Initialization.  */
 
-const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
-  {
-    SCM_DEFTOKEN_SINGLE ('\\', "character",      scm_read_character, 0),
-    SCM_DEFTOKEN_SINGLE ('(',  "vector",         scm_read_vector, 0),
-    SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector, 0),
-    SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean, 0),
-    SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword, 0),
-    SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+radix", scm_read_number_and_radix, 0),
-    SCM_DEFTOKEN_SINGLE ('{',  "extended-symbol",scm_read_extended_symbol, 0),
+void
+scm_initialize_token_reader_library (void)
+{
+#include "token-readers.c.x"
+}
 
-    /* For block comments, we set the `escape' field to 1 so that the sharp
-       reader will not loop when the block comment TR returns
-       SCM_UNSPECIFIED.  This way, the sharp reader will return
-       SCM_UNSPECIFIED to the top-level reader, which in turn will loop.  */
-    SCM_DEFTOKEN_SINGLE ('!',  "block-comment",  scm_read_block_comment, 1),
-    SCM_END_TOKENS
-  };
-
-/* A reader that must be compiled at initialization-time.  */
-scm_reader_t scm_standard_sharp_reader = NULL;
-
-/* A default, Scheme-like, reader specification.  */
-scm_token_reader_spec_t scm_reader_standard_specs[] =
-  {
-    /* Whitespaces are defined using a NULL reader:  characters in this range
-       are just ignored by the reader.  XXX:  The set itself cannot contain
-       the null character.  */
-    SCM_DEFTOKEN_RANGE ('\1', ' ', "whitespace", NULL, 0),
-
-    SCM_DEFTOKEN_SINGLE ('(', "sexp",   scm_read_sexp, 0),
-    SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string, 0),
-
-    /* Both numbers and symbols can start with `+' or `-'.  */
-    SCM_DEFTOKEN_RANGE ('0', '9', "guile-number", scm_read_guile_number, 0),
-
-    /* Let's define symbols as two ranges plus one set of triggering
-       characters.  Note that the sexp reader relies on the ability to read
-       `.' as a symbol.  */
-    SCM_DEFTOKEN_RANGE ('a', 'z', "guile-symbol-lower-case",
-			scm_read_guile_mixed_case_symbol, 0),
-    SCM_DEFTOKEN_RANGE ('A', 'Z', "guile-symbol-upper-case",
-			scm_read_guile_mixed_case_symbol, 0),
-    SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",
-		      "guile-symbol-misc-chars",
-		      scm_read_guile_mixed_case_symbol, 0),
-
-    SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote", scm_read_quote, 0),
-
-    SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",
-			 scm_read_semicolon_comment, 0),
-
-    /* This one is defined at reader's compile-time.  */
-    SCM_DEFTOKEN_SINGLE ('#', "sharp",                   NULL, 0),
-
-    SCM_END_TOKENS
-  };
-
-/* This is where we put non-standard token readers so that they can easily be
-   looked up with `scm_token_reader_lookup ()'.  */
-const scm_token_reader_spec_t scm_reader_misc_specs[] =
-  {
-    /* Skribe/Skribilo literal sequences.  */
-    SCM_DEFTOKEN_SINGLE ('[', "skribe-exp", scm_read_skribe_exp, 0),
-
-
-    /* S-exp alternative syntaxes.  Note that this requires the symbol token
-       reader to not handle the corresponding character (`}' and `]' for
-       instance).  */
-
-    /* Square-bracket S-exps as will be allowed by R6RS and is already
-       implemented by many Scheme implementations.  */
-    SCM_DEFTOKEN_SINGLE ('[', "square-bracket-sexp", scm_read_sexp, 0),
-
-    /* Curly-brace S-exps: why not?  :-)  */
-    SCM_DEFTOKEN_SINGLE ('{', "curly-brace-sexp",  scm_read_sexp, 0),
-
-
-    /* Various flavors of symbols.  */
-
-    SCM_DEFTOKEN_RANGE ('a', 'z', "r5rs-lower-case-symbol-lower-case",
-			scm_read_r5rs_lower_case_symbol, 0),
-    SCM_DEFTOKEN_RANGE ('A', 'Z', "r5rs-lower-case-symbol-upper-case",
-			scm_read_r5rs_lower_case_symbol, 0),
-    SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",
-		      "r5rs-lower-case-symbol-misc-chars",
-		      scm_read_r5rs_lower_case_symbol, 0),
-
-    SCM_DEFTOKEN_RANGE ('a', 'z', "r5rs-upper-case-symbol-lower-case",
-			scm_read_r5rs_upper_case_symbol, 0),
-    SCM_DEFTOKEN_RANGE ('A', 'Z', "r5rs-upper-case-symbol-upper-case",
-			scm_read_r5rs_upper_case_symbol, 0),
-    SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",
-		      "r5rs-upper-case-symbol-misc-chars",
-		      scm_read_r5rs_upper_case_symbol, 0),
-
+#if 0 /* FIXME: Put that in `token-readers.h'.  */
     SCM_DEFTOKEN_RANGE ('a', 'z', "r6rs-symbol-lower-case",
 			scm_read_r6rs_symbol, 0),
     SCM_DEFTOKEN_RANGE ('A', 'Z', "r6rs-symbol-upper-case",
@@ -1143,92 +1069,5 @@ const scm_token_reader_spec_t scm_reader_misc_specs[] =
     SCM_DEFTOKEN_SET ("[]:.+-/*%&@_<>!=?$",
 		      "brace-free-symbol-misc-chars",
 		      scm_read_brace_free_symbol, 0),
+#endif
 
-    /* Likewise, various flavours of numbers.  */
-    SCM_DEFTOKEN_RANGE ('0', '9', "guile-number", scm_read_guile_number, 0),
-    SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-lower-case-number",
-			scm_read_r5rs_lower_case_number, 0),
-    SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-upper-case-number",
-			scm_read_r5rs_upper_case_number, 0),
-    SCM_DEFTOKEN_RANGE ('0', '9', "r6rs-number", scm_read_r6rs_number, 0),
-    SCM_DEFTOKEN_RANGE ('0', '9', "brace-free-number",
-			scm_read_brace_free_number, 0),
-
-    SCM_END_TOKENS
-  };
-
-
-
-/* The standard reader (which depends on the standard keyword reader),
-   compiled at initialization time.  */
-scm_reader_t scm_standard_reader = NULL;
-
-/* The standard fault handler proc.  */
-SCM scm_reader_standard_fault_handler_proc = SCM_BOOL_F;
-
-
-static char standard_reader_code[8000];
-static char standard_sharp_reader_code[4000];
-
-static SCM
-scm_reader_standard_fault_handler (SCM chr, SCM port, SCM reader)
-{
-  scm_i_input_error ("%reader-standard-fault-handler",
-		     port, "unhandled character: ~S", scm_list_1 (chr));
-  return SCM_UNSPECIFIED;
-}
-
-void
-scm_load_standard_reader (void)
-{
-  /* XXX  Ultimately, we might want to simply mmap a file containing the
-     pre-compiled readers.  */
-
-  size_t code_size = 0;
-
-  if (scm_reader_standard_fault_handler_proc == SCM_BOOL_F)
-    {
-      scm_reader_standard_fault_handler_proc =
-	scm_c_make_gsubr ("%reader-standard-fault-handler", 3, 0, 0,
-			  scm_reader_standard_fault_handler);
-      scm_permanent_object (scm_reader_standard_fault_handler_proc);
-    }
-
-  if (!scm_standard_sharp_reader)
-    {
-      scm_standard_sharp_reader =
-	scm_c_make_reader (standard_sharp_reader_code,
-			   sizeof (standard_sharp_reader_code),
-			   scm_sharp_reader_standard_specs,
-			   scm_reader_standard_fault_handler_proc, 0,
-			   &code_size);
-    }
-
-  if (!scm_standard_reader)
-    {
-      /* Replace the sharp reader.  */
-      scm_token_reader_spec_t *tr;
-      for (tr = (scm_token_reader_spec_t *)scm_reader_standard_specs;
-	   tr->name != 0;
-	   tr++)
-	{
-	  if ((tr->token.type == SCM_TOKEN_SINGLE)
-	      && (tr->token.value.single == '#'))
-	    {
-	      tr->reader.type = SCM_TOKEN_READER_READER;
-	      tr->reader.value.reader = scm_standard_sharp_reader;
-	      break;
-	    }
-	}
-
-      /* We should not have reached the end of list.  */
-      assert (tr->name);
-
-      scm_standard_reader =
-	scm_c_make_reader (standard_reader_code,
-			   sizeof (standard_reader_code),
-			   scm_reader_standard_specs,
-			   scm_reader_standard_fault_handler_proc, 0,
-			   &code_size);
-    }
-}

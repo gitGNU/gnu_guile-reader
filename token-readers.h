@@ -35,9 +35,25 @@ extern SCM scm_read_string (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_guile_number (int, SCM, scm_reader_t, scm_reader_t);
 
+extern SCM scm_read_number_and_radix (int, SCM, scm_reader_t, scm_reader_t);
+
 extern SCM scm_read_quote (int, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_skribe_literal (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_semicolon_comment (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_scsh_block_comment (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_boolean (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_character (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_keyword (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_vector (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_srfi4_vector (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_skribe_exp (int, SCM, scm_reader_t, scm_reader_t);
 
 
 /* Symbol token readers.  */
@@ -50,7 +66,17 @@ extern SCM scm_read_r5rs_lower_case_symbol (int, SCM, scm_reader_t,
 extern SCM scm_read_r5rs_upper_case_symbol (int, SCM, scm_reader_t,
 					    scm_reader_t);
 
+extern SCM scm_read_r5rs_lower_case_number (int, SCM, scm_reader_t,
+					    scm_reader_t);
+
+extern SCM scm_read_r5rs_upper_case_number (int, SCM, scm_reader_t,
+					    scm_reader_t);
+
 extern SCM scm_read_r6rs_symbol (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_r6rs_number (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_brace_free_number (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_brace_free_symbol (int, SCM, scm_reader_t, scm_reader_t);
 
@@ -59,28 +85,208 @@ extern SCM scm_read_brace_free_symbol (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_extended_symbol (int, SCM, scm_reader_t, scm_reader_t);
 
-
 
-/* Zero-terminated array of a standard Scheme reader specification.  */
-extern scm_token_reader_spec_t scm_reader_standard_specs[];
-extern const scm_token_reader_spec_t scm_sharp_reader_standard_specs[];
-extern const scm_token_reader_spec_t scm_reader_misc_specs[];
-
-/* Two standard (in Guile terms) readers compiled at initialization time.  */
-extern scm_reader_t scm_standard_reader;
-extern scm_reader_t scm_standard_sharp_reader;
-
-/* A standard reader fault handler.  */
-extern SCM scm_reader_standard_fault_handler_proc;
-
 /* Look for a token reader named NAME in the standard token readers and
    return its specification if found, otherwise return NULL.  */
 extern const scm_token_reader_spec_t *
 scm_token_reader_lookup (const char *name);
 
-/* Load or compile the standard reader (and its `#' reader) declared above.
-   This function is automatically called by the `(reader)' module at
-   load-time.  */
-extern void scm_load_standard_reader (void);
+/* A NULL-terminated list of token reader names.  */
+extern const char *scm_standard_token_reader_list[];
+
+/* Return a list of symbols each of which is the name of a standard token
+   reader.  */
+extern SCM scm_standard_token_reader_names (void);
+
+/* Initialize the token reader library and its Scheme bindings.  */
+extern void scm_initialize_token_reader_library (void);
+
+
+
+/* Static C token readers initializers.
+
+   Note that the name enclose in comments right after the macro name is
+   important: it is extracted at compilation-time and then used as the token
+   reader identifier by `scm_token_reader_lookup ()'.  */
+
+
+/* A number of sharp token readers, i.e. token readers whose invocation only
+   makes sense after the `#' character.  */
+#define SCM_TR_CHARACTER /* character */				\
+  SCM_DEFTOKEN_SINGLE ('\\', "character",      scm_read_character, 0,	\
+		       "This is a sharp token reader, i.e. it reads "	\
+		       "an R5RS character once a @code{#} character "	\
+		       "has been read.")
+#define SCM_TR_VECTOR /* vector */					\
+  SCM_DEFTOKEN_SINGLE ('(',  "vector",         scm_read_vector, 0,	\
+		       "This is a sharp token reader, i.e. it reads "	\
+		       "an R5RS vector once a @code{#} character has "	\
+		       "been read.")
+#define SCM_TR_SRFI_4 /* srfi-4 */					 \
+  SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector, 0, \
+		    "This is a sharp token reader, i.e. it reads an "	 \
+		    "SRFI-4 homogenous numeric vector once a @code{#} "	 \
+		    "character has been read.")
+#define SCM_TR_BOOLEAN /* boolean */					\
+  SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean, 0,	\
+		    "This is a sharp token reader, i.e. it reads an "	\
+		    "R5RS boolean (@code{#f} or @code{#F}, @code{#t} "	\
+		    "or @code{#T}) once a @code{#} character has been "	\
+		    "read.")
+#define SCM_TR_KEYWORD /* keyword */					\
+  SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword, 0,	\
+		       "This token reader returns a keyword as found "	\
+		       "in Guile.  It may be used either after a "	\
+		       "@code{#} character (to implement Guile's "	\
+		       "default keyword syntax, @code{#:kw}) or "	\
+		       "within the top-level reader (to implement "	\
+		       "@code{:kw}-style keywords).")
+#define SCM_TR_NUMBER_AND_RADIX /* number+radix */			\
+  SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+radix",			\
+		    scm_read_number_and_radix, 0,			\
+		    "This is a sharp token reader, i.e. it reads a "	\
+		    "number using the radix notation, like "		\
+		    "@code{#b01} for the binary notation, @code{#x1d} "	\
+		    "for the hexadecimal notation, etc., see "		\
+		    "@inforef{Number Syntax, Guile's number syntax, "	\
+		    "guile}, for details.")
+#define SCM_TR_GUILE_EXTENDED_SYMBOL /* guile-extended-symbol */	\
+  SCM_DEFTOKEN_SINGLE ('{',  "guile-extended-symbol",			\
+		       scm_read_extended_symbol, 0,			\
+		       "This is a sharp token reader, i.e. it reads "	\
+		       "a symbol using Guile's extended symbol "	\
+		       "syntax assuming a @code{#} character was "	\
+		       "read.  See @inforef{Symbol Read Syntax, "	\
+		       "Guile's extended read syntax for symbols, "	\
+		       "guile}, for details.")
+#define SCM_TR_SCSH_BLOCK_COMMENT /* scsh-block-comment */		\
+  SCM_DEFTOKEN_SINGLE ('!',  "scsh-block-comment",			\
+		       scm_read_scsh_block_comment, 1,			\
+		       "This is a sharp token reader, i.e. it reads "	\
+		       "a SCSH-style block comment (like "		\
+		       "@code{#! multi-line comment !#}) and returns "	\
+		       "@code{*unspecified*}, assuming a @code{#} "	\
+		       "character was read before.  This token reader "	\
+		       "has its ``escape'' bit set, meaning that "	\
+		       "the reader that calls it will return "		\
+		       "@code{*unspecified*} to its parent reader.  "	\
+		       "See also @inforef{Block Comments, "		\
+		       "block comments, guile}, for details about "	\
+		       "SCSH block comments.")
+
+/* Top-level token readers.  */
+#define SCM_TR_WHITESPACE /* whitespace */				\
+  SCM_DEFTOKEN_RANGE ('\1', ' ', "whitespace", NULL, 0,			\
+		      "This is a void token reader that causes its "	\
+		      "calling reader to ignore (i.e. treat as "	\
+		      "whitespace) all ASCII characters ranging from "	\
+		      "1 to 32.")
+#define SCM_TR_SEXP /* sexp */						\
+  SCM_DEFTOKEN_SINGLE ('(', "sexp",   scm_read_sexp, 0,			\
+		       "Read a regular S-expression enclosed in "	\
+		       "parentheses.")
+#define SCM_TR_STRING /* string */				\
+  SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string, 0,	\
+		       "Read an R5RS string.")
+#define SCM_TR_GUILE_NUMBER /* guile-number */				\
+  SCM_DEFTOKEN_RANGE ('0', '9', "guile-number",				\
+		      scm_read_guile_number, 0,				\
+		      "Read a number following Guile's fashion.  "	\
+		      "Because the syntaxes for numbers and symbols "	\
+		      "are closely tight in R5RS and Guile, this "	\
+		      "token reader may return either a number or a "	\
+		      "symbol.  For instance, it will be invoked if "	\
+		      "the string @code{123.123.123} is passed to the "	\
+		      "reader but this will actually yield a symbol "	\
+		      "instead of a reader.")
+#define SCM_TR_GUILE_SYMBOL_LOWER_CASE /* guile-symbol-lower-case */	\
+  SCM_DEFTOKEN_RANGE ('a', 'z', "guile-symbol-lower-case",		\
+		      scm_read_guile_mixed_case_symbol, 0,		\
+		      "Read a symbol that starts with a lower-case "	\
+		      "letter in a case-sensitive fashion.")
+#define SCM_TR_GUILE_SYMBOL_UPPER_CASE /* guile-symbol-upper-case */	\
+  SCM_DEFTOKEN_RANGE ('A', 'Z', "guile-symbol-upper-case",		\
+		      scm_read_guile_mixed_case_symbol, 0,		\
+		      "Read a symbol that starts with an upper-case "	\
+		      "letter in a case-sensitive fashion.")
+#define SCM_TR_GUILE_SYMBOL_MISC_CHARS /* guile-symbol-misc-chars */	 \
+  SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",				 \
+		    "guile-symbol-misc-chars",				 \
+		    scm_read_guile_mixed_case_symbol, 0,		 \
+		    "Read a symbol that starts with a non-alphanumeric " \
+		    "character in a case-sensitive fashion.")
+#define SCM_TR_QUOTE_QUASIQUOTE_UNQUOTE /* quote-quasiquote-unquote */	  \
+  SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote",			  \
+		    scm_read_quote, 0,					  \
+		    "Read a quote, quasiquote, or unquote S-expression.")
+#define SCM_TR_SEMICOLON_COMMENT /* semicolon-comment */		   \
+  SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",			   \
+		       scm_read_semicolon_comment, 0,			   \
+		       "Read an R5RS semicolon line-comment and return "   \
+		       "@code{*unspecified*}.  Consequently, the calling " \
+		       "reader will loop and ignore the comment.")
+
+
+/* Alternative (uncommon) token readers.  */
+
+#define SCM_TR_SKRIBE_EXP /* skribe-exp */				\
+  SCM_DEFTOKEN_SINGLE ('[', "skribe-exp", scm_read_skribe_exp, 0,	\
+		       "Read a Skribe markup expression.  Skribe's "	\
+		       "expressions look like this:\n"			\
+		       "@smallexample\n"				\
+		       "[Hello ,(bold [World])!]\n"			\
+		       "=> (\"Hello \" (bold \"World\") \"!\")\n"	\
+		       "@end smallexample\n")
+#define SCM_TR_CURLY_BRACE_SEXP /* curly-brace-sexp */			 \
+  SCM_DEFTOKEN_SINGLE ('[', "square-bracket-sexp", scm_read_sexp, 0,	 \
+		       "Read an S-expression enclosed in square "	 \
+		       "brackets.  This is already permitted by a "	 \
+		       "number of Scheme implementations and will soon " \
+		       "be made compulsory by R6RS.")
+
+/* Various flavors of symbols.  */
+#define SCM_TR_R5RS_LOWER_CASE_SYMBOL_LOWER_CASE /* r5rs-lower-case-symbol-lower-case */ \
+  SCM_DEFTOKEN_RANGE ('a', 'z', "r5rs-lower-case-symbol-lower-case",			 \
+		      scm_read_r5rs_lower_case_symbol, 0,				 \
+		      "Read a symbol that starts with a lower-case "			 \
+		      "letter and return a lower-case symbol, "				 \
+		      "regardless of the case of the input.")
+#define SCM_TR_R5RS_LOWER_CASE_SYMBOL_UPPER_CASE /* r5rs-lower-case-symbol-upper-case */ \
+  SCM_DEFTOKEN_RANGE ('A', 'Z', "r5rs-lower-case-symbol-upper-case",			 \
+		      scm_read_r5rs_lower_case_symbol, 0,				 \
+		      "Read a symbol that starts with an upper-case "			 \
+		      "letter and return a lower-case symbol, "				 \
+		      "regardless of the case of the input.")
+#define SCM_TR_R5RS_LOWER_CASE_SYMBOL_MISC_CHARS /* r5rs-lower-case-symbol-misc-chars */ \
+  SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",						 \
+		    "r5rs-lower-case-symbol-misc-chars",				 \
+		    scm_read_r5rs_lower_case_symbol, 0,					 \
+		    "Read a symbol that starts with a non-"				 \
+		    "alphanumeric character and return a "				 \
+		    "lower-case symbol, regardless of the "				 \
+		    "case of the input.")
+
+/* Flavours of numbers.  */
+
+#define SCM_TR_R5RS_LOWER_CASE_NUMBER /* r5rs-lower-case-number */	\
+  SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-lower-case-number",		\
+		      scm_read_r5rs_lower_case_number, 0,		\
+		      "Return a number or a lower-case symbol.")
+#define SCM_TR_R5RS_UPPER_CASE_NUMBER /* r5rs-upper-case-number */	\
+  SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-upper-case-number",		\
+		      scm_read_r5rs_upper_case_number, 0,		\
+		      "Return a number or an upper-case symbol.")
+#define SCM_TR_R6RS_NUMBER /* r6rs-number */				\
+  SCM_DEFTOKEN_RANGE ('0', '9', "r6rs-number",				\
+		      scm_read_r6rs_number, 0,				\
+		      "Return a number or a symbol.  This token "	\
+		      "reader conforms to R6RS, i.e. it considers "	\
+		      "square brackets as delimiters.")
+#define SCM_TR_BRACE_FREE_NUMBER /* brace-free-number */		\
+  SCM_DEFTOKEN_RANGE ('0', '9', "brace-free-number",			\
+		      scm_read_brace_free_number, 0,			\
+		      "Return a number or a symbol, considering "	\
+		      "curly braces as delimiters.")			\
+
 
 #endif

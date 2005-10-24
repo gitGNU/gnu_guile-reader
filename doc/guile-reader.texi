@@ -338,41 +338,18 @@ used individually in any reader.
 
 The @code{standard-token-reader} procedure takes a symbol that names a
 standard TR from the library and returns it (or @code{#f} if not
-found).  Among those TRs are:
+found).  Currently, the available TRs are:
 
-@itemize
-@item @code{whitespace}, which reads (actually, skips) white spaces;
-@item @code{symbol-upper-case}, which reads symbols starting with an
-upper-case letter;
-@item @code{string}, which reads strings;
-@item @code{number}, which reads a number;
-@item @code{sexp}, which reads an S-expression; the S-exp may either
-be delimited by regular parentheses, or by square brackets (à la
-R6RS), or by curly braces; note that you'll have to make sure that the
-symbol readers do not interpret square brackets are curly braces as
-part of a symbol if you got for one of the two last options.
-@end itemize
+@c Include the documentation that was generated using `extract-doc.scm'.
+@table @code
+@include token-reader-doc.texi
+@end table
 
-A few @dfn{sharp TRs}, i.e. TRs which expect the @code{#} character to
-have been read prior to their invocation, are available:
-
-@itemize
-@item @code{boolean}, which reads a boolean;
-@item @code{character}, which reads an R5RS character once the
-@code{#} character has been read;
-@item @code{srfi-4}, which reads an SRFI-4 vector;
-@item @code{keyword}, which reads a keyword, equivalent to
-@code{colon-keyword};
-@item @code{number+radix}, which reads a number plus its radix, as in
-@code{#xdeadbeef}.
-@end itemize
-
-This list is not complete but it should already give you a good
-overview of what is available (FIXME).  As can be inferred from the
-above two lists, reading character sequences starting with the
-@code{#} characters can easily be done by defining a sub-reader for
-that character.  That reader can then be passed to
-@code{make-token-reader} as the procedure attached to @code{#}:
+As can be inferred from the above two lists, reading character
+sequences starting with the @code{#} characters can easily be done by
+defining a sub-reader for that character.  That reader can then be
+passed to @code{make-token-reader} as the procedure attached to
+@code{#}:
 
 @example
 (define sharp-reader

@@ -21,14 +21,17 @@
    #:export (make-reader make-token-reader
 
 	     ;; helpers
-	     standard-token-reader
+	     standard-token-reader standard-token-reader-names
 	     default-reader default-sharp-reader
 	     default-reader-token-readers
 	     default-sharp-reader-token-readers
 
 	     ;; accessors
 	     token-reader-procedure token-reader-specification
-             token-reader-escape?
+             token-reader-escape? token-reader-documentation
+
+	     ;; fault handler
+	     %reader-standard-fault-handler
 
 	     ;; internals
 	     %guile-reader-uses-lightning?))
