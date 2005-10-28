@@ -23,6 +23,9 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <assert.h>
+
 
 
 /* The Guile readers.  */
@@ -35,6 +38,7 @@ const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
     SCM_TR_CHARACTER,
     SCM_TR_VECTOR,
     SCM_TR_SRFI_4,
+    SCM_TR_GUILE_BIT_VECTOR,
     SCM_TR_BOOLEAN,
     SCM_TR_KEYWORD,
     SCM_TR_NUMBER_AND_RADIX,
@@ -49,7 +53,8 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
     SCM_TR_WHITESPACE,
 
     /* This one is defined at reader's compile-time.  Note that reader
-       compilers expect to find it here!  */
+       compilers expect to find it here!  See the definition of
+       SCM_STANDARD_READER_SHARP_OFFSET.  */
     SCM_DEFTOKEN_SINGLE ('#', "sharp", NULL, 0,
 			 "This is Guile's ``sharp reader'', i.e. a "
 			 "reader for tokens starting with @code{#}.  "
@@ -116,29 +121,72 @@ SCM_DEFINE (scm_default_sharp_reader_token_readers,
   return scm_from_reader_spec (scm_sharp_reader_standard_specs, 1);
 }
 
-SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 0, 1,
-	    (SCM flags),
+SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
+	    (SCM fault_handler, SCM flags),
 	    "Make and return a new reader compatible with Guile's built-in "
 	    "reader.  This function call @code{make-reader} with "
 	    "@var{flags}.  Note that the sharp reader used by the returned "
 	    "reader is also instantiated using @var{flags}.")
 #define FUNC_NAME s_scm_make_guile_reader
 {
-#if 0
-  SCM reader;
-  scm_reader_t c_reader;
+  SCM s_reader, *s_deps;
+  scm_reader_t c_reader, c_sharp_reader;
+  scm_token_reader_spec_t *c_specs;
   unsigned c_flags;
+  size_t code_size;
   void *buffer;
 
-  c_flags = scm_to_make_reader_flags (flags);
-  buffer = scm_malloc (5000); /* should be enough */
+  if (fault_handler == SCM_UNDEFINED)
+    fault_handler = SCM_BOOL_F;
 
-  c_reader = scm_c_make_reader (buffer, 5000, c_token_readers,
-				fault_handler, flags);
-#endif
-  return SCM_BOOL_F;
+  if (fault_handler != SCM_BOOL_F)
+    SCM_VALIDATE_PROC (1, fault_handler);
+
+  c_flags = scm_to_make_reader_flags (flags);
+
+  /* Build a brand new sharp reader.  */
+  buffer = scm_malloc (9000); /* should be enough for both readers */
+  c_sharp_reader = scm_c_make_reader (buffer + 5000, 4000,
+				      scm_sharp_reader_standard_specs,
+				      fault_handler, c_flags,
+				      &code_size);
+  assert (c_sharp_reader);
+  assert (code_size <= 4000);
+
+  /* Get a local copy of the reader specs and change the sharp token reader. */
+  c_specs = alloca ((standard_reader_specs_size + 1) * sizeof (*c_specs));
+  memcpy (c_specs, scm_reader_standard_specs,
+	  (standard_reader_specs_size + 1) * sizeof (*c_specs));
+  assert (c_specs[SCM_STANDARD_READER_SHARP_OFFSET].token.value.single
+	  == '#');
+  c_specs[SCM_STANDARD_READER_SHARP_OFFSET].reader.type =
+    SCM_TOKEN_READER_READER;
+  c_specs[SCM_STANDARD_READER_SHARP_OFFSET].reader.value.reader =
+    c_sharp_reader;
+
+  /* Build the top-level reader.  */
+  c_reader = scm_c_make_reader (buffer, 5000, c_specs,
+				fault_handler, c_flags,
+				&code_size);
+  assert (c_reader);
+  assert (code_size <= 5000);
+
+  if (fault_handler != SCM_BOOL_F)
+    {
+      /* Prepare a (small) list of GC dependencies.  */
+      s_deps = scm_malloc (sizeof (*s_deps));
+      s_deps[0] = fault_handler;
+    }
+  else
+    /* No GC dependencies.  */
+    s_deps = NULL;
+
+  SCM_NEW_READER_SMOB (s_reader, scm_reader_type, c_reader,
+		       s_deps, 1);
+  return s_reader;
 }
 #undef FUNC_NAME
+
 
 
 /* The R5RS reader.  */

@@ -60,6 +60,7 @@ LDFLAGS="$clean_LDFLAGS"
 AC_CONFIG_FILES([Makefile
 	         module/Makefile
 		 module/system/Makefile
+		 module/system/reader/Makefile
 		 doc/Makefile])
 
 AC_OUTPUT

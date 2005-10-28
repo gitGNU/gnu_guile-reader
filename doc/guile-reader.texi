@@ -84,7 +84,7 @@ files.
 * Internals::                   
 @end menu
 
-
+
 @c *********************************************************************
 
 @node Introduction, Overview, Top, Top
@@ -126,20 +126,22 @@ It is, however, less powerful in that it assumes a single reader
 instance (which is @emph{not} a good assumption for an interpreter).
 
 
-
+@c chapter ----------------------------------------------------------
 @node Overview, API Reference, Introduction, Top
 @chapter Overview
 
+@cindex reader
+@cindex token reader
 Before going into the details of the reader framework API, let us have
 a quick overview of what this is.  Basically, guile-reader introduces
 two objects: @dfn{readers} and @dfn{token readers}.  Readers can be
 thought of, simply, as procedures like Scheme's @code{read}
 @inforef{Input, R5RS, r5rs}, i.e. procedures that take one (optional)
 argument, namely the port to read from.  We will see later that
-readers as defined by guile-reader can actually receive a second
-argument (FIXME: xref).  A reader, like @code{read}, reads a sequence
-of characters (the @dfn{external representation} of some object) and
-returns a Scheme object.
+readers as defined by guile-reader can actually receive two more
+arguments (@pxref{Defining a New Reader}).  A reader, like
+@code{read}, reads a sequence of characters (the @dfn{external
+representation} of some object) and returns a Scheme object.
 
 Token readers (TRs, for short) are the building block of a reader.  A
 token reader is basically an association between a character or set of
@@ -165,7 +167,7 @@ the S-exp example, this would be @code{(};
 
 The next section will provide details about the API.
 
-
+@c chapter ----------------------------------------------------------
 @node API Reference, Internals, Overview, Top
 @chapter API Reference
 
@@ -205,6 +207,8 @@ ones.
 @node Defining a New Token Reader, TR Calling Convention, Token Readers, Token Readers
 @subsection Defining a New Token Reader
 
+@cindex token reader
+@cindex character specification
 A new token reader object can be created by calling the
 @code{make-token-reader} procedure with a @dfn{character
 specification} and a procedure.  A character specification defines the
@@ -259,16 +263,16 @@ Scheme object to return, and a reader is not expected to return
 anything but a ``real'' Scheme object.  A token reader for Scheme's
 @code{;} line comments may be defined as follows:
 
-@example
+@smallexample
 (make-token-reader #\; read-a-line-and-return-unspecified)
-@end example
+@end smallexample
 
 This behavior may, however, be overridden by passing
 @code{make-token-reader} a third argument (called @var{escape?}):
 
-@example
+@smallexample
 (make-token-reader #\; read-a-line-and-return-unspecified #t)
-@end example
+@end smallexample
 
 A reader that includes this TR will return @code{*unspecified*} once a
 line comment has been read.  This is particularly useful, for
@@ -282,9 +286,9 @@ Finally, the procedure passed to @code{make-token-reader} may be
 ignoring the characters it is associated to.  For instance,
 handling white spaces may be done by defining a TR like this:
 
-@example
+@smallexample
 (make-token-reader '(#\space #\newline #\tab) #f)
-@end example
+@end smallexample
 
 @code{make-token-reader}
 FIXME:  Snarf doc from `reader.c'.
@@ -375,9 +379,9 @@ FIXME:  Snarf doc from `reader.c'.
 @node Readers,  , Token Readers, API Reference
 @section Readers
 
-Guile-reader is about defining readers.  Continuing to read was
-definitely a good idea since we have finally reached the point where
-we will start talking about how to define new readers.
+Guile-reader is about defining readers.  Continuing to read this
+manual was definitely a good idea since we have finally reached the
+point where we will start talking about how to define new readers.
 
 @menu
 * Defining a New Reader::       
@@ -391,7 +395,7 @@ Roughly, a reader is no more than a loop which reads characters from a
 given port, and dispatches further interpretation to more specific
 procedures.  Written in Scheme, it could resemble something like:
 
-@example
+@lisp
 (define (my-reader port)
   (let loop ((result *unspecified*))
     (let ((the-char (getc port)))
@@ -401,24 +405,24 @@ procedures.  Written in Scheme, it could resemble something like:
          (my-number-token-reader the-char port my-reader))
         (else
          (error "unexpected character" the-char))))))
-@end example
+@end lisp
 
 Using guile-reader, this is done simply by providing a list of token
 readers to the @code{make-reader} procedure, as in the following
 example:
 
-@example
+@lisp
 (define my-reader
   (make-reader (list (make-token-reader #\( my-sexp-token-reader)
                      (make-token-reader '(#\0 . #\9)
                                         my-number-token-reader))))
-@end example
+@end lisp
 
 However, the procedure returned by @code{make-reader} is different
 from the hand-written one above in that in takes two additional
 optional arguments which makes it look like this:
 
-@example
+@lisp
 (define (my-reader port faults-caller-handled? top-level-reader)
   (let loop ((the-char (getc port)))
     (case the-char
@@ -428,7 +432,7 @@ optional arguments which makes it look like this:
             (error "unexpected character" the-char)
             (ungetc the-char) ;; and return *unspecified*
             )))))
-@end example
+@end lisp
 
 Therefore, by default, @code{my-reader} will raise an error as soon as
 it reads a character that it does not know how to handle.  However, if
@@ -489,7 +493,7 @@ default reader made of re-usable token readers written in C
 
 FIXME:  Snarf doc from `reader.c'.
 
-
+@c chapter ----------------------------------------------------------
 @node Internals,  , API Reference, Top
 @chapter Internals
 

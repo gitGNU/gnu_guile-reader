@@ -53,6 +53,8 @@ extern SCM scm_read_vector (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_srfi4_vector (int, SCM, scm_reader_t, scm_reader_t);
 
+extern SCM scm_read_guile_bit_vector (int, SCM, scm_reader_t, scm_reader_t);
+
 extern SCM scm_read_skribe_exp (int, SCM, scm_reader_t, scm_reader_t);
 
 
@@ -127,6 +129,13 @@ extern void scm_initialize_token_reader_library (void);
 		    "This is a sharp token reader, i.e. it reads an "	 \
 		    "SRFI-4 homogenous numeric vector once a @code{#} "	 \
 		    "character has been read.")
+#define SCM_TR_GUILE_BIT_VECTOR /* guile-bit-vector */			\
+  SCM_DEFTOKEN_SINGLE ('*', "guile-bit-vector",				\
+		       scm_read_guile_bit_vector, 0,			\
+		       "This is a sharp token reader, i.e. it reads a "	\
+		       "bit vector following Guile's read syntax for "	\
+		       "bit vectors.  See @inforef{Bit Vectors, "	\
+		       "Guile's bit vectors, guile}, for details.")
 #define SCM_TR_BOOLEAN /* boolean */					\
   SCM_DEFTOKEN_SET ("ftTF",  "boolean",        scm_read_boolean, 0,	\
 		    "This is a sharp token reader, i.e. it reads an "	\
@@ -191,7 +200,10 @@ extern void scm_initialize_token_reader_library (void);
 #define SCM_TR_GUILE_NUMBER /* guile-number */				\
   SCM_DEFTOKEN_RANGE ('0', '9', "guile-number",				\
 		      scm_read_guile_number, 0,				\
-		      "Read a number following Guile's fashion.  "	\
+		      "Read a number following Guile's fashion, "	\
+		      "that is, as in R5RS (@inforef{Lexical "		\
+		      "structure, R5RS' lexical structure, r5rs}, "	\
+		      "for syntactic details).  "			\
 		      "Because the syntaxes for numbers and symbols "	\
 		      "are closely tight in R5RS and Guile, this "	\
 		      "token reader may return either a number or a "	\
@@ -232,16 +244,25 @@ extern void scm_initialize_token_reader_library (void);
 #define SCM_TR_SKRIBE_EXP /* skribe-exp */				\
   SCM_DEFTOKEN_SINGLE ('[', "skribe-exp", scm_read_skribe_exp, 0,	\
 		       "Read a Skribe markup expression.  Skribe's "	\
-		       "expressions look like this:\n"			\
+		       "expressions look like this:\n\n"		\
 		       "@smallexample\n"				\
 		       "[Hello ,(bold [World])!]\n"			\
 		       "=> (\"Hello \" (bold \"World\") \"!\")\n"	\
-		       "@end smallexample\n")
-#define SCM_TR_CURLY_BRACE_SEXP /* curly-brace-sexp */			 \
-  SCM_DEFTOKEN_SINGLE ('[', "square-bracket-sexp", scm_read_sexp, 0,	 \
-		       "Read an S-expression enclosed in square "	 \
-		       "brackets.  This is already permitted by a "	 \
-		       "number of Scheme implementations and will soon " \
+		       "@end smallexample\n\n"				\
+		       "See @uref{http://www.inria.fr@/"		\
+		       "/mimosa/fp/Skribe, the Skribe web site} "	\
+		       "for more details.")
+#define SCM_TR_SQUARE_BRACKET_SEXP /* square-bracket-sexp */			\
+  SCM_DEFTOKEN_SINGLE ('[', "square-bracket-sexp", scm_read_sexp, 0,		\
+		       "Read an S-expression enclosed in square "		\
+		       "brackets.  This is already permitted by a "		\
+		       "number of Scheme implementations and will soon "	\
+		       "be made compulsory by R6RS.")
+#define SCM_TR_CURLY_BRACE_SEXP /* curly-brace-sexp */				\
+  SCM_DEFTOKEN_SINGLE ('{', "curly-brace-sexp", scm_read_sexp, 0,		\
+		       "Read an S-expression enclosed in square "		\
+		       "brackets.  This is already permitted by a "		\
+		       "number of Scheme implementations and will soon "	\
 		       "be made compulsory by R6RS.")
 
 /* Various flavors of symbols.  */
@@ -265,6 +286,57 @@ extern void scm_initialize_token_reader_library (void);
 		    "alphanumeric character and return a "				 \
 		    "lower-case symbol, regardless of the "				 \
 		    "case of the input.")
+
+
+#define SCM_TR_R6RS_SYMBOL_LOWER_CASE /* r6rs-symbol-lower-case */	\
+  SCM_DEFTOKEN_RANGE ('a', 'z', "r6rs-symbol-lower-case",		\
+		      scm_read_r6rs_symbol, 0,				\
+		      "Read a symbol that starts with a lower-case "	\
+		      "letter and return a symbol.  This token "	\
+		      "reader conforms with R6RS in that it is "	\
+		      "case-sensitive and recognizes square "		\
+		      "brackets as delimiters.")
+#define SCM_TR_R6RS_SYMBOL_UPPER_CASE /* r6rs-symbol-upper-case */	\
+  SCM_DEFTOKEN_RANGE ('A', 'Z', "r6rs-symbol-upper-case",		\
+		      scm_read_r6rs_symbol, 0,				\
+		      "Read a symbol that starts with an upper-case "	\
+		      "letter and return a symbol.  This token "	\
+		      "reader conforms with R6RS in that it is "	\
+		      "case-sensitive and recognizes square "		\
+		      "brackets as delimiters.")
+#define SCM_TR_R6RS_SYMBOL_MISC_CHARS /* r6rs-symbol-misc-chars */	\
+  SCM_DEFTOKEN_SET ("{}:.+-/*%&@_<>!=?$",				\
+		    "r6rs-symbol-misc-chars",				\
+		    scm_read_r6rs_symbol, 0,				\
+		    "Read a symbol that starts with a non-"		\
+		    "alphanumeric character and return a "		\
+		    "symbol.  This token "				\
+		    "reader conforms with R6RS in that it is "		\
+		    "case-sensitive and recognizes square "		\
+		    "brackets as delimiters.")
+#define SCM_TR_BRACE_FREE_SYMBOL_LOWER_CASE /* brace-free-symbol-lower-case */ \
+  SCM_DEFTOKEN_RANGE ('a', 'z', "brace-free-symbol-lower-case",		       \
+		      scm_read_brace_free_symbol, 0,			       \
+		      "Read a symbol that starts with a lower-case "	       \
+		      "letter and return a symbol.  This token "	       \
+		      "reader recognizes braces as delimiters, "	       \
+		      "unlike R5RS/R6RS.")
+#define SCM_TR_BRACE_FREE_SYMBOL_UPPER_CASE /* brace-free-symbol-upper-case */	\
+  SCM_DEFTOKEN_RANGE ('A', 'Z', "brace-free-symbol-upper-case",			\
+		      scm_read_brace_free_symbol, 0,				\
+		      "Read a symbol that starts with an upper-case "		\
+		      "letter and return a symbol.  This token "		\
+		      "reader recognizes braces as delimiters, "		\
+		      "unlike R5RS/R6RS.")
+#define SCM_TR_BRACE_FREE_SYMBOL_MISC_CHARS /* brace-free-symbol-misc-chars */	\
+  SCM_DEFTOKEN_SET ("[]:.+-/*%&@_<>!=?$",					\
+		    "brace-free-symbol-misc-chars",				\
+		    scm_read_brace_free_symbol, 0,				\
+		    "Read a symbol that starts with a non-"			\
+		    "alphanumeric character and return a "			\
+		    "symbol.  This token "					\
+		    "reader recognizes braces as delimiters, "			\
+		    "unlike R5RS/R6RS.")
 
 /* Flavours of numbers.  */
 

@@ -237,6 +237,7 @@ extern SCM scm_reader_standard_fault_handler_proc;
 extern scm_t_bits scm_reader_type, scm_token_reader_type,
   scm_token_reader_proc_type;
 
+
 
 /* SMOB helper data structures and macros.  Only meant to be used
    internally.  */

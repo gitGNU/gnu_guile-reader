@@ -24,7 +24,9 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 
 (define-module (testsuite)
   #:use-module (system reader)
+  #:use-module (system reader library)
   #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-11)
   #:use-module (ice-9 format))
 
 ;;; Author:  Ludovic Courtès
@@ -55,10 +57,17 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
             (loop (reader) (cons sexp result)))))))
 
 (define-public (correctly-loads-boot-file? reader)
+  (format #t "reading `boot-9.scm...  ")
   (let* ((boot-file (%search-load-path "ice-9/boot-9.scm"))
          (correct-result (load-file-with-reader boot-file read))
          (result (load-file-with-reader boot-file reader)))
-    (sexp-equal? correct-result result)))
+    (if (sexp-equal? correct-result result)
+	(begin
+	  (format #t "ok~%")
+	  (values 1 0))
+	(begin
+	  (format #t "FAILED~%")
+	  (values 1 1)))))
 
 (define-public (type-name obj)
   (cond ((symbol? obj)  "symbol")
@@ -91,17 +100,24 @@ encountered."
                  #f))))))
 
 (define-public test-cases
-  ;; A series of simple test cases for the standard Scheme reader.
+  ;; A series of simple test cases and corner cases for the standard Scheme
+  ;; reader.
   '((string . "\"hello\"")
     (string-with-backslash . "\"hello \\\"world\\\"\"")
     (number . "777")
     (floating-number . "3.14")
     (positive-number . "+12")
     (negative-number . "-12")
+    (number-exponential . "1e9")
+    (number-exponential-negative . "1e-09")
+    (negative-number-exponential-negative . "-77e-77")
     (complex-number . "1+2i")
     (complex-number-floating . "1.0-3.14I")
     (complex-pure-imaginary . "+i")
     (complex-like-symbol . "1.0-2.0")
+    (complex-at . "2@2")
+    (complex-+i . "+i")
+    (complex--i . "-i")
     (symbol-lower-case . "symbol")
     (symbol-upper-case . "SYMBOL")
     (symbol-ampersand . "&symbol")
@@ -117,6 +133,10 @@ encountered."
     (symbol-with-numbers . "123.123.123")
     (symbol-one-minus . "1-")
     (symbol-one-plus . "1+")
+    (symbol-plus-plus-i . "1++i")
+    (symbol-plus-i-plus-i . "1+i+i")
+    (symbol-like-complex . "1+e10000i")
+    (symbol-like-exponential . "1e")
     (quoted-symbol . "'quoted-symbol")
     (quoted-number . "'7")
     (sexp-numbers . "(1 2 3)")
@@ -150,6 +170,8 @@ encountered."
     (hex-number . "#x10")
     (bin-number . "#b10")
     (oct-number . "#o10")
+    (dec-number . "#d10")
+    (bit-vector . "#*010101010101")
 
     ;; more complex expressions
     (pair-of-chars . "(#\\a . #\\b)")
@@ -163,6 +185,26 @@ encountered."
     (scsh-block-comment-within-sexp . "(f #! a comment\n!#\n 2)\n\t\n")
     (scsh-block-comment-finishing-sexp . "(+ 2 #! a comment\n!#\n) ")))
 
+(define-public (reader-conforms-with-guile? reader)
+  "Tests whether @var{reader} conforms with Guile's built-in reader."
+  (let* ((results (map (lambda (test-case)
+			 (format #t "~a... " (car test-case))
+			 (let* ((name (car test-case))
+				(str (cdr test-case))
+				(passed?
+				 (read-well? str (default-reader))))
+			   (format #t "~a~%"
+				   (if passed? "ok" "FAILED"))
+			   passed?))
+		       test-cases))
+	 (total (length results))
+	 (failed (length (filter not results))))
+
+    (if (= 0 failed)
+	(format #t "All ~a tests passed~%" total)
+	(format #t "~a tests failed out of ~a~%" failed total))
+
+    (values total failed)))
 
 
 (define-public (testsuite . args)
@@ -170,21 +212,21 @@ encountered."
   (let ((total 0) (failed 0))
     (catch #t
       (lambda ()
-        (let* ((results (map (lambda (test-case)
-                               (format #t "~a... " (car test-case))
-                               (let* ((name (car test-case))
-                                      (str (cdr test-case))
-                                      (passed?
-                                       (read-well? str (default-reader))))
-                                 (format #t "~a~%"
-                                         (if passed? "ok" "FAILED"))
-                                 passed?))
-                             test-cases)))
-          (set! total (length results))
-          (set! failed (length (filter not results)))
-          (if (= 0 failed)
-              (format #t "All ~a tests passed~%" total)
-              (format #t "~a tests failed out of ~a~%" failed total))))
+	(for-each (lambda (reader)
+		    (map (lambda (test)
+			   (let-values (((total* failed*)
+					 (test reader)))
+			     (set! total (+ total total*))
+			     (set! failed (+ failed failed*))))
+			 (list reader-conforms-with-guile?
+			       correctly-loads-boot-file?)))
+
+		  ;; Try out two versions of the Guile reader: one that
+		  ;; doesn't record positions and one that does.
+		  (list (default-reader)
+			(make-guile-reader #f 'reader/record-positions)))
+	(format #t "~%~%* summary~%~%total: ~a~%failed: ~a~%"
+		total failed))
 
       (lambda (key . args)
         ;; Since Guile exists with status zero when an exception is thrown and
@@ -195,13 +237,6 @@ encountered."
               (fmt-arg (caddr args)))
           (format #t (string-append fmt "~%") fmt-arg)
           (exit 1))))
-
-    (format #t "reading `boot-9.scm'... ")
-    (if (correctly-loads-boot-file? (default-reader))
-        (format #t "ok~%")
-        (begin
-          (set! failed (+ 1 failed))
-          (format #t "failed~%")))
 
     failed))
 

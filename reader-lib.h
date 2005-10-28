@@ -27,7 +27,7 @@ extern SCM scm_default_reader (void);
 extern SCM scm_default_sharp_reader (void);
 extern SCM scm_default_reader_token_readers (void);
 extern SCM scm_default_sharp_reader_token_readers (void);
-extern SCM scm_make_guile_reader (SCM flagsx);
+extern SCM scm_make_guile_reader (SCM fault_handler, SCM flags);
 
 
 /* Zero-terminated array of a standard Scheme reader specification.  */

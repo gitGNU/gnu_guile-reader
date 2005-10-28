@@ -1,5 +1,3 @@
-SUBDIRS = module doc
-
 lib_LTLIBRARIES = libguile-reader.la
 libguile_reader_la_SOURCES = reader.c token-readers.c reader-lib.c
 libguile_reader_la_LDFLAGS = -module -version-info 1:0:0
@@ -46,3 +44,6 @@ token-reader-lookup.c: token-readers.h
 token-reader-list.c: token-readers.h
 	./extract-token-readers.sh --no-gperf-header | \
 	cut -f 1 -d , | sort | sed -e's/^\(.*\)$$/"\1",/g' > $@
+
+# Jump to the sub-directories.
+SUBDIRS = module doc

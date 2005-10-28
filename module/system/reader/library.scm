@@ -1,8 +1,4 @@
-#!/bin/sh
-# aside from this initial boilerplate, this is actually -*- scheme -*- code
-main='(module-ref (resolve-module '\''(extract-doc)) '\'main')'
-exec ${GUILE-../guile} -L ../module -l $0 -c "(apply $main (cdr (command-line)))" "$@"
-!#
+;;; library.scm  --  A framework for building Scheme-like readers.
 ;;;
 ;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
@@ -21,32 +17,22 @@ exec ${GUILE-../guile} -L ../module -l $0 -c "(apply $main (cdr (command-line)))
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-
-(define-module (extract-doc)
+(define-module (system reader library)
   #:use-module (system reader))
 
 ;;; Author:  Ludovic Courtès
 ;;;
 ;;; Commentary:
 ;;;
-;;; Extract documentation of the standard token readers and print them in a
-;;; Texinfo-friendly form so that they can be included in the manual.
+;;; This module provides a library of readers for various syntax flavours.
 ;;;
 ;;; Code:
 
-(define (extract-doc . args)
-  (for-each (lambda (tr-name)
-	      (let* ((tr (standard-token-reader tr-name))
-		     (doc (token-reader-documentation tr)))
-		(format #t "@item ~a~%~a~%"
-			tr-name doc)))
-	    (sort (standard-token-reader-names)
-		  (lambda (s1 s2)
-		    (string<=? (symbol->string s1)
-			       (symbol->string s2))))))
+(define-public make-guile-reader
+  ;; This function is actually written in C and a bound in `(system reader)'.
+  (module-ref (resolve-module '(system reader))
+	      'make-guile-reader))
 
-(define main extract-doc)
+;;; arch-tag: 8ac38d67-472d-4371-ad92-8a1306218505
 
-;;; arch-tag: e6ff91db-72f3-4b1c-8cec-ccc6305b2fd1
-
-;;; extract-doc.scm ends here
+;;; library.scm ends here

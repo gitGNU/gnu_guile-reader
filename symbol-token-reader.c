@@ -27,6 +27,12 @@
 #endif
 
 
+/* Exponent markers, as defined in section 7.1.1 of R5RS, ``Lexical
+   Structure''.  */
+#define CHAR_IS_EXPONENT_MARKER(_chr)				\
+  (((_chr) == 'e') || ((_chr) == 's') || ((_chr) == 'f')	\
+   || ((_chr) == 'd') || ((_chr) == 'l'))
+
 SCM
 NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 		scm_reader_t top_level_reader)
@@ -36,6 +42,7 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
   char c_num[1024];
   size_t c_num_len = 0;
   unsigned saw_point = 0, saw_plus_or_minus = 0, saw_leading_sign = 0;
+  unsigned saw_exponent = 0, saw_at_sign = 0;
   unsigned last_char_is_i = 0;
   unsigned return_symbol = 0;
 
@@ -67,8 +74,12 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 	  else
 	    saw_point = 1;
 	}
+      else if (c == '@')
+	saw_at_sign++;
       else if ((c == '+') || (c == '-'))
 	saw_plus_or_minus++;
+      else if (CHAR_IS_EXPONENT_MARKER (c))
+	saw_exponent++;
       else if (!isdigit (c))
 	return_symbol = 1;
 
@@ -88,19 +99,28 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 
   if (last_char_is_i)
     {
-      if ((saw_plus_or_minus >= 1) && (saw_plus_or_minus <= 2))
+      if (saw_plus_or_minus == 1)
 	/* Oh, this is a complex number!  */
 	return_symbol = 0;
       else
 	return_symbol = 1;
     }
+#if 0 /* Commented out: an complicated approach that tries to determine
+	 whether we actually read a number or not.  We'd better let
+	 `scm_string_to_number ()' do its job instead.  */
   else
     {
       if ((saw_plus_or_minus) && (!saw_leading_sign))
 	return_symbol = 1;
       else if (saw_plus_or_minus > 1)
 	return_symbol = 1;
+      else if (saw_exponent > 1)
+	return_symbol = 1;
+      else if (saw_at_sign > 1)
+	/* One `@' sign may be used to represent a complex number.  */
+	return_symbol = 1;
     }
+#endif
 
   result_str =
     scm_string_append (scm_list_2
@@ -111,16 +131,25 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
     scm_i_input_error(__FUNCTION__, port,
 		      "invalid number syntax", SCM_EOL);
 
+  if (!return_symbol)
+    {
+      result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
+      if (result == SCM_BOOL_F)
+	/* We must have done something wrong: this must be a symbol rather
+	   than a number.  */
+	return_symbol = 1;
+    }
+
   if (return_symbol)
     /* The token wasn't actually a number so we'll return a symbol, just like
        Guile's default reader does (e.g. it reads `123.123.123' as a
        symbol).  */
     return (scm_string_to_symbol (result_str));
 
-  result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
-
   return result;
 }
+
+#undef CHAR_IS_EXPONENT_MARKER
 
 SCM
 SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,

@@ -878,6 +878,27 @@ scm_read_srfi4_vector (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 SCM
+scm_read_guile_bit_vector (int chr, SCM port, scm_reader_t scm_reader,
+			   scm_reader_t top_level_reader)
+{
+  /* Read the `#*10101'-style read syntax for bit vectors in Guile.  This is
+     terribly inefficient but who cares?  */
+  SCM s_bits = SCM_EOL;
+
+  for (chr = scm_getc (port);
+       (chr != EOF) && ((chr == '0') || (chr == '1'));
+       chr = scm_getc (port))
+    {
+      s_bits = scm_cons ((chr == '0') ? SCM_BOOL_F : SCM_BOOL_T, s_bits);
+    }
+
+  if (chr != EOF)
+    scm_ungetc (chr, port);
+
+  return scm_bitvector (scm_reverse_x (s_bits, SCM_EOL));
+}
+
+SCM
 scm_read_scsh_block_comment (int chr, SCM port, scm_reader_t scm_reader,
 			     scm_reader_t top_level_reader)
 {
@@ -1015,7 +1036,7 @@ scm_token_reader_lookup (const char *name)
 
   entry = _scm_token_reader_lookup (name, strlen (name));
 
-  return (&entry->reader);
+  return (entry ? &entry->reader : NULL);
 }
 
 /* A NULL-terminated array of token reader names.  */
@@ -1053,21 +1074,3 @@ scm_initialize_token_reader_library (void)
 {
 #include "token-readers.c.x"
 }
-
-#if 0 /* FIXME: Put that in `token-readers.h'.  */
-    SCM_DEFTOKEN_RANGE ('a', 'z', "r6rs-symbol-lower-case",
-			scm_read_r6rs_symbol, 0),
-    SCM_DEFTOKEN_RANGE ('A', 'Z', "r6rs-symbol-upper-case",
-			scm_read_r6rs_symbol, 0),
-    SCM_DEFTOKEN_SET ("{}:.+-/*%&@_<>!=?$",
-		      "r6rs-symbol-misc-chars", scm_read_r6rs_symbol, 0),
-
-    SCM_DEFTOKEN_RANGE ('a', 'z', "brace-free-symbol-lower-case",
-			scm_read_brace_free_symbol, 0),
-    SCM_DEFTOKEN_RANGE ('A', 'Z', "brace-free-symbol-upper-case",
-			scm_read_brace_free_symbol, 0),
-    SCM_DEFTOKEN_SET ("[]:.+-/*%&@_<>!=?$",
-		      "brace-free-symbol-misc-chars",
-		      scm_read_brace_free_symbol, 0),
-#endif
-
