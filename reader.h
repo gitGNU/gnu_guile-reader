@@ -39,7 +39,7 @@ typedef SCM (* scm_reader_t) (SCM port, int caller_handled,
    Readers should *always* be called using the `scm_call_reader ()' macro
    since this may be done differently in the non-Lightning case.  */
 #define scm_call_reader(_reader, _port, _caller_handled, _top_level)	\
-  ((_reader) ((_port), (_caller_handled), NULL))
+  ((_reader) ((_port), (_caller_handled), (_top_level)))
 
 #else
 

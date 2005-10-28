@@ -125,9 +125,12 @@ _flush_ws (SCM port, const char *eoferr)
       case SCM_SINGLE_SPACES:
       case '\t':
 	break;
+
       default:
 	return c;
       }
+
+  return 0;
 }
 
 #define scm_flush_ws _flush_ws

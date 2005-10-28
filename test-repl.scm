@@ -57,7 +57,9 @@ reader for Guile!~%~%")
   (make-reader (append (list whitespace-token-reader
                              test-token-reader)
                        (map standard-token-reader
-                            '(character srfi-4 vector number+radix
+                            '(character
+			      srfi-4 vector guile-bit-vector
+			      number+radix
                               guile-extended-symbol
                               boolean keyword
                               scsh-block-comment)))

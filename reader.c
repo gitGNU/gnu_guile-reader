@@ -227,8 +227,17 @@ do_scm_make_reader_smob (scm_reader_t reader)
 
 #ifdef DEBUG
 
-# define debug_pre_call()   do { generate_debug_registers (&_jit, 1, __LINE__, start, buffer_size); } while (0)
-# define debug_post_call()  do { generate_debug_registers (&_jit, 0, __LINE__, start, buffer_size); } while (0)
+# define debug_pre_call()						\
+do									\
+{									\
+  generate_debug_registers (&_jit, 1, __LINE__, start, buffer_size);	\
+} while (0)
+
+# define debug_post_call()						\
+do									\
+{									\
+  generate_debug_registers (&_jit, 0, __LINE__, start, buffer_size);	\
+} while (0)
 
 #else
 
@@ -268,7 +277,7 @@ do							\
 
 
 static void
-do_debug_regs (unsigned line, int entering, void *sp, void *v2)
+do_debug_regs (unsigned line, int entering, void *sp, void *v2, void *v1)
 {
   static int level = 0;
   char indent[1024];
@@ -276,6 +285,7 @@ do_debug_regs (unsigned line, int entering, void *sp, void *v2)
 
   if (!entering)
     level--;
+  assert (level >= 0);
 
   for (i = 0; i < level; i++)
     indent[i] = '+';
@@ -287,7 +297,7 @@ do_debug_regs (unsigned line, int entering, void *sp, void *v2)
   if (level < 0)
     level = 0;
 
-  printf ("%sregisters:%u: SP=%p V2=%p\n", indent, line, sp, v2);
+  printf ("%sregisters:%u: SP=%p V2=%p V1=%p\n", indent, line, sp, v2, v1);
 }
 
 static inline int
@@ -302,16 +312,20 @@ generate_debug_registers (jit_state *lightning_state,
   jit_pushr_p (JIT_R0);
   jit_pushr_p (JIT_R1);
   jit_pushr_p (JIT_R2);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
 
   jit_movi_ui (JIT_R0, line);
   jit_movi_i (JIT_R1, enter);
-  jit_prepare (4);
+  jit_prepare (5);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_pusharg_p (JIT_V1);
   jit_pusharg_p (JIT_V2);
   jit_pusharg_p (JIT_SP);
   jit_pusharg_i (JIT_R1);
   jit_pusharg_i (JIT_R0);
   (void)jit_finish (do_debug_regs);
 
+  CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_popr_p (JIT_R2);
   jit_popr_p (JIT_R1);
   jit_popr_p (JIT_R0);
@@ -334,6 +348,7 @@ generate_position_store (jit_state *lightning_state,
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
   debug_pre_call ();
+  CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);  /* port */
   (void)jit_finish (scm_port_line);
@@ -343,6 +358,7 @@ generate_position_store (jit_state *lightning_state,
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
   debug_pre_call ();
+  CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (scm_port_column);
@@ -352,6 +368,7 @@ generate_position_store (jit_state *lightning_state,
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
   debug_pre_call ();
+  CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (scm_port_filename);
@@ -392,6 +409,7 @@ generate_position_set (jit_state *lightning_state,
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
   debug_pre_call ();
+  CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_prepare (4);
   jit_pusharg_p (JIT_R2);
   jit_pusharg_p (JIT_R1);
@@ -506,6 +524,7 @@ generate_reader_epilogue (jit_state *lightning_state,
 
       (void)jit_movi_p (JIT_R0, msg_epilogue);
       debug_pre_call ();
+      CHECK_CODE_SIZE (buffer_size, start, -1);
       jit_prepare (2);
       jit_pusharg_p (JIT_V2);
       jit_pusharg_p (JIT_R0);
@@ -542,6 +561,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
   jit_ldxi_i (JIT_R0, JIT_V2, -JIT_STACK_CALLER_HANDLED);
   ref = jit_beqi_i (jit_forward (), JIT_R0, 0);
   debug_pre_call ();
+  CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_prepare (2);
   jit_pusharg_p (JIT_V0); /* port */
   jit_pusharg_i (JIT_V1); /* character */
@@ -571,6 +591,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       CHECK_CODE_SIZE (buffer_size, start, -1);
 
       debug_pre_call ();
+      CHECK_CODE_SIZE (buffer_size, start, -1);
       jit_prepare (1);
       jit_pusharg_i (JIT_V1);
       (void)jit_finish (do_scm_make_char);
@@ -580,6 +601,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       CHECK_CODE_SIZE (buffer_size, start, -1);
       (void)jit_movi_p (JIT_R0, (void *)fault_handler);
       debug_pre_call ();
+      CHECK_CODE_SIZE (buffer_size, start, -1);
       jit_prepare (4);
       jit_pusharg_p (JIT_V2);  /* reader */
       jit_pusharg_p (JIT_V0);  /* port */
@@ -598,6 +620,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
 	 handle this situation so return the faulty character to PORT.  */
       CHECK_CODE_SIZE (buffer_size, start, -1);
       debug_pre_call ();
+      CHECK_CODE_SIZE (buffer_size, start, -1);
       jit_prepare (2);
       jit_pusharg_p (JIT_V0); /* port */
       jit_pusharg_i (JIT_V1); /* character */
@@ -659,9 +682,10 @@ scm_c_make_reader (void *code_buffer,
   result = (scm_reader_t) (jit_set_ip (code_buffer).iptr);
   start = jit_get_ip ().ptr;
 
-  /* Take two arguments (the port and an `int') and put them into V0 and V1
-     (preserved accross function calls).  */
-  jit_prolog (2);
+  /* Take three arguments (the port, an `int', and the top-level reader) and
+     put them into V0 and V1 (preserved accross function calls) and R2 (not
+     preserved---but we put it on the stack soon after).  */
+  jit_prolog (3);
   arg_port = jit_arg_p ();
   jit_getarg_p (JIT_V0, arg_port);
   arg_caller_handled = jit_arg_i ();
@@ -706,6 +730,7 @@ scm_c_make_reader (void *code_buffer,
 
   /* Call `scm_getc ()'.  */
   debug_pre_call ();
+  CHECK_CODE_SIZE (buffer_size, start);
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (scm_getc);
@@ -736,6 +761,7 @@ scm_c_make_reader (void *code_buffer,
       /* Print a debug message.  */
       (void)jit_movi_p (JIT_R0, msg_getc);
       debug_pre_call ();
+      CHECK_CODE_SIZE (buffer_size, start);
       jit_prepare (2);
       jit_pusharg_i (JIT_V1);
       jit_pusharg_p (JIT_R0);
@@ -853,6 +879,7 @@ scm_c_make_reader (void *code_buffer,
 	  (void)jit_movi_p (JIT_R0, msg_found_token);
 
 	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start);
 	  jit_prepare (2);
 	  jit_pusharg_i (JIT_V1);
 	  jit_pusharg_p (JIT_R0);
@@ -885,6 +912,7 @@ scm_c_make_reader (void *code_buffer,
 	      jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
 
 	      debug_pre_call ();
+	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_prepare (4);
 	      jit_pusharg_p (JIT_R1); /* top-level reader */
 	      jit_pusharg_p (JIT_R0); /* reader */
@@ -934,6 +962,7 @@ scm_c_make_reader (void *code_buffer,
 
 	      /* Convert the character read to a Scheme char.  */
 	      debug_pre_call ();
+	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_V1);
 	      (void)jit_finish (do_scm_make_char);
@@ -943,6 +972,7 @@ scm_c_make_reader (void *code_buffer,
 	      /* Same for the reader.  */
 	      (void)jit_movi_p (JIT_R0, start);
 	      debug_pre_call ();
+	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_R0);
 	      jit_finish (do_scm_make_reader_smob);
@@ -953,6 +983,7 @@ scm_c_make_reader (void *code_buffer,
 	      jit_pushr_p (JIT_R0);
 	      jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
 	      debug_pre_call ();
+	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_prepare (1);
 	      jit_pusharg_i (JIT_R2);
 	      jit_finish (do_scm_make_reader_smob);
@@ -964,6 +995,7 @@ scm_c_make_reader (void *code_buffer,
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
 	      debug_pre_call ();
+	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_prepare (5);
 	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_pusharg_p (JIT_R2); /* top-level reader */
@@ -1012,8 +1044,9 @@ scm_c_make_reader (void *code_buffer,
 	      jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
 	      jit_movi_i (JIT_R0, 0); /* let the callee handle its things */
 	      debug_pre_call ();
+	      CHECK_CODE_SIZE (buffer_size, start);
 	      jit_prepare (3);
-	      jit_pusharg_p (JIT_R2);
+	      jit_pusharg_p (JIT_R2); /* top-level reader */
 	      jit_pusharg_i (JIT_R0); /* caller_handled */
 	      jit_pusharg_p (JIT_V0); /* port */
 	      jit_finish (tr->reader.value.reader);

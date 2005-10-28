@@ -77,6 +77,14 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
 /* The number of elements in SCM_READER_STANDARD_SPECS.  */
 static size_t standard_reader_specs_size = 0;
 
+#ifdef DEBUG
+# define SHARP_READER_SIZE      10000
+# define TOP_LEVEL_READER_SIZE  12000
+#else
+# define SHARP_READER_SIZE      4000
+# define TOP_LEVEL_READER_SIZE  5000
+#endif
+
 SCM_DEFINE (scm_default_reader, "default-reader", 0, 0, 0,
 	    (void),
 	    "Returns a reader compatible with Guile's built-in "
@@ -144,14 +152,15 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
 
   c_flags = scm_to_make_reader_flags (flags);
 
-  /* Build a brand new sharp reader.  */
-  buffer = scm_malloc (9000); /* should be enough for both readers */
-  c_sharp_reader = scm_c_make_reader (buffer + 5000, 4000,
+  /* Build a brand new sharp reader.  Should be enough for both readers.  */
+  buffer = scm_malloc (SHARP_READER_SIZE + TOP_LEVEL_READER_SIZE);
+  c_sharp_reader = scm_c_make_reader (buffer + TOP_LEVEL_READER_SIZE,
+				      SHARP_READER_SIZE,
 				      scm_sharp_reader_standard_specs,
 				      fault_handler, c_flags,
 				      &code_size);
   assert (c_sharp_reader);
-  assert (code_size <= 4000);
+  assert (code_size <= SHARP_READER_SIZE);
 
   /* Get a local copy of the reader specs and change the sharp token reader. */
   c_specs = alloca ((standard_reader_specs_size + 1) * sizeof (*c_specs));
@@ -165,11 +174,11 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
     c_sharp_reader;
 
   /* Build the top-level reader.  */
-  c_reader = scm_c_make_reader (buffer, 5000, c_specs,
+  c_reader = scm_c_make_reader (buffer, TOP_LEVEL_READER_SIZE, c_specs,
 				fault_handler, c_flags,
 				&code_size);
   assert (c_reader);
-  assert (code_size <= 5000);
+  assert (code_size <= TOP_LEVEL_READER_SIZE);
 
   if (fault_handler != SCM_BOOL_F)
     {
