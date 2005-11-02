@@ -1500,11 +1500,14 @@ scm_to_reader (SCM reader)
 
 #include "token-readers.h"
 
-/* These are initialized at module load time.  */
-static SCM scm_sym_reader_debug = SCM_BOOL_F;
-static SCM scm_sym_reader_record_positions = SCM_BOOL_F;
-static SCM scm_sym_reader_lower_case = SCM_BOOL_F;
-static SCM scm_sym_reader_upper_case = SCM_BOOL_F;
+struct scm_reader_flag_entry;
+
+const struct scm_reader_flag_entry *
+_scm_to_make_reader_flag (const char *, unsigned int);
+
+/* Include the automatically-generated perfect hash function.  */
+#include "make-reader-flags.c"
+
 
 unsigned
 scm_to_make_reader_flags (SCM flags)
@@ -1517,22 +1520,27 @@ scm_to_make_reader_flags (SCM flags)
 
   for (; flags != SCM_EOL; flags = SCM_CDR (flags), argnum++)
     {
-      SCM f = SCM_CAR (flags);
+      unsigned c_flag;
+      SCM flag_name = SCM_CAR (flags);
+      size_t flag_name_len;
+      char *c_flag_name;
+      const struct scm_reader_flag_entry *c_flag_entry;
 
-      if (!scm_is_symbol (f))
-	scm_wrong_type_arg (FUNC_NAME, argnum, f);
+      if (!scm_is_symbol (flag_name))
+	scm_wrong_type_arg (FUNC_NAME, argnum, flag_name);
 
-      if (scm_is_eq (f, scm_sym_reader_debug))
-	c_flags |= SCM_READER_FLAG_DEBUG;
-      else if (scm_is_eq (f, scm_sym_reader_record_positions))
-	c_flags |= SCM_READER_FLAG_POSITIONS;
-      else if (scm_is_eq (f, scm_sym_reader_lower_case))
-	c_flags |= SCM_READER_FLAG_LOWER_CASE;
-      else if (scm_is_eq (f, scm_sym_reader_upper_case))
-	c_flags |= SCM_READER_FLAG_UPPER_CASE;
+      flag_name = scm_symbol_to_string (flag_name);
+      flag_name_len = scm_c_string_length (flag_name);
+      c_flag_name = alloca (flag_name_len + 1);
+      scm_to_locale_stringbuf (flag_name, c_flag_name, flag_name_len);
+      c_flag_name[flag_name_len] = '\0';
+
+      c_flag_entry = _scm_to_make_reader_flag (c_flag_name, flag_name_len);
+      if ((c_flag_entry) && (c_flag_entry->flag))
+	c_flags |= c_flag_entry->flag;
       else
 	scm_misc_error (FUNC_NAME, "unknown `make-reader' flag: ~A",
-			scm_list_1 (f));
+			scm_list_1 (flag_name));
     }
 
   return c_flags;
@@ -1708,7 +1716,8 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
 SCM_DEFINE (scm_standard_token_reader, "standard-token-reader", 1, 0, 0,
 	    (SCM name),
 	    "Lookup standard token reader named @var{name} (a symbol) and "
-	    "return it.  Return @code{#f} if not found.")
+	    "return it.  If @var{name} is does not name a standard token "
+	    "reader, then an error is raised.")
 #define FUNC_NAME "standard-token-reader"
 {
   SCM s_token_reader;
@@ -1718,7 +1727,11 @@ SCM_DEFINE (scm_standard_token_reader, "standard-token-reader", 1, 0, 0,
 
   spec = scm_token_reader_lookup (scm_i_symbol_chars (name));
   if (!spec)
-    return SCM_BOOL_F;
+    {
+      scm_misc_error (FUNC_NAME, "not a standard token reader: ~A",
+		      scm_list_1 (name));
+      return SCM_BOOL_F;
+    }
 
   /* Return a "non-freeable" SMOB.  */
   SCM_NEW_READER_SMOB (s_token_reader, scm_token_reader_type, spec,
@@ -1869,6 +1882,28 @@ SCM_DEFINE (scm_guile_reader_uses_lightning,
 #else
   return SCM_BOOL_F;
 #endif
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (scm_guile_reader_version_major,
+	    "%guile-reader-version-major", 0, 0, 0,
+	    (void),
+	    "Return the version's major number for the version of "
+	    "guile-reader in use.")
+#define FUNC_NAME s_scm_guile_reader_version_major
+{
+  return SCM_I_MAKINUM (SCM_READER_VERSION_MAJOR);
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (scm_guile_reader_version_minor,
+	    "%guile-reader-version-minor", 0, 0, 0,
+	    (void),
+	    "Return the version's minor number for the version of "
+	    "guile-reader in use.")
+#define FUNC_NAME s_scm_guile_reader_version_minor
+{
+  return SCM_I_MAKINUM (SCM_READER_VERSION_MINOR);
 }
 #undef FUNC_NAME
 
@@ -2035,15 +2070,6 @@ scm_reader_init_bindings (void)
   scm_set_smob_apply (scm_token_reader_proc_type, token_reader_proc_apply,
 		      3, 0, 0); /* XXX unfortunately, we are limited to 3
 				   compulsory arguments...  */
-
-  scm_sym_reader_debug =
-    scm_permanent_object (scm_from_locale_symbol ("reader/debug"));
-  scm_sym_reader_record_positions =
-    scm_permanent_object (scm_from_locale_symbol ("reader/record-positions"));
-  scm_sym_reader_lower_case =
-    scm_permanent_object (scm_from_locale_symbol ("reader/lower-case"));
-  scm_sym_reader_upper_case =
-    scm_permanent_object (scm_from_locale_symbol ("reader/upper-case"));
 
   scm_reader_standard_fault_handler_proc =
     scm_permanent_object (scm_c_define_gsubr

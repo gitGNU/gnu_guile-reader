@@ -1,5 +1,7 @@
 #!/bin/sh
 # aside from this initial boilerplate, this is actually -*- scheme -*- code
+LTDL_LIBRARY_PATH="`pwd`/.libs"
+export LTDL_LIBRARY_PATH
 main='(module-ref (resolve-module '\''(testsuite)) '\'main')'
 exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$@"
 !#
@@ -57,7 +59,7 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
             (loop (reader) (cons sexp result)))))))
 
 (define-public (correctly-loads-boot-file? reader)
-  (format #t "reading `boot-9.scm...  ")
+  (format #t "reading `boot-9.scm'...  ")
   (let* ((boot-file (%search-load-path "ice-9/boot-9.scm"))
          (correct-result (load-file-with-reader boot-file read))
          (result (load-file-with-reader boot-file reader)))

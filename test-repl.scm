@@ -28,6 +28,9 @@
 
 (format #t "Hello, this is your friendly REPL using a dynamically defined\n\
 reader for Guile!~%~%")
+(format #t "We are using guile-reader ~a.~a.~%~%"
+	(%guile-reader-version-major)
+	(%guile-reader-version-minor))
 
 (define *ws*
   ;; Consider characters 1 to 32 (included) as whitespaces.

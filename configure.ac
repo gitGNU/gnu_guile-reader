@@ -32,6 +32,12 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([strncasecmp])
 
+# Gperf
+AC_PATH_PROG([GPERF], [gperf], [not-found])
+if test "x$gperf" = "xnot-found"; then
+   AC_MSG_ERROR([GNU Gperf not found.  Please install it first.])
+fi
+
 # Guile!
 GUILE_PROGS
 GUILE_FLAGS

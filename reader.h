@@ -25,6 +25,9 @@
 #include "reader-config.h"
 
 
+#define SCM_READER_VERSION_MAJOR 0
+#define SCM_READER_VERSION_MINOR 2
+
 #ifdef SCM_READER_USE_LIGHTNING
 
 #include <lightning.h>
@@ -116,11 +119,12 @@ typedef struct scm_token_reader_spec
 typedef scm_token_reader_spec_t *scm_reader_spec_t;
 
 
-/* Flags that may be passed to `scm_c_make_reader ()'.  */
-#define SCM_READER_FLAG_DEBUG           0x01 /* output debugging info */
-#define SCM_READER_FLAG_POSITIONS       0x02 /* record source position */
-#define SCM_READER_FLAG_LOWER_CASE      0x04 /* lower case everything */
-#define SCM_READER_FLAG_UPPER_CASE      0x08 /* upper case everything */
+/* Flags that may be passed to `scm_c_make_reader ()'.  The comment on the
+   right is their Scheme counter-part, extracted at compilation time.  */
+#define SCM_READER_FLAG_DEBUG           0x01 /* reader/debug */
+#define SCM_READER_FLAG_POSITIONS       0x02 /* reader/record-positions */
+#define SCM_READER_FLAG_LOWER_CASE      0x04 /* reader/lower-case */
+#define SCM_READER_FLAG_UPPER_CASE      0x08 /* reader/upper-case */
 
 /* Return a pointer to a reader function compliant with the specifications in
    TOKEN_READERS.  FLAGS should be a logical or of the `SCM_READER_FLAG_'

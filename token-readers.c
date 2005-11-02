@@ -166,7 +166,7 @@ scm_read_sexp (int chr, SCM port, scm_reader_t reader,
 
     default:
       scm_ungetc (chr, port);
-      scm_i_input_error (FUNC_NAME, port, "invalid list starting character",
+      scm_i_input_error (FUNC_NAME, port, "invalid sexp-starting character",
 			 scm_list_1 (SCM_MAKE_CHAR (chr)));
       return SCM_BOOL_F;
     }
@@ -223,9 +223,22 @@ scm_read_sexp (int chr, SCM port, scm_reader_t reader,
 	}
 
       if (tmp == SCM_UNSPECIFIED)
-	/* SCM_READER read a character it does not handle.  This may be a
-	   closing bracket so let's see.  */
-	continue;
+	{
+	  /* TOP_LEVEL_READER read a character it does not handle.  This may
+	     be a closing bracket so let's see.  */
+	  c = scm_getc (port);
+	  if (c == terminating_char)
+	    /* Fine: we're done with this S-expression so we can leave the
+	       loop.  */
+	    break;
+	  else
+	    {
+	      /* Gosh! C is a unhandled character, so we'll let the calling
+		 reader handle it.  */
+	      scm_ungetc (c, port);
+	      return SCM_UNSPECIFIED;
+	    }
+	}
 
       new_tail = scm_cons (tmp, SCM_EOL);
       SCM_SETCDR (tl, new_tail);
@@ -561,224 +574,6 @@ scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 
-/* The hash syntax and its support functions.  */
-
-/* Consume an SCSH-style block comment.  Assume that we've already read the
-   initial `#!', and eat characters until we get an
-   exclamation-point/sharp-sign sequence.  */
-static void
-skip_scsh_block_comment (SCM port)
-{
-  int bang_seen = 0;
-
-  for (;;)
-    {
-      int c = scm_getc (port);
-
-      if (c == EOF)
-	scm_i_input_error ("skip_block_comment", port,
-			   "unterminated `#! ... !#' comment", SCM_EOL);
-
-      if (c == '!')
-	bang_seen = 1;
-      else if (c == '#' && bang_seen)
-	return;
-      else
-	bang_seen = 0;
-    }
-}
-
-
-
-#if 0 /* XXX This function was originally used for `read-hash-extend', but do
-	 we care any longer?  */
-
-/* Recover the read-hash procedure corresponding to char c.  */
-static inline SCM
-scm_get_hash_procedure (int c)
-{
-  /* FIXME:  SCM_READ_HASH_PROCEDURES is not public!  */
-  return SCM_BOOL_F;
-  SCM rest = *scm_read_hash_procedures;
-
-  while (1)
-    {
-      if (scm_is_null (rest))
-	return SCM_BOOL_F;
-  
-      if (SCM_CHAR (SCM_CAAR (rest)) == c)
-	return SCM_CDAR (rest);
-     
-      rest = SCM_CDR (rest);
-    }
-}
-#endif
-
-#if 0  /* XXX This function is being replaced by `scm_sharp_reader'.  */
-SCM
-scm_read_sharp (int chr, SCM port, scm_reader_t scm_reader,
-		scm_reader_t top_level_reader)
-#define FUNC_NAME "scm_read_sharp"
-{
-  int c = scm_getc (port);
-
-  {
-    /* Check for user-defined hash procedure first, to allow
-       overriding of builtin hash read syntaxes.  */
-    SCM sharp = scm_get_hash_procedure (c);
-    if (scm_is_true (sharp))
-      {
-	int line = SCM_LINUM (port);
-	int column = SCM_COL (port) - 2;
-	SCM got;
-
-	got = scm_call_2 (sharp, SCM_MAKE_CHAR (c), port);
-	if (scm_is_eq (got, SCM_UNSPECIFIED))
-	  goto handle_sharp;
-
-	return got;
-      }
-  }
- handle_sharp:
-  switch (c)
-    {
-      /* Vector, arrays, both uniform and not are handled by this
-	 one function.  It also disambiguates between '#f' and
-	 '#f32' and '#f64'.
-      */
-    case '0': case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8': case '9':
-    case 'u': case 's': case 'f':
-    case '@':
-    case '(':
-#if SCM_ENABLE_DEPRECATED
-      /* See below for 'i' and 'e'. */
-    case 'a':
-    case 'c':
-    case 'y':
-    case 'h':
-    case 'l':
-#endif
-      return scm_i_read_array (port, c);
-
-    case 't':
-    case 'T':
-      return SCM_BOOL_T;
-
-    case 'F':
-      /* See above for lower case 'f'. */
-      return SCM_BOOL_F;
-
-
-    case 'i':
-    case 'e':
-#if SCM_ENABLE_DEPRECATED
-      {
-	/* When next char is '(', it really is an old-style
-	   uniform array. */
-	int next_c = scm_getc (port);
-	if (next_c != EOF)
-	  scm_ungetc (next_c, port);
-	if (next_c == '(')
-	  return scm_i_read_array (port, c);
-	/* Fall through. */
-      }
-#endif  
-    case 'b':
-    case 'B':
-    case 'o':
-    case 'O':
-    case 'd':
-    case 'D':
-    case 'x':
-    case 'X':
-    case 'I':
-    case 'E':
-      scm_ungetc (c, port);
-      c = '#';
-      /* The call below should yield a call to `scm_read_number ()' or some
-	 such.  */
-      return scm_call_reader (scm_reader, port);
-
-    case '!':
-      /* Only handle `#! ... !#' block comments if no user extension was
-	 defined for `!' using `read-hash-extend'.  */
-      skip_scsh_block_comment (port);
-      return SCM_UNSPECIFIED;
-
-#if 0 /* FIXME:  Adapt the code below.  */
-    case '*':
-      j = scm_read_token (c, tok_buf, port, 0);
-      p = scm_istr2bve (scm_c_substring_shared (*tok_buf, 1, j));
-      if (scm_is_true (p))
-	return p;
-      else
-	goto unkshrp;
-
-    case '{':
-      j = scm_read_token (c, tok_buf, port, 1);
-      return scm_string_to_symbol (scm_c_substring_copy (*tok_buf, 0, j));
-
-    case '\\':
-      c = scm_getc (port);
-      j = scm_read_token (c, tok_buf, port, 0);
-      if (j == 1)
-	return SCM_MAKE_CHAR (c);
-      if (c >= '0' && c < '8')
-	{
-	  /* Dirk:FIXME::  This type of character syntax is not R5RS
-	   * compliant.  Further, it should be verified that the constant
-	   * does only consist of octal digits.  Finally, it should be
-	   * checked whether the resulting fixnum is in the range of
-	   * characters.  */
-	  p = scm_i_mem2number (scm_i_string_chars (*tok_buf), j, 8);
-	  if (SCM_I_INUMP (p))
-	    return SCM_MAKE_CHAR (SCM_I_INUM (p));
-	}
-      for (c = 0; c < scm_n_charnames; c++)
-	if (scm_charnames[c]
-	    && (scm_i_casei_streq (scm_charnames[c],
-				   scm_i_string_chars (*tok_buf), j)))
-	  return SCM_MAKE_CHAR (scm_charnums[c]);
-      scm_i_input_error (FUNC_NAME, port, "unknown character name ~a",
-			 scm_list_1 (scm_c_substring (*tok_buf, 0, j)));
-
-#endif
-
-      /* #:SYMBOL is a syntax for keywords supported in all contexts.  */
-    case ':':
-      return scm_symbol_to_keyword (scm_call_reader (scm_reader, port));
-
-    default:
-    callshrp:
-      {
-	SCM sharp = scm_get_hash_procedure (c);
-
-	if (scm_is_true (sharp))
-	  {
-	    int line = SCM_LINUM (port);
-	    int column = SCM_COL (port) - 2;
-	    SCM got;
-
-	    got = scm_call_2 (sharp, SCM_MAKE_CHAR (c), port);
-	    if (scm_is_eq (got, SCM_UNSPECIFIED))
-	      goto unkshrp;
-
-	    return got;
-	  }
-      }
-    unkshrp:
-    scm_i_input_error (FUNC_NAME, port, "Unknown # object: ~S",
-		       scm_list_1 (SCM_MAKE_CHAR (c)));
-    }
-
-  abort ();
-  return SCM_UNSPECIFIED;
-}
-#undef FUNC_NAME
-#endif
-
-
 /* Sharp readers, i.e. readers called after a `#' sign has been read.  */
 
 SCM
@@ -851,14 +646,13 @@ SCM
 scm_read_keyword (int chr, SCM port, scm_reader_t reader,
 		  scm_reader_t top_level_reader)
 {
-  /* Initially, I was tempted to call SCM_READER below, thinking that it was
-     likely to result in a call to `scm_read_symbol ()'.  However,
-     `scm_read_keyword ()' may typically be used either in the top-level
-     reader or in the sharp reader.  In the latter case, calling SCM_READER
-     just wouldn't work since the sharp reader doesn't handle symbols.  */
-  return (scm_symbol_to_keyword
-	  (scm_read_guile_mixed_case_symbol (scm_getc (port), port,
-					     reader, top_level_reader)));
+  /* Invoke TOP_LEVEL_READER to read the symbol that comprises the keyword.
+     Doing this instead of invoking a specific symbol reader function allows
+     `scm_read_keyword ()' to adapt to the delimiters currently valid of
+     symbols.  */
+  return (scm_symbol_to_keyword (scm_call_reader (top_level_reader,
+						  port, 0,
+						  top_level_reader)));
 }
 
 SCM
@@ -902,10 +696,77 @@ scm_read_guile_bit_vector (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 SCM
-scm_read_scsh_block_comment (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_scsh_block_comment (int chr, SCM port, scm_reader_t reader,
 			     scm_reader_t top_level_reader)
 {
-  skip_scsh_block_comment (port);
+  int bang_seen = 0;
+
+  for (;;)
+    {
+      int c = scm_getc (port);
+
+      if (c == EOF)
+	scm_i_input_error (__FUNCTION__, port,
+			   "unterminated `#! ... !#' comment", SCM_EOL);
+
+      if (c == '!')
+	bang_seen = 1;
+      else if (c == '#' && bang_seen)
+	break;
+      else
+	bang_seen = 0;
+    }
+
+  return SCM_UNSPECIFIED;
+}
+
+SCM
+scm_read_srfi30_block_comment (int chr, SCM port, scm_reader_t reader,
+			       scm_reader_t top_level_reader)
+{
+  /* Unlike SCSH-style block comments, SRFI-30 block comments may be nested.
+     So care must be taken.  */
+  int nesting_level = 1;
+  int opening_seen = 0, closing_seen = 0;
+
+  while (nesting_level > 0)
+    {
+      int c = scm_getc (port);
+
+      if (c == EOF)
+	scm_i_input_error (__FUNCTION__, port,
+			   "unterminated `#| ... |#' comment", SCM_EOL);
+
+      if (opening_seen)
+	{
+	  if (c == '|')
+	    nesting_level++;
+	  opening_seen = 0;
+	}
+      else if (closing_seen)
+	{
+	  if (c == '#')
+	    nesting_level--;
+	  closing_seen = 0;
+	}
+      else if (c == '|')
+	closing_seen = 1;
+      else if (c == '#')
+	opening_seen = 1;
+      else
+	opening_seen = closing_seen = 0;
+    }
+
+  return SCM_UNSPECIFIED;
+}
+
+SCM
+scm_read_srfi62_sexp_comment (int chr, SCM port, scm_reader_t reader,
+			      scm_reader_t top_level_reader)
+{
+  /* Skip the S-expression that follows the semi-colon.  */
+  scm_call_reader (top_level_reader, port, 0, top_level_reader);
+
   return SCM_UNSPECIFIED;
 }
 
@@ -971,54 +832,87 @@ SCM
 scm_read_skribe_exp (int chr, SCM port, scm_reader_t reader,
 		     scm_reader_t top_level_reader)
 {
-  int c;
-  char c_literal[1024];
+  int c, escaped = 0;
+  char c_literal[2048];
   size_t c_literal_len = 0;
-  SCM result = SCM_EOL;
+  SCM result = SCM_EOL, s_literal;
+
+#define FLUSH_STRING()							\
+  do									\
+    {									\
+      s_literal =							\
+	scm_string_append (scm_list_2					\
+			   (s_literal,					\
+			    scm_from_locale_stringn (c_literal,		\
+						     c_literal_len)));	\
+      c_literal_len = 0;						\
+    }									\
+  while (0)
+
+  s_literal = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
 
   for (c = scm_getc (port);
-       (c != EOF) && (c != ']');
+       (c != EOF) && ((c != ']') || (escaped));
        c = scm_getc (port))
     {
-      switch (c)
+      if (escaped)
 	{
-	case ',':
-	  c = scm_getc (port);
-	  if (c == '(')
-	    {
-	      SCM subexp;
-	      result = scm_cons (scm_from_locale_stringn (c_literal,
-							  c_literal_len),
-				 result);
-	      c_literal_len = 0;
-	      scm_ungetc (c, port);
-	      subexp = scm_cons2 (scm_sym_unquote,
-				  scm_call_reader (top_level_reader,
-						   port, 0,
-						   top_level_reader),
-				  SCM_EOL);
-	      result = scm_cons (subexp, result);
-	    }
-	  else
-	    {
-	      c_literal[c_literal_len++] = ',';
-	      if (c != EOF)
-		c_literal[c_literal_len++] = (char)c;
-	    }
-	  break;
-
-	default:
 	  c_literal[c_literal_len++] = (char)c;
+	  escaped = 0;
 	}
+      else
+	{
+	  switch (c)
+	    {
+	    case ',':
+	      c = scm_getc (port);
+	      if (c == '(')
+		{
+		  SCM subexp;
+
+		  FLUSH_STRING ();
+		  result = scm_cons (s_literal, result);
+		  s_literal = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+
+		  scm_ungetc (c, port);
+		  subexp = scm_cons2 (scm_sym_unquote,
+				      scm_call_reader (top_level_reader,
+						       port, 0,
+						       top_level_reader),
+				      SCM_EOL);
+		  result = scm_cons (subexp, result);
+		}
+	      else
+		{
+		  c_literal[c_literal_len++] = ',';
+		  if (c != EOF)
+		    c_literal[c_literal_len++] = (char)c;
+		}
+	      break;
+
+	    case '\\':
+	      escaped = 1;
+	      break;
+
+	    default:
+	      c_literal[c_literal_len++] = (char)c;
+	    }
+	}
+
+      if (c_literal_len + 1 >= sizeof (c_literal))
+	/* Flush the contents of C_LITERAL to S_LITERAL, a dynamically grown
+	   Scheme string.  */
+	FLUSH_STRING ();
     }
 
-  if (c_literal_len)
-    result = scm_cons (scm_from_locale_stringn (c_literal,
-						c_literal_len),
-		       result);
+  FLUSH_STRING ();
+  if (scm_c_string_length (s_literal) > 0)
+    result = scm_cons (s_literal, result);
 
   result = scm_reverse_x (result, SCM_EOL);
   result = scm_cons2 (scm_sym_quasiquote, result, SCM_EOL);
+
+#undef FLUSH_STRING
 
   return result;
 }

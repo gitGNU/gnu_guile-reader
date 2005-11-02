@@ -2,7 +2,7 @@
 
 @c %**start of header
 @setfilename guile-reader.info
-@settitle Guile's Reader Framework
+@settitle A Reader Framework for Guile
 @footnotestyle end
 @setchapternewpage odd
 @c %**end of header
@@ -15,7 +15,7 @@
 @ifinfo
 @dircategory The Algorithmic Language Scheme
 @direntry
-* Guile Reader: (guile-reader).      Guile's Reader Framework.
+* Guile Reader: (guile-reader).      A Reader Framework for Guile.
 @end direntry
 
 This file documents Guile Reader.
@@ -38,7 +38,7 @@ approved by the Free Software Foundation.
 @end ifinfo
 
 @titlepage
-@title Guile's Reader Framework
+@title A Reader Framework for Guile
 @subtitle for Guile-Reader @value{VERSION}
 @author Ludovic Courtès
 
@@ -69,7 +69,7 @@ approved by the Free Software Foundation.
 
 @c *********************************************************************
 @node Top, Introduction, (dir), (dir)
-@top Guile's Reader Framework
+@top A Reader Framework for Guile
 
 This document describes Guile-Reader version @value{VERSION}.
 
@@ -82,6 +82,8 @@ files.
 * Overview::                    
 * API Reference::               
 * Internals::                   
+* Concept Index::               
+* Function Index::              
 @end menu
 
 
@@ -121,9 +123,11 @@ Reader comes with a library of components that can typically be used
 to construct a reader for the Scheme syntax.  And each one of this
 components may be reused at will when creating other readers.
 
-Note that Common Lisp has a similar mechanism, the @dfn{read table}.
-It is, however, less powerful in that it assumes a single reader
-instance (which is @emph{not} a good assumption for an interpreter).
+@cindex read table
+Common Lisp has a similar mechanism to extend its reader which is
+called the @dfn{read table}.  It is, however, less powerful in that it
+assumes a single reader instance (which is @emph{not} a good
+assumption for an interpreter).
 
 
 @c chapter ----------------------------------------------------------
@@ -202,6 +206,7 @@ ones.
 * TR Calling Convention::       
 * Invoking a Reader from a TR::  
 * Token Reader Library::        
+* Token Delimiters::            
 @end menu
 
 @node Defining a New Token Reader, TR Calling Convention, Token Readers, Token Readers
@@ -209,6 +214,8 @@ ones.
 
 @cindex token reader
 @cindex character specification
+@findex make-token-reader
+
 A new token reader object can be created by calling the
 @code{make-token-reader} procedure with a @dfn{character
 specification} and a procedure.  A character specification defines the
@@ -222,11 +229,11 @@ corresponding procedure.  The character specification may be either:
 characters.
 @end itemize
 
-The procedure passed to @var{make-token-reader} may actually be either
-a C function or Scheme procedure that takes four arguments (@pxref{TR
-Calling Convention}), any ``object'' returned by
+The procedure passed to @code{make-token-reader} may actually be
+either a C function or Scheme procedure that takes four arguments
+(@pxref{TR Calling Convention}), any ``object'' returned by
 @code{token-reader-procedure}, or a reader.  This last option turns
-out to be quite helpful.  For example, this turns out to be convenient
+out to be quite helpful.  For example, this is very convenient
 when implementing the various Scheme read syntaxes prefixed by the
 @code{#} character: one can create a reader for @code{#}, and then
 turn it into a token reader that is part of the top-level reader.
@@ -237,6 +244,7 @@ The next section explains the token reader calling convention.
 @node TR Calling Convention, Invoking a Reader from a TR, Defining a New Token Reader, Token Readers
 @subsection Token Reader Calling Convention
 
+@cindex calling convention
 A token reader's procedure is passed four arguments:
 
 @itemize
@@ -247,6 +255,7 @@ the S-exp example, this would be @code{(};
 @code{scm_reader_t} object (if the token reader is written in C) or a
 four-argument Scheme procedure (if the token reader is written in
 Scheme);
+@cindex top-level reader
 @item the top-level reader which yielded this invocation and which may
 be different from the previous argument in the case a token reader was
 made from a reader; the next section, @xref{Invoking a Reader from a
@@ -274,6 +283,7 @@ This behavior may, however, be overridden by passing
 (make-token-reader #\; read-a-line-and-return-unspecified #t)
 @end smallexample
 
+@cindex SCSH block comments
 A reader that includes this TR will return @code{*unspecified*} once a
 line comment has been read.  This is particularly useful, for
 instance, when implementing @code{#!} block comments (@inforef{Block
@@ -332,9 +342,10 @@ must call @var{top-level-reader} which points to the top-level reader,
 i.e. the reader which yielded the invocation of the @code{#}
 sub-reader.
 
-@node Token Reader Library,  , Invoking a Reader from a TR, Token Readers
+@node Token Reader Library, Token Delimiters, Invoking a Reader from a TR, Token Readers
 @subsection Token Reader Library
 
+@cindex token reader library
 Guile-reader comes with a number of re-usable token readers.
 Together, they might be assembled to form a complete Scheme reader
 equivalent to that of Guile (@pxref{Reader Library}).  Or they can be
@@ -345,9 +356,7 @@ standard TR from the library and returns it (or @code{#f} if not
 found).  Currently, the available TRs are:
 
 @c Include the documentation that was generated using `extract-doc.scm'.
-@table @code
 @include token-reader-doc.texi
-@end table
 
 As can be inferred from the above two lists, reading character
 sequences starting with the @code{#} characters can easily be done by
@@ -376,6 +385,56 @@ FIXME:  Snarf doc from `reader.c'.
 @code{token-reader-procedure}
 @code{token-reader-escape?}
 
+
+@node Token Delimiters,  , Token Reader Library, Token Readers
+@subsection Token Delimiters
+
+@cindex token delimiters
+As can be seen from the previous section, there exist, for instance,
+an surprisingly high number of symbol token readers.  The reason for
+this is that different syntax variants define different @dfn{token
+delimiters}.  Token delimiters are characters that help the reader
+determine where tokens that require implicit termination do
+terminate.  Quoting R5RS (@inforef{Lexical structure, R5RS' lexical
+structure, r5rs}, for details):
+
+@quotation
+Tokens which require implicit termination (identifiers, numbers,
+characters, and dot) may be terminated by any <delimiter>, but not
+necessarily by anything else.
+@end quotation
+
+@cindex R5RS
+@cindex R6RS
+R5RS defines token delimiters as one of the following: a whitespace, a
+parentheses, a quotation mark (@code{"}) or a semi-colon (@code{;})
+character.  On the other hand, R6RS, which is to support the ability
+to use square brackets instead of parentheses for S-expressions, also
+considers square brackets as token delimiters.  Likewise, if we were
+to support curly braces to enclose S-expressions, then curly braces
+would need to be considered as token delimiters too.
+
+For this reason, the token reader library comes with several symbol
+token readers: the @code{guile-symbol-} family does not consider
+square brackets as delimiters while the @code{r6rs-symbol-} family
+does, the @code{brace-free-} TR family considers curly braces as
+delimiters but not square brackets, etc.  Similarly, several variants
+of number TRs are available.  This is due to the fact that number TRs
+may return symbols in corner cases like symbol names starting with a
+number.
+
+However, although keywords must also comply with the token delimiters
+rules, there is only one keyword TR (called @code{keyword}).  The
+reason for this is that this TR relies on the top-level reader's
+symbol reader to read the symbol that makes up the keyword being read.
+
+@cindex pitfall
+In the current design of guile-reader, this token delimiter issue
+creates a number of pitfalls when one is willing to change the current
+delimiters.  In particular, one has to be very careful about using TRs
+that consistently assume the same token delimiters.
+
+
 @node Readers,  , Token Readers, API Reference
 @section Readers
 
@@ -391,6 +450,7 @@ point where we will start talking about how to define new readers.
 @node Defining a New Reader, Reader Library, Readers, Readers
 @subsection Defining a New Reader
 
+@cindex reader
 Roughly, a reader is no more than a loop which reads characters from a
 given port, and dispatches further interpretation to more specific
 procedures.  Written in Scheme, it could resemble something like:
@@ -407,6 +467,7 @@ procedures.  Written in Scheme, it could resemble something like:
          (error "unexpected character" the-char))))))
 @end lisp
 
+@findex make-reader
 Using guile-reader, this is done simply by providing a list of token
 readers to the @code{make-reader} procedure, as in the following
 example:
@@ -480,21 +541,28 @@ debugging output.
 @node Reader Library,  , Defining a New Reader, Readers
 @subsection Reader Library
 
+@cindex reader library
 The @code{(system reader)} module exports the @code{default-reader}
 procedure which returns a reader equivalent to Guile's built-in
 default reader made of re-usable token readers written in C
 (@pxref{Token Reader Library}).
 
-@code{default-reader}
+@itemize
+@item @code{default-reader}
+@item @code{default-reader-token-readers}
+@item @code{default-sharp-reader-token-readers}
+@end itemize
 
-@code{default-reader-token-readers}
+FIXME:  Snarf doc from `reader-lib.c'.
 
-@code{default-sharp-reader-token-readers}
+Additionally, the @code{(system reader library)} module exports a
+number of procedures that ease the re-use of readers.
 
-FIXME:  Snarf doc from `reader.c'.
+@include reader-lib-doc.texi
+
 
 @c chapter ----------------------------------------------------------
-@node Internals,  , API Reference, Top
+@node Internals, Concept Index, API Reference, Top
 @chapter Internals
 
 In order to not have to trade too much performance for flexibility,
@@ -510,28 +578,23 @@ Reader Library}, does not imply any additional cost: the underlying C
 function will be called directly by the reader, without having to go
 through any marshalling/unmarshalling stage.
 
-
+
 @c *********************************************************************
-@c @node Concept Index, Command Index, Related Information, Top
-@c @unnumbered Concept Index
-@c @printindex cp
+@node Concept Index, Function Index, Internals, Top
+@unnumbered Concept Index
+@printindex cp
 
-@c @node Command Index, Variable Index, Concept Index, Top
-@c @unnumbered Command Index
-@c @printindex fn
+@node Function Index,  , Concept Index, Top
+@unnumbered Function Index
+@printindex fn
 
-@c @node Variable Index,  , Command Index, Top
-@c @unnumbered Variable Index
-@c @printindex vr
 
 @bye
-
 
 @ignore
 ;;; arch-tag: e82c9dff-b040-4398-a1e9-1e2570cfc025
 @end ignore
 
 @c Local Variables:
-@c mode:outline-minor
-@c outline-regexp:"@\\(ch\\|sec\\|subs\\)"
+@c ispell-local-dictionary: "american";
 @c End:

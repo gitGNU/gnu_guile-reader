@@ -1,18 +1,11 @@
 ;; arch-tag: 1bde8076-76ed-429c-b8d4-167b54c123bd
 
-* save/restore a reader (with relocation upon reloading)
-
-* same for the Lightning-free case
-
-* install a set of pre-compiled readers
 
 * compatibility with Guile 1.[64]
 
-* expose the standard reader specs to Scheme, impl. `scm_to_reader_spec ()'
-
-* implement a case-insensitive token reader
-
 * augment the reader library: R5RS, Guile, Guile + keywords, Skribe
+
+* distribute a guile-reader-aware implementation of SRFI-10.
 
 * re-implement `read-enable' and `read-hash-extend' so that they modify
   a module-local reader (which may be lazily instantiated)

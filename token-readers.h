@@ -43,6 +43,11 @@ extern SCM scm_read_semicolon_comment (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_scsh_block_comment (int, SCM, scm_reader_t, scm_reader_t);
 
+extern SCM scm_read_srfi30_block_comment (int, SCM, scm_reader_t,
+					  scm_reader_t);
+
+extern SCM scm_read_srfi62_sexp_comment (int, SCM, scm_reader_t, scm_reader_t);
+
 extern SCM scm_read_boolean (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_character (int, SCM, scm_reader_t, scm_reader_t);
@@ -149,7 +154,13 @@ extern void scm_initialize_token_reader_library (void);
 		       "@code{#} character (to implement Guile's "	\
 		       "default keyword syntax, @code{#:kw}) or "	\
 		       "within the top-level reader (to implement "	\
-		       "@code{:kw}-style keywords).")
+		       "@code{:kw}-style keywords).\n\n"		\
+		       "It is worth noting that this token reader "	\
+		       "invokes its top-level in order to read the "	\
+		       "symbol subsequent to the @code{:} "		\
+		       "character.  Therefore, it will adapt to the "	\
+		       "symbol delimiters currently in use "		\
+		       "(@pxref{Token Delimiters}).")
 #define SCM_TR_NUMBER_AND_RADIX /* number+radix */			\
   SCM_DEFTOKEN_SET ("bBoOdDxXiIeE", "number+radix",			\
 		    scm_read_number_and_radix, 0,			\
@@ -182,6 +193,32 @@ extern void scm_initialize_token_reader_library (void);
 		       "See also @inforef{Block Comments, "		\
 		       "block comments, guile}, for details about "	\
 		       "SCSH block comments.")
+#define SCM_TR_SRFI30_BLOCK_COMMENT /* srfi30-block-comment */		\
+  SCM_DEFTOKEN_SINGLE ('|',  "srfi30-block-comment",			\
+		       scm_read_srfi30_block_comment, 1,		\
+		       "\n@cindex SRFI-30\n"				\
+		       "This is a sharp token reader, i.e. it reads "	\
+		       "an SRFI-30 block comment (like "		\
+		       "@code{#| multi-line comment |#}) and returns "	\
+		       "@code{*unspecified*}, assuming a @code{#} "	\
+		       "character was read before.  This token reader "	\
+		       "has its ``escape'' bit set.  For more details "	\
+		       "about SRFI-30, see @uref{http://srfi."		\
+		       "schemers.org/srfi-30/srfi-30.html, Nested "	\
+		       "Multi-line Comments}.")
+#define SCM_TR_SRFI62_SEXP_COMMENT /* srfi62-sexp-comment */		\
+  SCM_DEFTOKEN_SINGLE (';', "srfi62-sexp-comment",			\
+		       scm_read_srfi62_sexp_comment, 1,			\
+		       "\n@cindex SRFI-62\n"				\
+		       "This is a sharp token reader, i.e. it reads "	\
+		       "an SRFI-62 comment S-expression (as in "	\
+		       "@code{(+ 2 #;(comment here) 2)}) and returns "	\
+		       "@code{*unspecified*}, assuming a @code{#} "	\
+		       "character was read before.  This token reader "	\
+		       "has its ``escape'' bit set.  For more details "	\
+		       "about SRFI-62, please see @uref{http://srfi."	\
+		       "schemers.org/srfi-62/srfi-62.html, "		\
+		       "S-expression comments specifications}.")
 
 /* Top-level token readers.  */
 #define SCM_TR_WHITESPACE /* whitespace */				\

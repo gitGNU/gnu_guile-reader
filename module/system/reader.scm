@@ -34,7 +34,9 @@
 	     %reader-standard-fault-handler
 
 	     ;; internals
-	     %guile-reader-uses-lightning?))
+	     %guile-reader-uses-lightning?
+	     %guile-reader-version-major
+	     %guile-reader-version-minor))
 
 ;;; Author:  Ludovic Courtès
 ;;;
