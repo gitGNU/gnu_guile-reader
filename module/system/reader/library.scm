@@ -19,8 +19,10 @@
 
 (define-module (system reader library)
   #:use-module (system reader)
+  #:use-module (system reader compat)
   #:use-module (srfi srfi-1)
-  #:use-module (srfi srfi-11)
+  #:use-module (srfi srfi-11) ;; `let-values'
+  #:use-module (srfi srfi-17) ;; generalized `set!'
   #:use-module (ice-9 optargs))
 
 ;;; Author:  Ludovic Courtès
@@ -35,6 +37,12 @@
   ;; This function is actually written in C and bound in `(system reader)'.
   (module-ref (resolve-module '(system reader))
 	      'make-guile-reader))
+
+
+
+;;;
+;;; Turning ``extended'' reader options into a list of token readers.
+;;;
 
 (define (filter-out-symbol-token-readers top-specs)
   "Filter out symbol-related token readers from @var{top-specs}, a list of
@@ -196,6 +204,42 @@ and @var{flags} arguments are the same as those passed to
 			      top-specs))
 	       ,fault-handler
 	       ,@flags)))))
+
+
+
+;;;
+;;; Turning Guile's read options into ``extended'' reader options
+;;; understandable by `alternate-guile-reader-token-readers'.
+;;;
+
+(define-macro (g-w/-s var)
+  `(getter-with-setter (lambda () ,var)
+		       (lambda (val) (set! ,var val))))
+
+(define-public (read-options->extended-reader-options read-opts)
+  "Read @var{read-opts}, a list representing read options following Guile's
+built-in representation (see @inforef{Scheme Read, , guile}, for details),
+and return a list of symbols represented ``extended reader options''
+understood by @code{make-alternate-guile-reader} et al."
+  (let loop ((read-opts read-opts)
+	     (extended-opts '())
+	     (make-reader-opts '()))
+    (if (null? read-opts)
+	(values extended-opts make-reader-opts)
+	(let ((opt-spec (lookup-read-option (car read-opts))))
+	  (if (not opt-spec)
+	      (error "unknown read option" (car read-opts))
+	      (let ((takes-arg? (read-option-takes-argument? opt-spec))
+		    (convert! (read-option-convert-proc opt-spec)))
+		(apply convert!
+		       (append (list (g-w/-s extended-opts)
+				     (g-w/-s make-reader-opts))
+			       (if takes-arg?
+				   (list (cadr read-opts))
+				   '())))
+		(loop (if takes-arg? (cddr read-opts) (cdr read-opts))
+		      extended-opts
+		      make-reader-opts)))))))
 
 
 ;;; arch-tag: 8ac38d67-472d-4371-ad92-8a1306218505

@@ -18,7 +18,12 @@
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 (define-module (system reader confinement)
-  #:use-module (system reader))
+  #:use-module (system reader)
+  #:use-module (system reader compat)
+  #:use-module (system reader library)
+  #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-9)
+  #:use-module (srfi srfi-11))
 
 ;;; Author:  Ludovic Courtès
 ;;;
@@ -34,13 +39,14 @@
 (define %built-in-read-options-interface read-options-interface)
 
 ;; The current value of `read-options' within this module.
-(define %module-read-options (make-object-property))
+(define-public %module-read-options (make-object-property))
 
 ;; Information useful to `make-reader'.
-(define %module-reader-spec (make-object-property))
-(define %module-reader-make-options (make-object-property))
-(define %module-reader-fault-handler (make-object-property))
-(define %module-reader (make-object-property))
+(define-public %module-reader-specs         (make-object-property))
+(define-public %module-reader-sharp-specs   (make-object-property))
+(define-public %module-reader-make-options  (make-object-property))
+(define-public %module-reader-fault-handler (make-object-property))
+(define-public %module-reader               (make-object-property))
 
 (define-macro (define-ensure what default-value)
   `(define (,(symbol-append 'ensure- what) module)
@@ -55,40 +61,40 @@
 (define-ensure reader-fault-handler #f)
 (define-ensure reader (default-reader))
 
-
-;; Description of the various options of `read-options', i.e. whether they
-;; need an additional argument or not.
 
-(define %read-options-spec
-  '((keywords . #t)
-    (case-insensitive . #f)
-    (positions . #f)
-    (copy . #f)))
+(define-public (compile-module-read-options! module read-options)
+  "Set @var{module}'s read options to @var{read-options}, a list representing
+standard Guile read options, and compile a new reader local to @var{module}
+that implements those options."
+  (format #t "compile-module-read-options! ~a ~a~%" module read-options)
+  (set! (%module-read-options module) read-options)
 
-(define (read-option-takes-argument? option)
-  (assoc-ref %read-options-spec option))
+  ;; Convert MODULE's read options into extended read options.
+  (let-values (((extended-read-opts make-reader-opts)
+		(read-options->extended-reader-options read-options)))
+    (set! (%module-reader-make-options module) make-reader-opts)
 
-(define (process-new-read-options options)
-  "Process the new read options in @var{options}, a flat list, and return a
-``cleaned'' flat list without duplicate options, etc."
-  (let loop ((result '())
-	     (options options))
-    (if (null? options)
-	result
-	(let* ((opt (car options))
-	       (takes-arg? (read-option-takes-argument? opt)))
-	  (if takes-arg?
-	      (let ((value (memq opt result))
-		    (new-value (cadr options)))
-		(if value
-		    (set-cdr! value
-			      (cons new-value (cddr value)))
-		    (set! result
-			  (append (list opt new-value) result))))
-	      (if (not (memq opt result))
-		  (set! result (append! result (list opt)))))
-	  (loop result
-		(if takes-arg? (cddr options) (cdr options)))))))
+    ;; Convert EXTENDED-READ-OPTS into lists of token readers.
+    (let-values (((sharp-specs top-level-specs)
+		  (alternate-guile-reader-token-readers
+		   extended-read-opts)))
+      (set! (%module-reader-sharp-specs module) sharp-specs)
+      (let* ((sharp (apply make-reader `(,sharp-specs #f ,@make-reader-opts)))
+	     (sharp-tr (make-token-reader #\# sharp)))
+	(set! (%module-reader-specs module)
+	      (cons sharp-tr
+		    (filter (lambda (tr)
+			      (not (eq? (token-reader-specification tr)
+					#\#)))
+			    top-level-specs)))
+	(set! (%module-reader module)
+	      (apply make-reader
+		     `(,(%module-reader-specs module)
+		       #f ;; default fault handler
+		       ,@make-reader-opts)))
+
+	(module-define! module 'read (%module-reader module))))))
+
 
 
 ;; A version of `read-options-interface' (and consequently `read-options',
@@ -103,28 +109,13 @@
 		 opts)
 		((list? (car args))
 		 (set! (%module-read-options module)
-		       (process-new-read-options (car args))))
+		       (clean-up-read-options (car args)))
+		 (compile-module-read-options! module
+					       (%module-read-options module)))
+
 		(else
 		 ;; FIXME: This could be implemented too.
 		 (apply %built-in-read-options-interface args))))))
-
-(define (enable-reader-options option value)
-  (let ((module (current-module)))
-    (format #t "read-enable: module is ~a~%" module)
-    (case option
-      ((positions)
-       (set! (%module-reader-make-options module)
-	     (cons 'reader/record-positions
-		   (ensure-reader-options module)))
-       (set! (%module-reader module)
-	     (apply make-reader
-		    (append (list (ensure-reader-spec module))
-			    (cons (%module-reader-fault-handler module)
-				  (%module-reader-make-options module)))))
-       (module-define! module 'read
-		       (%module-reader module)))
-      (else
-       (error "unhandled reader option" option)))))
 
 
 ;;; arch-tag: 9eda977f-4edb-48c5-bdb7-28a6dd0850c6
