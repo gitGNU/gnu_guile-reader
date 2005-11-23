@@ -85,7 +85,7 @@ exec ${GUILE-../guile} -L ../module -l $0 -c "(apply $main (cdr (command-line)))
 	   (format #t "~a " (car args))
 	   (loop (cdr args)))
 	  ((pair? args)
-	   (format #t "~a ~a...~%" (car args) (cdr args))))))
+	   (format #t "~a ~a@dots{}~%" (car args) (cdr args))))))
 
 (define (extract-module-doc module)
   (module-for-each (lambda (binding var)

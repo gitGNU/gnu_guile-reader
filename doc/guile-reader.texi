@@ -445,6 +445,7 @@ point where we will start talking about how to define new readers.
 @menu
 * Defining a New Reader::       
 * Reader Library::              
+* Compatibility and Confinement::  
 @end menu
 
 @node Defining a New Reader, Reader Library, Readers, Readers
@@ -538,7 +539,7 @@ debugging output.
 
 @end itemize
 
-@node Reader Library,  , Defining a New Reader, Readers
+@node Reader Library, Compatibility and Confinement, Defining a New Reader, Readers
 @subsection Reader Library
 
 @cindex reader library
@@ -559,6 +560,60 @@ Additionally, the @code{(system reader library)} module exports a
 number of procedures that ease the re-use of readers.
 
 @include reader-lib-doc.texi
+
+
+@node Compatibility and Confinement,  , Reader Library, Readers
+@subsection Compatibility and Confinement
+
+@findex read-options
+@findex read-enable
+@findex read-disable
+@findex read-set!
+@findex read-hash-extend
+Guile's core read subsystem (@inforef{Scheme Read, , guile}, for
+details) provides an interface to customize its reader, namely via the
+@code{read-options} (@inforef{Reader Options, Guile's built-in reader
+option, guile}, for more information) and @code{read-hash-extend}
+(@inforef{Reader Extensions, @code{read-hash-extend}, guile}, for
+details) procedures.
+
+The main problem with this approach is that changing the reader's
+options using these procedures has a global effect since there is only
+one instance of @code{read}.  Changing the behavior of a single
+function at the scale of the whole is not very ``schemey'' and can be
+quite harmful. Suppose a module relies on case-insensitivity while
+another relies on case-sensitivity.  If one tries to use both modules
+at the same time, chances are that at least one of them will not work
+as expected.  Risks of conflicts are even higher when
+@code{read-hash-extend} is used: imagine a module that uses
+DSSSL-style keywords, while another needs SCSH-style block comments.
+
+@cindex confinement
+@cindex reader confinement
+@cindex compatibility
+@findex read-options-interface
+In @code{(system reader confinement)}, guile-reader offers an
+implementation of @code{read-option-interface} and
+@code{read-hash-extend} that allows to @emph{confine} such settings on
+a per-module basis.  In order to enable reader confinement, one just
+has to do this:
+
+@smalllisp
+(use-modules (system reader confinement))
+@end smalllisp
+
+Note that this must be done before the suspicious modules are loaded,
+that is, typically when your program starts.  This will redefine
+@code{read-options-interface} and @code{read-hash-extend} so that any
+future modification performed via Guile's built-in reader option
+interface will be confined to the calling module.
+
+@c FIXME: This should be fixed by rewriting `primitive-load' when needed.
+This module is mostly useful with a Guile 1.7 where the
+@code{*current-reader*} fluid is available (starting from version
+1.7.3).  Without it, @code{primitive-load}, for instance, will only
+use Guile's built-in reader, thus ignoring the fact that the
+definition of @code{read} has changed within the module being loaded.
 
 
 @c chapter ----------------------------------------------------------
@@ -596,5 +651,5 @@ through any marshalling/unmarshalling stage.
 @end ignore
 
 @c Local Variables:
-@c ispell-local-dictionary: "american";
+@c ispell-local-dictionary: "american"
 @c End:

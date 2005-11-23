@@ -41,12 +41,21 @@
 ;; The current value of `read-options' within this module.
 (define-public %module-read-options (make-object-property))
 
-;; Information useful to `make-reader'.
-(define-public %module-reader-specs         (make-object-property))
-(define-public %module-reader-sharp-specs   (make-object-property))
-(define-public %module-reader-make-options  (make-object-property))
-(define-public %module-reader-fault-handler (make-object-property))
-(define-public %module-reader               (make-object-property))
+(define-public *debug-port* (make-fluid))
+(fluid-set! *debug-port* #f)
+
+
+
+;;
+;; Per-module information useful to `make-reader'.
+;;
+
+(define-public %module-reader-specs           (make-object-property))
+(define-public %module-reader-sharp-specs     (make-object-property))
+(define-public %module-reader-make-options    (make-object-property))
+(define-public %module-reader-fault-handler   (make-object-property))
+(define-public %module-reader-hash-extensions (make-object-property))
+(define-public %module-reader                 (make-object-property))
 
 (define-macro (define-ensure what default-value)
   `(define (,(symbol-append 'ensure- what) module)
@@ -59,14 +68,16 @@
 (define-ensure reader-spec (default-reader-token-readers))
 (define-ensure reader-make-options '())
 (define-ensure reader-fault-handler #f)
+(define-ensure reader-hash-extensions '())
 (define-ensure reader (default-reader))
 
 
-(define-public (compile-module-read-options! module read-options)
+(define (compile-module-read-options! module read-options)
   "Set @var{module}'s read options to @var{read-options}, a list representing
 standard Guile read options, and compile a new reader local to @var{module}
 that implements those options."
-  (format #t "compile-module-read-options! ~a ~a~%" module read-options)
+  (format (fluid-ref *debug-port*)
+	  "compile-module-read-options! ~a ~a~%" module read-options)
   (set! (%module-read-options module) read-options)
 
   ;; Convert MODULE's read options into extended read options.
@@ -78,7 +89,19 @@ that implements those options."
     (let-values (((sharp-specs top-level-specs)
 		  (alternate-guile-reader-token-readers
 		   extended-read-opts)))
+      (set! sharp-specs
+	    ;; Append the module's hash extensions.  Warning: no attempt is
+	    ;; made to avoid conflicts.
+	    (append (map (lambda (chr+proc)
+			   (make-token-reader (car chr+proc)
+					      (lambda (chr port read top)
+						(apply (cdr chr+proc)
+						       (list chr port)))))
+			 (%module-reader-hash-extensions module))
+		    sharp-specs))
+
       (set! (%module-reader-sharp-specs module) sharp-specs)
+
       (let* ((sharp (apply make-reader `(,sharp-specs #f ,@make-reader-opts)))
 	     (sharp-tr (make-token-reader #\# sharp)))
 	(set! (%module-reader-specs module)
@@ -97,12 +120,16 @@ that implements those options."
 
 
 
-;; A version of `read-options-interface' (and consequently `read-options',
-;; `read-set!', `read-enable' and `read-disable') that is confined to a
-;; module.
+;;;
+;;; A version of `read-options-interface' (and consequently `read-options',
+;;; `read-set!', `read-enable' and `read-disable') that is confined to a
+;;; module.
+;;;
+
 (set! read-options-interface
       (lambda args
-	(format #t "confined `read-options-interface': ~a~%" args)
+	(format (fluid-ref *debug-port*)
+		"confined `read-options-interface': ~a~%" args)
 	(let* ((module (current-module))
 	       (opts (ensure-read-options module)))
 	  (cond ((null? args)
@@ -116,6 +143,20 @@ that implements those options."
 		(else
 		 ;; FIXME: This could be implemented too.
 		 (apply %built-in-read-options-interface args))))))
+
+
+;;;
+;;; Confined `read-hash-extend'.
+;;;
+
+(set! read-hash-extend
+      (lambda (chr proc)
+	(let* ((module (current-module))
+	       (hash (ensure-reader-hash-extensions module)))
+	  (set! (%module-reader-hash-extensions module)
+		(assoc-set! hash chr proc))
+	  (compile-module-read-options! module
+					(ensure-read-options module)))))
 
 
 ;;; arch-tag: 9eda977f-4edb-48c5-bdb7-28a6dd0850c6

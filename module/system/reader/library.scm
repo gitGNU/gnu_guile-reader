@@ -151,7 +151,7 @@ Allow for square brackets around S-expressions.
 		 (let* ((kw-tr (standard-token-reader 'keyword))
 			(kw-proc (token-reader-procedure kw-tr)))
 		   (cons (make-token-reader #\: kw-proc)
-			 sharp-specs)))
+			 top-specs)))
 
 		;; case-insensitive symbols
 		((case-insensitive)

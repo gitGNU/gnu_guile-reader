@@ -259,7 +259,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "Read a symbol that starts with an upper-case "	\
 		      "letter in a case-sensitive fashion.")
 #define SCM_TR_GUILE_SYMBOL_MISC_CHARS /* guile-symbol-misc-chars */	 \
-  SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",				 \
+  SCM_DEFTOKEN_SET ("[]{}~^:.+-/*%&@_<>!=?$",				 \
 		    "guile-symbol-misc-chars",				 \
 		    scm_read_guile_mixed_case_symbol, 0,		 \
 		    "Read a symbol that starts with a non-alphanumeric " \
@@ -316,7 +316,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "letter and return a lower-case symbol, "				 \
 		      "regardless of the case of the input.")
 #define SCM_TR_R5RS_LOWER_CASE_SYMBOL_MISC_CHARS /* r5rs-lower-case-symbol-misc-chars */ \
-  SCM_DEFTOKEN_SET ("[]{}:.+-/*%&@_<>!=?$",						 \
+  SCM_DEFTOKEN_SET ("[]{}~^:.+-/*%&@_<>!=?$",						 \
 		    "r5rs-lower-case-symbol-misc-chars",				 \
 		    scm_read_r5rs_lower_case_symbol, 0,					 \
 		    "Read a symbol that starts with a non-"				 \
@@ -342,7 +342,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "case-sensitive and recognizes square "		\
 		      "brackets as delimiters.")
 #define SCM_TR_R6RS_SYMBOL_MISC_CHARS /* r6rs-symbol-misc-chars */	\
-  SCM_DEFTOKEN_SET ("{}:.+-/*%&@_<>!=?$",				\
+  SCM_DEFTOKEN_SET ("{}~^:.+-/*%&@_<>!=?$",				\
 		    "r6rs-symbol-misc-chars",				\
 		    scm_read_r6rs_symbol, 0,				\
 		    "Read a symbol that starts with a non-"		\
@@ -365,14 +365,14 @@ extern void scm_initialize_token_reader_library (void);
 		      "letter and return a symbol.  This token "		\
 		      "reader recognizes braces as delimiters, "		\
 		      "unlike R5RS/R6RS.")
-#define SCM_TR_BRACE_FREE_SYMBOL_MISC_CHARS /* brace-free-symbol-misc-chars */	\
-  SCM_DEFTOKEN_SET ("[]:.+-/*%&@_<>!=?$",					\
-		    "brace-free-symbol-misc-chars",				\
-		    scm_read_brace_free_symbol, 0,				\
-		    "Read a symbol that starts with a non-"			\
-		    "alphanumeric character and return a "			\
-		    "symbol.  This token "					\
-		    "reader recognizes braces as delimiters, "			\
+#define SCM_TR_BRACE_FREE_SYMBOL_MISC_CHARS /* brace-free-symbol-misc-chars */ \
+  SCM_DEFTOKEN_SET ("[]~^:.+-/*%&@_<>!=?$",				       \
+		    "brace-free-symbol-misc-chars",			       \
+		    scm_read_brace_free_symbol, 0,			       \
+		    "Read a symbol that starts with a non-"		       \
+		    "alphanumeric character and return a "		       \
+		    "symbol.  This token "				       \
+		    "reader recognizes braces as delimiters, "		       \
 		    "unlike R5RS/R6RS.")
 
 /* Flavours of numbers.  */

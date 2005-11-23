@@ -40,6 +40,7 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 ;;;
 ;;; Code:
 
+
 (define-public (read-this str reader)
   (with-input-from-string str
     (lambda ()
@@ -56,20 +57,30 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
                  (result '()))
         (if (eof-object? sexp)
             result
-            (loop (reader) (cons sexp result)))))))
+	    (loop (reader) (cons sexp result)))))))
 
-(define-public (correctly-loads-boot-file? reader)
-  (format #t "reading `boot-9.scm'...  ")
-  (let* ((boot-file (%search-load-path "ice-9/boot-9.scm"))
-         (correct-result (load-file-with-reader boot-file read))
-         (result (load-file-with-reader boot-file reader)))
+(define-public (correctly-loads-file? reader file)
+  (format #t "reading `~a'... " file)
+  (let* ((file (%search-load-path file))
+         (correct-result (load-file-with-reader file read))
+         (result (load-file-with-reader file reader)))
     (if (sexp-equal? correct-result result)
 	(begin
 	  (format #t "ok~%")
-	  (values 1 0))
+	  #t)
 	(begin
 	  (format #t "FAILED~%")
-	  (values 1 1)))))
+	  #f))))
+
+(define-public (correctly-loads-standard-files? reader)
+  (let ((files (list "ice-9/boot-9.scm"  "ice-9/common-list.scm"
+		     "ice-9/format.scm"  "ice-9/optargs.scm"
+		     "ice-9/session.scm" "ice-9/getopt-long.scm")))
+    (values (length files)
+	    (length (filter not
+			    (map (lambda (file)
+				   (correctly-loads-file? reader file))
+				 files))))))
 
 (define-public (type-name obj)
   (cond ((symbol? obj)  "symbol")
@@ -101,6 +112,7 @@ encountered."
                          ref sexp)
                  #f))))))
 
+
 (define-public test-cases
   ;; A series of simple test cases and corner cases for the standard Scheme
   ;; reader.
@@ -202,10 +214,6 @@ encountered."
 	 (total (length results))
 	 (failed (length (filter not results))))
 
-    (if (= 0 failed)
-	(format #t "All ~a tests passed~%" total)
-	(format #t "~a tests failed out of ~a~%" failed total))
-
     (values total failed)))
 
 
@@ -221,7 +229,7 @@ encountered."
 			     (set! total (+ total total*))
 			     (set! failed (+ failed failed*))))
 			 (list reader-conforms-with-guile?
-			       correctly-loads-boot-file?)))
+			       correctly-loads-standard-files?)))
 
 		  ;; Try out two versions of the Guile reader: one that
 		  ;; doesn't record positions and one that does.

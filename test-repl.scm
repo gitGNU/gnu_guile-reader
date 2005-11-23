@@ -19,6 +19,11 @@
 
 ;;; arch-tag: test-repl.scm
 
+;;; This program illustrates the use of guile-reader to create a reader for a
+;;; variant of the Scheme syntax.  Basically, the resulting reader
+;;; understands most of Guile's default syntax plus nifty things like curly
+;;; brace S-expressions.
+
 
 (use-modules (system reader)
 	     (srfi srfi-1))
