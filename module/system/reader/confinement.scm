@@ -97,7 +97,7 @@ that implements those options."
 					      (lambda (chr port read top)
 						(apply (cdr chr+proc)
 						       (list chr port)))))
-			 (%module-reader-hash-extensions module))
+			 (ensure-reader-hash-extensions module))
 		    sharp-specs))
 
       (set! (%module-reader-sharp-specs module) sharp-specs)
@@ -138,7 +138,8 @@ that implements those options."
 		 (set! (%module-read-options module)
 		       (clean-up-read-options (car args)))
 		 (compile-module-read-options! module
-					       (%module-read-options module)))
+					       (%module-read-options module))
+		 (set-current-reader (%module-reader module)))
 
 		(else
 		 ;; FIXME: This could be implemented too.
@@ -156,7 +157,44 @@ that implements those options."
 	  (set! (%module-reader-hash-extensions module)
 		(assoc-set! hash chr proc))
 	  (compile-module-read-options! module
-					(ensure-read-options module)))))
+					(ensure-read-options module))
+	  (set-current-reader (%module-reader module)))))
+
+
+
+;;;
+;;; Dynamically configurable `primitive-load'.
+;;;
+
+(if (and (not (defined? '*current-reader*))
+	 (not (defined? 'current-reader)))
+    (begin
+      (define-public *current-reader* (make-fluid))
+      (fluid-set! *current-reader* #f)
+
+      (define-public (set-current-reader reader)
+	(fluid-set! *current-reader* reader))
+
+      (define-public (current-reader)
+	(fluid-ref *current-reader*))
+
+      ;; This version of `primitive-load' takes into account the value of the
+      ;; `*current-reader*' fluid.  Therefore, a file being loaded can choose
+      ;; to modify the reader being used.
+      ;;
+      ;; This was submitted as a proposal to extend `primitive-load' in Guile
+      ;; 1.7, see
+      ;; http://lists.gnu.org/archive/html/guile-devel/2005-11/msg00006.html
+      ;; for details.
+      (set! primitive-load
+	    (lambda (file)
+	      (with-input-from-file file
+		(lambda ()
+		  (let loop ((sexp ((or (current-reader) read))))
+		    (if (not (eof-object? sexp))
+			(begin
+			  (primitive-eval sexp)
+			  (loop ((or (current-reader) read))))))))))))
 
 
 ;;; arch-tag: 9eda977f-4edb-48c5-bdb7-28a6dd0850c6

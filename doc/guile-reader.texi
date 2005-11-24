@@ -608,12 +608,14 @@ that is, typically when your program starts.  This will redefine
 future modification performed via Guile's built-in reader option
 interface will be confined to the calling module.
 
-@c FIXME: This should be fixed by rewriting `primitive-load' when needed.
-This module is mostly useful with a Guile 1.7 where the
-@code{*current-reader*} fluid is available (starting from version
-1.7.3).  Without it, @code{primitive-load}, for instance, will only
-use Guile's built-in reader, thus ignoring the fact that the
-definition of @code{read} has changed within the module being loaded.
+@findex current-reader
+@findex set-current-reader
+This module redefines @code{primitive-load} where needed so that a
+file being loaded can change the reader being used.  This is done via
+the @code{set-current-reader} procedure which is used by the confined
+variants of @code{read-options-interface} and @code{read-hash-extend}.
+This way, invocations of these functions from within a file being
+loaded by @code{primitive-load} take effect immediately.
 
 
 @c chapter ----------------------------------------------------------
@@ -632,6 +634,16 @@ Re-using token readers written in C, as explained in @xref{Token
 Reader Library}, does not imply any additional cost: the underlying C
 function will be called directly by the reader, without having to go
 through any marshalling/unmarshalling stage.
+
+@findex make-guile-reader
+Additionally, on the C side, token readers may be initialized
+@emph{statically} (except, obviously, token readers made out of a
+dynamically-compiled reader).  Making good use of it can improve the
+startup time of a program.  For example, @code{make-guile-reader}
+(@pxref{Reader Library}) is implemented in C and it uses statically
+initialized arrays of token readers.  It still needs to invoke
+@code{scm_c_make_reader ()}, but at least, token readers themselves
+are ``ready to use''.
 
 
 @c *********************************************************************

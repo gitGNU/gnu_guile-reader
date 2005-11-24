@@ -1,5 +1,5 @@
-scheme-reader, an extensible, fast, reader for Guile
-====================================================
+guile-reader, an extensible, fast, reader framework for Guile
+=============================================================
 
 Introduction
 ------------
@@ -24,12 +24,44 @@ is hardly extensible.
 
 The point here is to be able to create a completely customizable Scheme
 reader using basic building-blocks such as an R5RS string reader, an
-sexp reader, etc., or even user-defined readers.
+S-exp reader, etc., or even user-defined readers.
 
 In order to achieve performance equivalent (or better?) to Guile's C
-hand-coded reader, scheme-reader relies on GNU Lightning to compile
+hand-coded reader, guile-reader relies on GNU Lightning to compile
 readers to native code.  For compatibility, a Lightning-free, slower
 implementation is available for platforms not supported by Lightning.
+
+
+Availability
+------------
+
+Guile-reader is available under the GNU General Public License, version
+2 or later, at your option (see file `COPYING').  It is hosted by
+Savannah at:
+
+  http://savannah.nongnu.org/projects/guile-reader/
+
+If you want do discuss about it, do not hesitate to subscribe to the
+`guile-reader-devel' mailing list from there.
+
+Source code if managed by GNU Arch and is currently available in the
+archives located at the following URLs (depending on the version):
+
+  http://www.laas.fr/~lcourtes/software/arch-2004/
+  http://www.laas.fr/~lcourtes/software/arch-2005/
+
+In order to fetch source code from there, you may run the following
+commands:
+
+  $ tla register-archive http://www.laas.fr/~lcourtes/software/arch-2004/
+  $ tla get lcourtes@laas.fr--2004-libre/guile-reader--devo--0.2  \
+        guile-reader-0.2
+
+This will fetch the source and put it in the `guile-reader-0.2'
+directory.
+
+Thanks in advance for your feedback!  :-)
+
 
 
 August 2005.

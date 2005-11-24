@@ -4,9 +4,3 @@
 * compatibility with Guile 1.[64]
 
 * augment the reader library: R5RS, Guile, Guile + keywords, Skribe
-
-* distribute a guile-reader-aware implementation of SRFI-10.
-
-* re-implement `read-enable' and `read-hash-extend' so that they modify
-  a module-local reader (which may be lazily instantiated)
-

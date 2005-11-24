@@ -4,7 +4,7 @@ libguile_reader_la_LDFLAGS = -module -version-info 1:0:0
 
 readerincludedir = $(includedir)/guile-reader
 
-readerinclude_HEADERS = reader.h reader-config.h \
+readerinclude_HEADERS = reader.h reader-config.h	\
 			token-readers.h reader-lib.h
 BUILT_SOURCES = token-reader-lookup.c token-reader-list.c	\
 		make-reader-flags.c				\
@@ -17,8 +17,8 @@ CLEANFILES = $(BUILT_SOURCES)
 noinst_PROGRAMS = guile
 guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
 
-TESTS = testsuite.scm
-EXTRA_DIST = symbol-token-reader.c test-repl.scm $(TESTS)		\
+TESTS = testsuite.scm test-confinement.scm
+EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 	     extract-token-readers.sh extract-make-reader-flags.sh
 
 AM_CFLAGS = -Wmissing-prototypes -Wall -g -O0
@@ -34,7 +34,7 @@ snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 
 
 %.c.x: %.c
-	guile-snarf-1.7 -o $@ $< $(snarfcppopts)
+	$(guile_snarf) -o $@ $< $(snarfcppopts)
 
 %.doc: %.c
 	$(CPP) $(CPPFLAGS) -DSCM_MAGIC_SNARF_DOCS $< > $@
