@@ -1,0 +1,6 @@
+;; arch-tag: 1bde8076-76ed-429c-b8d4-167b54c123bd
+
+
+* compatibility with Guile 1.[64]
+
+* augment the reader library: R5RS, Guile, Guile + keywords, Skribe

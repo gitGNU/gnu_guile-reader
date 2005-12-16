@@ -1,0 +1,17 @@
+New in guile-reader 0.2
+
+  * Modified `make-reader' with support for source position recording.
+
+  * New token readers such as: SRFI-30 block comments, SRFI-62 S-exp
+    comments, R6RS-like square bracket S-exps, curly-brace S-exps.
+
+  * New high-level API (namely `make-alternate-guile-reader') to create
+    Scheme readers.
+
+  * Read extension confinement module: replaces `read-options-interface'
+    and `read-hash-extend' with confined variants.
+
+  * Online documentation of token readers and improved documentation.
+
+  * Bug fixes.
+
