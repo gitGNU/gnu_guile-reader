@@ -38,7 +38,7 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 		scm_reader_t top_level_reader)
 {
   int c;
-  SCM result, result_str;
+  SCM result, result_str = SCM_BOOL_F;
   char c_num[1024];
   size_t c_num_len = 0;
   unsigned saw_point = 0, saw_plus_or_minus = 0, saw_leading_sign = 0;
@@ -46,7 +46,6 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
   unsigned last_char_is_i = 0;
   unsigned return_symbol = 0;
 
-  result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
   c = chr;
 
   if ((c == '+') || (c == '-'))
@@ -87,6 +86,10 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 
       if (c_num_len + 1 >= sizeof (c_num))
 	{
+	  /* Start flushing the symbol to a Scheme string.  */
+	  if (result_str == SCM_BOOL_F)
+	    result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+
 	  result_str =
 	    scm_string_append (scm_list_2
 			       (result_str,
@@ -105,46 +108,50 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
       else
 	return_symbol = 1;
     }
-#if 0 /* Commented out: an complicated approach that tries to determine
-	 whether we actually read a number or not.  We'd better let
-	 `scm_string_to_number ()' do its job instead.  */
+
+  if (result_str != SCM_BOOL_F)
+    {
+      /* So we're using a Scheme string.  */
+      if (c_num_len)
+	{
+	  result_str =
+	    scm_string_append (scm_list_2
+			       (result_str,
+				scm_from_locale_stringn (c_num, c_num_len)));
+	}
+
+      if (scm_c_string_length (result_str) == 0)
+	scm_i_input_error(__FUNCTION__, port,
+			  "invalid number syntax", SCM_EOL);
+
+      if (!return_symbol)
+	{
+	  result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
+	  if (result == SCM_BOOL_F)
+	    /* We must have done something wrong: this must be a symbol
+	       rather than a number.  */
+	    result = scm_string_to_symbol (result_str);
+	}
+      else
+	/* The token wasn't actually a number so we'll return a symbol, just
+	   like Guile's default reader does (e.g. it reads `123.123.123' as a
+	   symbol).  */
+	result = scm_string_to_symbol (result_str);
+    }
   else
     {
-      if ((saw_plus_or_minus) && (!saw_leading_sign))
-	return_symbol = 1;
-      else if (saw_plus_or_minus > 1)
-	return_symbol = 1;
-      else if (saw_exponent > 1)
-	return_symbol = 1;
-      else if (saw_at_sign > 1)
-	/* One `@' sign may be used to represent a complex number.  */
-	return_symbol = 1;
+      /* The number is smaller than `sizeof (c_num)' so we successfully
+	 avoided resorting to Scheme strings.  */
+      if (!return_symbol)
+	{
+	  result = scm_i_mem2number (c_num, c_num_len, 10);
+	  if (result == SCM_BOOL_F)
+	    /* Oh, this is a symbol rather than a number.  */
+	    result = scm_from_locale_symboln (c_num, c_num_len);
+	}
+      else
+	result = scm_from_locale_symboln (c_num, c_num_len);
     }
-#endif
-
-  result_str =
-    scm_string_append (scm_list_2
-		       (result_str,
-			scm_from_locale_stringn (c_num, c_num_len)));
-
-  if (scm_c_string_length (result_str) == 0)
-    scm_i_input_error(__FUNCTION__, port,
-		      "invalid number syntax", SCM_EOL);
-
-  if (!return_symbol)
-    {
-      result = scm_string_to_number (result_str, SCM_I_MAKINUM (10));
-      if (result == SCM_BOOL_F)
-	/* We must have done something wrong: this must be a symbol rather
-	   than a number.  */
-	return_symbol = 1;
-    }
-
-  if (return_symbol)
-    /* The token wasn't actually a number so we'll return a symbol, just like
-       Guile's default reader does (e.g. it reads `123.123.123' as a
-       symbol).  */
-    return (scm_string_to_symbol (result_str));
 
   return result;
 }
@@ -156,11 +163,10 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
 		scm_reader_t top_level_reader)
 {
   int c;
-  SCM result;
+  SCM result = SCM_BOOL_F;
   char c_id[1024];
   size_t c_id_len = 0;
 
-  result = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
   c = chr;
   while (c != EOF)
     {
@@ -190,6 +196,10 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
 
       if (c_id_len + 1 >= sizeof (c_id))
 	{
+	  /* Start flushing the symbol to a Scheme string.  */
+	  if (result == SCM_BOOL_F)
+	    result = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+
 	  result =
 	    scm_string_append (scm_list_2
 			       (result,
@@ -200,13 +210,24 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
       c = scm_getc (port);
     }
 
-  if (c_id_len)
-    result =
-      scm_string_append (scm_list_2
-			 (result,
-			  scm_from_locale_stringn (c_id, c_id_len)));
+  if (result != SCM_BOOL_F)
+    {
+      if (c_id_len)
+	result =
+	  scm_string_append (scm_list_2
+			     (result,
+			      scm_from_locale_stringn (c_id, c_id_len)));
 
-  return (scm_string_to_symbol (result));
+      result = scm_string_to_symbol (result);
+    }
+  else
+    /* For symbols smaller than `sizeof (c_id)', we don't need to recur to
+       strings.  Therefore, we only create one Scheme object (a symbol) per
+       symbol read, while we create two Scheme objects (a string and a
+       symbol) in the worst case.  */
+    result = scm_from_locale_symboln (c_id, c_id_len);
+
+  return result;
 }
 
 /* arch-tag: 1fc534ea-5046-47ab-aa18-da259bbfa733
