@@ -268,12 +268,14 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
 		 scm_reader_t top_level_reader)
 #define FUNC_NAME "scm_read_string"
 {
-  SCM tok_buf;
-  char *str_buf;
-  int c;
-  unsigned j = 0;
+  /* For strings smaller than C_STR, this function creates only one Scheme
+     object (the string returned).  */
 
-  tok_buf = scm_i_make_string (256, &str_buf);
+  SCM str = SCM_BOOL_F;
+  char c_str[1024];
+  unsigned c_str_len = 0;
+  int c;
+
   while ('"' != (c = scm_getc (port)))
     {
       if (c == EOF)
@@ -281,8 +283,19 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
 				    "end of file in string constant",
 				    SCM_EOL);
 
-      while (j + 2 >= scm_i_string_length (tok_buf))
-	scm_grow_tok_buf (&tok_buf);
+      if (c_str_len + 1 >= sizeof (c_str))
+	{
+	  /* Flush the C buffer onto a Scheme string.  */
+	  SCM addy;
+
+	  if (str == SCM_BOOL_F)
+	    str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+
+	  addy = scm_from_locale_stringn (c_str, c_str_len);
+	  str = scm_string_append_shared (scm_list_2 (str, addy));
+
+	  c_str_len = 0;
+	}
 
       if (c == '\\')
 	switch (c = scm_getc (port))
@@ -346,16 +359,23 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
 			      "illegal character in escape sequence: ~S",
 			      scm_list_1 (SCM_MAKE_CHAR (c)));
 	  }
-      scm_c_string_set_x (tok_buf, j, SCM_MAKE_CHAR (c));
-      ++j;
+      c_str[c_str_len++] = c;
     }
-  if (j == 0)
-    return scm_nullstr;
 
-  /* Change this to scm_c_substring_read_only when
-     SCM_STRING_CHARS has been removed.
-  */
-  return scm_c_substring_copy (tok_buf, 0, j);
+  if (c_str_len > 0)
+    {
+      SCM addy;
+
+      addy = scm_from_locale_stringn (c_str, c_str_len);
+      if (str == SCM_BOOL_F)
+	str = addy;
+      else
+	str = scm_string_append_shared (scm_list_2 (str, addy));
+    }
+  else
+    str = (str == SCM_BOOL_F) ? scm_nullstr : str;
+
+  return str;
 }
 #undef FUNC_NAME
 
