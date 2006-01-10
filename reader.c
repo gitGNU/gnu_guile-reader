@@ -114,6 +114,10 @@ do_scm_set_source_position (SCM obj, SCM line, SCM column,
   debug ("%s: o=%p l=%p c=%p f=%p\n",
 	  __FUNCTION__, obj, line, column, filename);
 
+  if (filename == SCM_BOOL_F)
+    /* Maybe the input port was not a file port.  */
+    return;
+
   assert (scm_is_string (filename));
   assert (scm_is_number (column));
   assert (scm_is_number (line));
