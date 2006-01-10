@@ -666,13 +666,22 @@ SCM
 scm_read_keyword (int chr, SCM port, scm_reader_t reader,
 		  scm_reader_t top_level_reader)
 {
+  SCM symbol;
+
   /* Invoke TOP_LEVEL_READER to read the symbol that comprises the keyword.
      Doing this instead of invoking a specific symbol reader function allows
      `scm_read_keyword ()' to adapt to the delimiters currently valid of
-     symbols.  */
-  return (scm_symbol_to_keyword (scm_call_reader (top_level_reader,
-						  port, 0,
-						  top_level_reader)));
+     symbols.
+
+     XXX: This implementation allows sloppy syntaxes like `#:  key' but so
+     does Guile's built-in reader.  */
+  symbol = scm_call_reader (top_level_reader, port, 0, top_level_reader);
+  if (!scm_is_symbol (symbol))
+    scm_i_input_error (__FUNCTION__, port,
+		       "symbol prefix `~a' not followed by a symbol: ~s",
+		       scm_list_2 (SCM_MAKE_CHAR (chr), symbol));
+
+  return (scm_symbol_to_keyword (symbol));
 }
 
 SCM
