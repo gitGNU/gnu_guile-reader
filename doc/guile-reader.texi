@@ -609,13 +609,24 @@ future modification performed via Guile's built-in reader option
 interface will be confined to the calling module.
 
 @findex current-reader
-@findex set-current-reader
-This module redefines @code{primitive-load} where needed so that a
-file being loaded can change the reader being used.  This is done via
-the @code{set-current-reader} procedure which is used by the confined
-variants of @code{read-options-interface} and @code{read-hash-extend}.
-This way, invocations of these functions from within a file being
-loaded by @code{primitive-load} take effect immediately.
+Starting from Guile 1.7.3, @code{current-reader} is a core binding
+bound to a fluid whose value should be either `#f' or a reader (i.e.,
+a @code{read}-like procedure).  The value of this fluid dictates the
+reader that is to be used by @code{primitive-load} and its value can
+be changed dynamically.
+
+The confined variants of @code{read-options-interface} and
+@code{read-hash-extend} rely on this feature to make reader
+customizations local to the file being loaded.  This way, invocations
+of these functions from within a file being loaded by
+@code{primitive-load} take effect immediately.
+
+@cindex forward-compatibility
+When using a version of Guile that does not support the
+@code{current-reader} feature, the @code{(system reader compat)}
+module defines a new @code{current-reader} core binding and redefines
+@code{primitive-load} in order to provide compatibility with newer
+versions of Guile.
 
 
 @c chapter ----------------------------------------------------------

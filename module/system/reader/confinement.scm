@@ -161,37 +161,6 @@ that implements those options."
 	  (fluid-set! current-reader (%module-reader module)))))
 
 
-
-;;;
-;;; Dynamically configurable `primitive-load'.
-;;;
-
-;; In Guile 1.7.2++, `current-reader' is a core binding bound to a fluid
-;; whose value should be either `#f' or a `read'-like procedure.  The value
-;; of this fluid dictates the reader that is to be used by `primitive-load'.
-;;
-;; See:
-;; http://lists.gnu.org/archive/html/guile-devel/2005-11/msg00006.html
-;; http://lists.gnu.org/archive/html/guile-devel/2005-12/msg00062.html .
-
-(if (not (defined? 'current-reader))
-    (begin ;; forward-compatible implementation
-
-      (module-define! the-root-module 'current-reader (make-fluid))
-      (fluid-set! current-reader #f)
-
-      (set! primitive-load
-	    (lambda (file)
-	      (with-input-from-file file
-		(lambda ()
-		  (let loop ((sexp ((or (fluid-ref current-reader) read))))
-		    (if (not (eof-object? sexp))
-			(begin
-			  (primitive-eval sexp)
-			  (loop ((or (fluid-ref current-reader)
-				     read))))))))))))
-
-
 ;;; arch-tag: 9eda977f-4edb-48c5-bdb7-28a6dd0850c6
 
 ;;; confinement.scm ends here
