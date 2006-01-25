@@ -17,7 +17,7 @@ CLEANFILES = $(BUILT_SOURCES)
 noinst_PROGRAMS = guile
 guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
 
-TESTS = testsuite.scm test-confinement.scm
+TESTS = testsuite.scm test-position.scm test-confinement.scm
 EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 	     extract-token-readers.sh extract-make-reader-flags.sh
 

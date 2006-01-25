@@ -732,6 +732,14 @@ scm_c_make_reader (void *code_buffer,
   CHECK_CODE_SIZE (buffer_size, start);
   do_again = jit_get_label ();
 
+  if (flags & SCM_READER_FLAG_POSITIONS)
+    {
+      /* Before invoking `scm_getc ()', keep track of the current position of
+	 PORT.  */
+      generate_position_store (&_jit, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start);
+    }
+
   /* Call `scm_getc ()'.  */
   debug_pre_call ();
   CHECK_CODE_SIZE (buffer_size, start);
@@ -771,14 +779,6 @@ scm_c_make_reader (void *code_buffer,
       jit_pusharg_p (JIT_R0);
       (void)jit_finish (do_like_printf);
       debug_post_call ();
-    }
-
-  if (flags & SCM_READER_FLAG_POSITIONS)
-    {
-      /* Before invoking a token reader, keep track of the current position
-	 of PORT.  */
-      generate_position_store (&_jit, start, buffer_size);
-      CHECK_CODE_SIZE (buffer_size, start);
     }
 
   /* XXX: Instead of testing whether the character is handled by each TR, we
@@ -1274,8 +1274,22 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
     SCM_VALIDATE_PORT (2, port);
 
  doit:
-  while ((c = scm_getc (port)) != EOF)
+  while (1)
     {
+      SCM column = SCM_BOOL_F, line = SCM_BOOL_F;
+      SCM filename = SCM_BOOL_F;
+
+      if (reader->flags & SCM_READER_FLAG_POSITIONS)
+	{
+	  column = scm_port_column (port);
+	  line = scm_port_line (port);
+	  filename = scm_port_filename (port);
+	}
+
+      c = scm_getc (port);
+      if (c == EOF)
+	break;
+
       if (reader->flags & SCM_READER_FLAG_LOWER_CASE)
 	c = tolower (c);
       else if (reader->flags & SCM_READER_FLAG_UPPER_CASE)
@@ -1287,16 +1301,6 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
 	{
 	  if (tr_handles_char (tr, c))
 	    {
-	      SCM column = SCM_BOOL_F, line = SCM_BOOL_F;
-	      SCM filename = SCM_BOOL_F;
-
-	      if (reader->flags & SCM_READER_FLAG_POSITIONS)
-		{
-		  column = scm_port_column (port);
-		  line = scm_port_line (port);
-		  filename = scm_port_filename (port);
-		}
-
 	      result = tr_invoke (tr, c, port, reader,
 				  top_level_reader);
 	      if ((result == SCM_UNSPECIFIED) && (!tr->escape))
