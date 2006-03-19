@@ -198,7 +198,7 @@ extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
     { .type = SCM_TOKEN_SINGLE, .value = { .single = (_chr) } },	\
     .name = (_name),							\
     .reader = { .type = SCM_TOKEN_READER_C,				\
-		.value.c_reader = (_func) },				\
+		.value = { .c_reader = (_func) } },			\
     .escape = _escape,							\
     .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)			\
   }
@@ -209,27 +209,28 @@ extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
       .value = { .range = { .low = (_lo), .high = (_hi) } } },		\
     .name = (_name),							\
     .reader = { .type = SCM_TOKEN_READER_C,				\
-		.value.c_reader = (_func) },				\
+		.value = { .c_reader = (_func) } },			\
     .escape = _escape,							\
     .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)			\
   }
 
-#define SCM_DEFTOKEN_SET(_set, _name, _func, _escape, _doc)		\
-  {									\
-    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },		\
-    .name = (_name),							\
-    .reader = { .type = SCM_TOKEN_READER_C,				\
-	        .value.c_reader = (_func) },				\
-    .escape = _escape,							\
-    .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)		     	\
+#define SCM_DEFTOKEN_SET(_set, _name, _func, _escape, _doc)	\
+  {								\
+    { .type = SCM_TOKEN_SET, .value = { .set = (_set) } },	\
+    .name = (_name),						\
+    .reader = { .type = SCM_TOKEN_READER_C,			\
+	        .value = { .c_reader = (_func) } },		\
+    .escape = _escape,						\
+    .documentation = SCM_DEFTOKEN_MAKE_DOC (_doc)		\
   }
 
-#define SCM_END_TOKENS							  \
-  {									  \
-    { .type = SCM_TOKEN_UNDEF },					  \
-    .name = NULL,							  \
-    .reader = { .type = SCM_TOKEN_READER_UNDEF, .value.c_reader = NULL }, \
-    .documentation = NULL						  \
+#define SCM_END_TOKENS					\
+  {							\
+    { .type = SCM_TOKEN_UNDEF },			\
+    .name = NULL,					\
+    .reader = { .type = SCM_TOKEN_READER_UNDEF,		\
+		.value = { .c_reader = NULL } },	\
+    .documentation = NULL				\
   }
 
 
