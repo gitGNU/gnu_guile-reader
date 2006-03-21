@@ -19,7 +19,8 @@ guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
 
 TESTS = testsuite.scm test-position.scm test-confinement.scm
 EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
-	     extract-token-readers.sh extract-make-reader-flags.sh
+	     extract-token-readers.sh extract-make-reader-flags.sh	\
+	     compat.h
 
 AM_CFLAGS = -Wmissing-prototypes -Wall -g -O0
 
