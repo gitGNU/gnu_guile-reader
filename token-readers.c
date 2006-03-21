@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
@@ -39,6 +39,7 @@
 #include "token-readers.h"
 
 #include "config.h"
+#include "compat.h"
 
 
 
@@ -645,7 +646,7 @@ scm_read_character (int chr, SCM port, scm_reader_t reader,
        * does only consist of octal digits.  Finally, it should be
        * checked whether the resulting fixnum is in the range of
        * characters.  */
-      SCM p = scm_i_mem2number (charname, charname_len, 8);
+      SCM p = scm_c_locale_stringn_to_number (charname, charname_len, 8);
       if (SCM_I_INUMP (p))
 	return SCM_MAKE_CHAR (SCM_I_INUM (p));
     }

@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,6 +25,9 @@
 #if (!defined SYMBOL_TR_NAME) || (!defined NUMBER_TR_NAME)
 # error "This file should only be included from `token-readers.c'."
 #endif
+
+
+#include "compat.h"
 
 
 /* Exponent markers, as defined in section 7.1.1 of R5RS, ``Lexical
@@ -144,7 +147,7 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 	 avoided resorting to Scheme strings.  */
       if (!return_symbol)
 	{
-	  result = scm_i_mem2number (c_num, c_num_len, 10);
+	  result = scm_c_locale_stringn_to_number (c_num, c_num_len, 10);
 	  if (result == SCM_BOOL_F)
 	    /* Oh, this is a symbol rather than a number.  */
 	    result = scm_from_locale_symboln (c_num, c_num_len);

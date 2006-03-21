@@ -60,6 +60,10 @@ if test "x$have_guile_1_7" != "xyes"; then
   AC_MSG_ERROR([You need Guile 1.7.x or higher.])
 fi
 
+# `scm_c_locale_stringn_to_number ()' was introduced after 1.8.0.  It is
+# equivalent to the former `scm_i_mem2number ()'.
+AC_CHECK_FUNCS([scm_c_locale_stringn_to_number scm_i_mem2number])
+
 CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 
