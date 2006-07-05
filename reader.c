@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -33,10 +33,12 @@
 
 #ifdef SCM_READER_USE_LIGHTNING
 # include <lightning.h>
-#endif
 
 /* If defined, an inlined implementation of `scm_getc ()' will be used.  */
-/* #define SCM_READER_INLINE_GETC */
+# define SCM_READER_INLINE_GETC
+
+#endif
+
 
 /* Debugging support.  */
 static void debug (const char *, ...)
@@ -478,6 +480,92 @@ generate_to_lower (jit_state *lightning_state,
 #undef _jit
 
 #ifdef SCM_READER_INLINE_GETC
+/* Functions producing an inline version of `scm_getc ()'.  */
+
+/* Update a port's column and line numbers based on the character just read
+   from it.  Assumes a pointer to the C port structure is in R0 and the last
+   character read from it is in V1.  Clobbers R1 and R2.  */
+static inline int
+generate_getc_update_port_position (jit_state *lightning_state,
+				    char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  /* This code mimics the `switch' statement that appears at the end of the C
+     version of `scm_getc ()'.  */
+
+  /* XXX: We're assuming that the `line_number' field is a `long' while the
+     `column_number' is an `int'.  */
+
+  jit_insn *test,
+    *alarm_jump, *bs_jump, *nl_jump, *reset_jump, *tab_jump;
+
+  /* Alarm: don't change line and column numbers.  */
+  alarm_jump = jit_beqi_i (jit_forward (), JIT_V1, (int)'\a');
+
+  /* Backspace: decrease column number if greater than zero.  */
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\b');
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  {
+    jit_insn *lt_zero;
+
+    lt_zero = jit_blei_i (jit_forward (), JIT_R1, 0);
+    jit_subi_i (JIT_R2, JIT_R1, 1);
+    jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+    jit_patch (lt_zero);
+  }
+  bs_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* New line: increase line number and reset column number.  */
+  jit_patch (test);
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\n');
+  jit_ldxi_l (JIT_R1, JIT_R0, offsetof (scm_t_port, line_number));
+  jit_addi_l (JIT_R2, JIT_R1, 1);
+  jit_stxi_l (offsetof (scm_t_port, line_number), JIT_R0, JIT_R2);
+  jit_movi_i (JIT_R2, 0);
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+  nl_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Reset: reset the column number.  */
+  jit_patch (test);
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\r');
+  jit_movi_i (JIT_R2, 0);
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+  reset_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Tab: set column number to (C + 8 - (C % 8)).  */
+  jit_patch (test);
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\t');
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
+  jit_addi_i (JIT_R2, JIT_R1, 8);      /* R2 = R1+8 */
+  jit_modi_i (JIT_R1, JIT_R2, 8);      /* R1 = R2%8 */
+  jit_subr_i (JIT_R1, JIT_R2, JIT_R1); /* R1 = R2-R1 */
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R1);
+  tab_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Default: increase column number.  */
+  jit_patch (test);
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
+  jit_addi_i (JIT_R2, JIT_R1, 1);
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* End of `switch' statement.  */
+  jit_patch (alarm_jump);
+  jit_patch (bs_jump);
+  jit_patch (nl_jump);
+  jit_patch (reset_jump);
+  jit_patch (tab_jump);
+
+  return 0;
+}
+#undef _jit
+
+
 /* Generate an implementation of `scm_getc ()' inline.  The code expects the
    `SCM' port object in V0 and return its result in V1.  It potentially
    clobbers all the `R' registers.  Note: This is an exact re-implementation
@@ -495,6 +583,9 @@ generate_getc (jit_state *lightning_state,
      This is equivalent to `SCM_PTAB_ENTRY ()'.  */
 #define FETCH_C_PORT(_reg)			\
   jit_ldxi_p ((_reg), JIT_V0, sizeof (SCM))
+
+  /* Throughout this piece of code, we try to keep the pointer to the C port
+     structure in R0.  */
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
   FETCH_C_PORT (JIT_R0);
@@ -554,7 +645,9 @@ generate_getc (jit_state *lightning_state,
   jit_stxi_p (offsetof (scm_t_port, read_pos), JIT_R0, JIT_R2);
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
-  /* XXX: Here we should update PORT's column/line numbers.  */
+  if (generate_getc_update_port_position (lightning_state,
+					  start, buffer_size))
+    return -1;
 
   jit_patch (jump_to_end);
 
