@@ -46,11 +46,16 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 (define %test-cases
   ;; Input strings that read as pairs (source properties are only attached to
   ;; pairs).
-  '("(+ 2 2)\n"
+  `("(+ 2 2)\n"
     "\n  (* 4 5)"
     "\n (\n (x) (y) 3)"
     "\t(\n\t  (x) 3\n)"
-    "  \n\t(\n\t(\t( (\n+ 2)\n))\t)"))
+    "  \n\t(\n\t(  \t( (\n+ 2)\n))\t)"
+    "(alarm \"\a\a\a\" (+ p q))"
+    ,(string-append "   (backspace \"" (string #\bs) "\" (+ 6 7))")
+    ,(string-append "(lots-of-backspaces \"" (make-string 40 #\bs)
+		    "\" (+ a b))")
+    "  \t  \r(reset)"))
 
 (define (expected:line e) (vector-ref e 0))
 (define (expected:column e) (vector-ref e 1))
@@ -96,11 +101,14 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 	(failed 0))
     (for-each (lambda (str)
 		(set! total (+ 1 total))
-		(catch #t
-		  (lambda ()
-		    (run-test read str (expected-position str)))
-		  (lambda (key . args)
-		    (set! failed (+ failed 1)))))
+; 		(catch #t
+; 		  (lambda ()
+		    (run-test read str (expected-position str))
+; 		    )
+; 		  (lambda (key . args)
+; 		    (set! failed (+ failed 1)))
+;		  )
+	      )
 	      %test-cases)
     (format #t "failed: ~a~%total: ~a~%" failed total)
     (exit failed)))
