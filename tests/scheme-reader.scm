@@ -2,8 +2,8 @@
 # aside from this initial boilerplate, this is actually -*- scheme -*- code
 LTDL_LIBRARY_PATH="`pwd`/.libs"
 export LTDL_LIBRARY_PATH
-main='(module-ref (resolve-module '\''(testsuite)) '\'main')'
-exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$@"
+main='(module-ref (resolve-module '\''(scheme-reader)) '\'main')'
+exec ${GUILE-./guile-for-test} -l $0 -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
 ;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
@@ -24,7 +24,7 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 
-(define-module (testsuite)
+(define-module (scheme-reader)
   #:use-module (system reader)
   #:use-module (system reader library)
   #:use-module (srfi srfi-1)
@@ -36,7 +36,8 @@ exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$
 ;;; Commentary:
 ;;;
 ;;; Runs a test-suite to verify the behaviour of the various token readers
-;;; provided.
+;;; provided and use by the default Scheme reader returned by
+;;; `default-reader'.
 ;;;
 ;;; Code:
 
@@ -217,7 +218,7 @@ encountered."
     (values total failed)))
 
 
-(define-public (testsuite . args)
+(define-public (scheme-reader . args)
   (read-enable 'positions)
   (let ((total 0) (failed 0))
     (catch #t
@@ -250,8 +251,8 @@ encountered."
 
     failed))
 
-(define main testsuite)
+(define main scheme-reader)
 
 ;;; arch-tag: testsuite.scm
 
-;;; testsuite.scm ends here
+;;; scheme-reader.scm ends here

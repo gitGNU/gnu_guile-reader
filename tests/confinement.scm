@@ -3,7 +3,7 @@
 LTDL_LIBRARY_PATH="`pwd`/.libs"
 export LTDL_LIBRARY_PATH
 main='(module-ref (resolve-module '\''(test-confinement)) '\'main')'
-exec ${GUILE-./guile} -L module -l $0 -c "(apply $main (cdr (command-line)))" "$@"
+exec ${GUILE-./guile-for-test} -l $0 -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
 ;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>

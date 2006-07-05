@@ -1,0 +1,10 @@
+#!/bin/sh
+
+#
+# Sets up the execution environment needed to run the test programs.
+#
+
+GUILE_LOAD_PATH="@abs_top_srcdir@/module:$GUILE_LOAD_PATH"
+export GUILE_LOAD_PATH
+
+exec @GUILE@ "$@"
