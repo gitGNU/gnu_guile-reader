@@ -541,7 +541,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
   test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\t');
   jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
   jit_addi_i (JIT_R2, JIT_R1, 8);      /* R2 = R1+8 */
-  jit_modi_i (JIT_R1, JIT_R2, 8);      /* R1 = R2%8 */
+  jit_andi_i (JIT_R1, JIT_R2, 7);      /* R1 = R2%8 */
   jit_subr_i (JIT_R1, JIT_R2, JIT_R1); /* R1 = R2-R1 */
   jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R1);
   tab_jump = jit_jmpi (jit_forward ());
