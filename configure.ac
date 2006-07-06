@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(guile-reader, 0.2, ludovic.courtes@laas.fr)
-AM_INIT_AUTOMAKE(guile-reader, 0.2)
+AC_INIT(guile-reader, 0.3, ludovic.courtes@laas.fr)
+AM_INIT_AUTOMAKE(guile-reader, 0.3)
 
 AC_CONFIG_SRCDIR([reader.c])
 AC_CONFIG_HEADER([config.h reader-config.h])
@@ -68,9 +68,13 @@ CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 
 AC_CONFIG_FILES([Makefile
+		 tests/Makefile
+		 tests/guile-for-test
 	         module/Makefile
 		 module/system/Makefile
 		 module/system/reader/Makefile
 		 doc/Makefile])
+
+AC_CONFIG_COMMANDS([guile-for-test], [chmod +x tests/guile-for-test])
 
 AC_OUTPUT

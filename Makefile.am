@@ -11,13 +11,6 @@ BUILT_SOURCES = token-reader-lookup.c token-reader-list.c	\
                 reader-lib.c.x token-readers.c.x reader.c.x
 CLEANFILES = $(BUILT_SOURCES)
 
-# We build a `guile' executable here so that it is linked against
-# `libguile-reader' and Libtool's magic ensures that we can use it to
-# run the test suite.
-noinst_PROGRAMS = guile
-guile_LDFLAGS = -dlpreopen libguile-reader.la $(GUILE_LDFLAGS)
-
-TESTS = testsuite.scm test-position.scm test-confinement.scm
 EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 	     extract-token-readers.sh extract-make-reader-flags.sh	\
 	     compat.h
@@ -55,4 +48,4 @@ make-reader-flags.c: reader.h
 	$(GPERF) -t -C -N _scm_to_make_reader_flag > $@
 
 # Jump to the sub-directories.
-SUBDIRS = . module doc
+SUBDIRS = . module doc tests

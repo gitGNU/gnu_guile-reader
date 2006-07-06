@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -33,6 +33,10 @@
 
 #ifdef SCM_READER_USE_LIGHTNING
 # include <lightning.h>
+
+/* If defined, an inlined implementation of `scm_getc ()' will be used.  */
+# define SCM_READER_INLINE_GETC
+
 #endif
 
 
@@ -203,7 +207,7 @@ do_scm_make_reader_smob (scm_reader_t reader)
    - V0 contains at any time the PORT argument;
 
    - V1 contains at any time the character just returned by `scm_getc ()',
-   i.e. a C integer;
+     i.e., a C integer;
 
    - V2 contains the frame pointer, i.e. a pointer to the base of all stack
      variables.
@@ -475,6 +479,185 @@ generate_to_lower (jit_state *lightning_state,
 }
 #undef _jit
 
+#ifdef SCM_READER_INLINE_GETC
+/* Functions producing an inline version of `scm_getc ()'.  */
+
+/* Update a port's column and line numbers based on the character just read
+   from it.  Assumes a pointer to the C port structure is in R0 and the last
+   character read from it is in V1.  Clobbers R1 and R2.  */
+static inline int
+generate_getc_update_port_position (jit_state *lightning_state,
+				    char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  /* This code mimics the `switch' statement that appears at the end of the C
+     version of `scm_getc ()'.  */
+
+  /* XXX: We're assuming that the `line_number' field is a `long' while the
+     `column_number' is an `int'.  */
+
+  jit_insn *test,
+    *alarm_jump, *bs_jump, *nl_jump, *reset_jump, *tab_jump;
+
+  /* Alarm: don't change line and column numbers.  */
+  alarm_jump = jit_beqi_i (jit_forward (), JIT_V1, (int)'\a');
+
+  /* Backspace: decrease column number if greater than zero.  */
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\b');
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  {
+    jit_insn *lt_zero;
+
+    lt_zero = jit_blei_i (jit_forward (), JIT_R1, 0);
+    jit_subi_i (JIT_R2, JIT_R1, 1);
+    jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+    jit_patch (lt_zero);
+  }
+  bs_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* New line: increase line number and reset column number.  */
+  jit_patch (test);
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\n');
+  jit_ldxi_l (JIT_R1, JIT_R0, offsetof (scm_t_port, line_number));
+  jit_addi_l (JIT_R2, JIT_R1, 1);
+  jit_stxi_l (offsetof (scm_t_port, line_number), JIT_R0, JIT_R2);
+  jit_movi_i (JIT_R2, 0);
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+  nl_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Reset: reset the column number.  */
+  jit_patch (test);
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\r');
+  jit_movi_i (JIT_R2, 0);
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+  reset_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Tab: set column number to (C + 8 - (C % 8)).  */
+  jit_patch (test);
+  test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\t');
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
+  jit_addi_i (JIT_R2, JIT_R1, 8);      /* R2 = R1+8 */
+  jit_modi_i (JIT_R1, JIT_R2, 8);      /* R1 = R2%8 */
+  jit_subr_i (JIT_R1, JIT_R2, JIT_R1); /* R1 = R2-R1 */
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R1);
+  tab_jump = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Default: increase column number.  */
+  jit_patch (test);
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
+  jit_addi_i (JIT_R2, JIT_R1, 1);
+  jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* End of `switch' statement.  */
+  jit_patch (alarm_jump);
+  jit_patch (bs_jump);
+  jit_patch (nl_jump);
+  jit_patch (reset_jump);
+  jit_patch (tab_jump);
+
+  return 0;
+}
+#undef _jit
+
+
+/* Generate an implementation of `scm_getc ()' inline.  The code expects the
+   `SCM' port object in V0 and return its result in V1.  It potentially
+   clobbers all the `R' registers.  Note: This is an exact re-implementation
+   of the C version that's in `ports.c' as of Guile 1.8.0 (and most older
+   versions certainly).  */
+static inline int
+generate_getc (jit_state *lightning_state,
+	       char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  jit_insn *rw_check, *position_check, *eof_check,
+    *random_access_check, *jump_to_end;
+
+  /* Fetch the `scm_t_port' object corresponding to the `SCM' object in V0.
+     This is equivalent to `SCM_PTAB_ENTRY ()'.  */
+#define FETCH_C_PORT(_reg)			\
+  jit_ldxi_p ((_reg), JIT_V0, sizeof (SCM))
+
+  /* Throughout this piece of code, we try to keep the pointer to the C port
+     structure in R0.  */
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  FETCH_C_PORT (JIT_R0);
+
+  /* Check whether read-write.  */
+  jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, rw_active));
+  rw_check = jit_bnei_p (jit_forward (), JIT_R1, SCM_PORT_WRITE);
+
+  /* Invoke `scm_flush ()', passing it the port as SCM, and then reload the C
+     port into R0.  */
+  jit_prepare (1);
+  jit_pusharg_p (JIT_V0);
+  (void)jit_finish (scm_flush);
+  FETCH_C_PORT (JIT_R0);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  jit_patch (rw_check);
+
+  /* Check whether `port->rw_random' is true.  If this is the case, set
+     `port->rw_active' to `SCM_PORT_READ'.  */
+  jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, rw_random));
+  random_access_check = jit_beqi_i (jit_forward (), JIT_R1, 0);
+  jit_movi_i (JIT_R1, SCM_PORT_READ);
+  jit_stxi_i (offsetof (scm_t_port, rw_active), JIT_R0, JIT_R1);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  jit_patch (random_access_check);
+
+  /* Check whether `read_pos' is passed `read_end'.  */
+  jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, read_pos));
+  jit_ldxi_p (JIT_R2, JIT_R0, offsetof (scm_t_port, read_end));
+  position_check = jit_bltr_p (jit_forward (), JIT_R1, JIT_R2);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Since `port->read_pos >= port->read_end', we must fill it again.  */
+  jit_prepare (1);
+  jit_pusharg_p (JIT_V0);
+  (void)jit_finish (scm_fill_input);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Check whether `scm_fill_input ()' return `EOF'.  If so, return `EOF'.  */
+  jit_retval_i (JIT_R1);
+  FETCH_C_PORT (JIT_R0);
+  eof_check = jit_bnei_i (jit_forward (), JIT_R1, EOF);
+  jit_movi_i (JIT_V1, EOF);
+  jump_to_end = jit_jmpi (jit_forward ());
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  jit_patch (position_check);
+  jit_patch (eof_check);
+
+  /* Load the character at `port->read_pos' in V1 and increment
+     `port->read_pos'.  */
+  jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, read_pos));
+  jit_ldxi_c (JIT_V1, JIT_R1, 0); /* the character */
+  jit_addi_p (JIT_R2, JIT_R1, 1);
+  jit_stxi_p (offsetof (scm_t_port, read_pos), JIT_R0, JIT_R2);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  if (generate_getc_update_port_position (lightning_state,
+					  start, buffer_size))
+    return -1;
+
+  jit_patch (jump_to_end);
+
+#undef FETCH_C_PORT
+
+  return 0;
+}
+#undef _jit
+#endif
+
 /* Generate a prologue that reserves enough space on the stack to store the
    reader's local variables and store the original value of the stack pointer
    (which we'll refer to as the ``frame pointer'') in V2.  */
@@ -485,6 +668,7 @@ generate_reader_prologue (jit_state *lightning_state,
 #define _jit (* lightning_state)
 {
   static const char *msg_prologue = "reader prologue: SP is %p\n";
+  jit_insn *ref;
 
   if (debug)
     {
@@ -504,10 +688,34 @@ generate_reader_prologue (jit_state *lightning_state,
       jit_popr_p (JIT_R0);
     }
 
+  /* Set up the stack, saving space for local variables.  */
   jit_movr_p (JIT_V2, JIT_SP);
   jit_subi_p (JIT_SP, JIT_V2, JIT_STACK_LOCAL_VARIABLES_SIZE+16);
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  /* Store the CALLER_HANDLED argument (currently in V1) and the
+     TOP_LEVEL_READER argument (in R2) on the stack.  */
+  jit_stxi_i (-JIT_STACK_CALLER_HANDLED, JIT_V2, JIT_V1);
+  {
+    /* If TOP_LEVEL_READER is NULL, then we'll advertise ourself as the
+       top-level reader.  */
+    ref = jit_bnei_p (jit_forward (), JIT_R2, NULL);
+    jit_movi_p (JIT_R2, start);
+    jit_patch (ref);
+    jit_stxi_p (-JIT_STACK_TOP_LEVEL_READER, JIT_V2, JIT_R2);
+    CHECK_CODE_SIZE (buffer_size, start, -1);
+  }
+
+  /* FIXME:  We should check the type of PORT here.  */
+
+  /* The PORT argument is optional.  If not passed (i.e. equals to
+     SCM_UNDEFINED), default to the current input port.  */
+  ref = jit_bnei_p (jit_forward (), JIT_V0, (void *)SCM_UNDEFINED);
+  (void)jit_finish (scm_current_input_port);
+  jit_retval_p (JIT_V0);
+  jit_patch (ref);
+
   return 0;
 }
 #undef _jit
@@ -705,30 +913,6 @@ scm_c_make_reader (void *code_buffer,
 			    start, buffer_size);
   CHECK_CODE_SIZE (buffer_size, start);
 
-  /* Store the CALLER_HANDLED argument (currently in V1) and the
-     TOP_LEVEL_READER argument (in R2) on the stack.  */
-  CHECK_CODE_SIZE (buffer_size, start);
-  jit_stxi_i (-JIT_STACK_CALLER_HANDLED, JIT_V2, JIT_V1);
-  {
-    /* If TOP_LEVEL_READER is NULL, then we'll advertise ourself as the
-       top-level reader.  */
-    jit_insn *ref;
-    ref = jit_bnei_p (jit_forward (), JIT_R2, NULL);
-    jit_movi_p (JIT_R2, start);
-    jit_patch (ref);
-    jit_stxi_p (-JIT_STACK_TOP_LEVEL_READER, JIT_V2, JIT_R2);
-    CHECK_CODE_SIZE (buffer_size, start);
-  }
-
-  /* FIXME:  We should check the type of PORT here.  */
-
-  /* The PORT argument is optional.  If not passed (i.e. equals to
-     SCM_UNDEFINED), default to the current input port.  */
-  ref = jit_bnei_p (jit_forward (), JIT_V0, (void *)SCM_UNDEFINED);
-  (void)jit_finish (scm_current_input_port);
-  jit_retval_p (JIT_V0);
-  jit_patch (ref);
-
   CHECK_CODE_SIZE (buffer_size, start);
   do_again = jit_get_label ();
 
@@ -740,6 +924,7 @@ scm_c_make_reader (void *code_buffer,
       CHECK_CODE_SIZE (buffer_size, start);
     }
 
+#ifndef SCM_READER_INLINE_GETC
   /* Call `scm_getc ()'.  */
   debug_pre_call ();
   CHECK_CODE_SIZE (buffer_size, start);
@@ -751,6 +936,11 @@ scm_c_make_reader (void *code_buffer,
   /* Put the character just read (an `int') in V1 (preserved accross function
      calls).  */
   jit_retval_i (JIT_V1);
+#else
+  /* Use an inlined version of `scm_getc ()'.  The character just read is put
+     in V1.  */
+  generate_getc (&_jit, start, buffer_size);
+#endif
 
   /* Test whether we got `EOF'.  */
   jump_to_end = jit_beqi_i (jit_forward (), JIT_V1, (int)EOF);
@@ -1914,6 +2104,69 @@ SCM_DEFINE (scm_guile_reader_version_minor,
   return SCM_I_MAKINUM (SCM_READER_VERSION_MINOR);
 }
 #undef FUNC_NAME
+
+
+#if (defined SCM_READER_INLINE_GETC) && (defined DEBUG)
+SCM_DEFINE (test_getc, "test-getc", 1, 0, 0,
+	    (SCM port),
+	    "Test our JIT implementation of `scm_getc ()'.")
+#define FUNC_NAME s_test_getc
+{
+  static unsigned char buffer[2048];
+  static int (* my_getc) (SCM) = NULL;
+  scm_t_port *c_port;
+
+  if (!my_getc)
+    {
+      static const char *msg_dbg = "test-getc: got char %i\n";
+
+#define _jit lightning_state
+      jit_state lightning_state;
+      char *start, *end;
+      int arg_port;
+
+      my_getc = (int (*) (SCM))(jit_set_ip (buffer).iptr);
+      start = (char *)my_getc;
+
+      jit_prolog (1);
+      arg_port = jit_arg_p ();
+      jit_getarg_p (JIT_V0, arg_port);
+
+      generate_getc (&lightning_state, start, sizeof (buffer));
+      jit_movi_p (JIT_R0, msg_dbg);
+
+      jit_prepare (2);
+      jit_pusharg_p (JIT_V1);
+      jit_pusharg_p (JIT_R0);
+      (void)jit_finish (do_like_printf);
+
+      (void)jit_movr_p (JIT_RET, JIT_V1);
+      jit_ret ();
+
+      end = jit_get_ip ().ptr;
+      jit_flush_code (start, end);
+
+      if (end - start > sizeof (buffer))
+	abort ();
+#undef _jit
+    }
+
+  c_port = SCM_PTAB_ENTRY (port);
+  printf ("port info for %p: %s %s %s\n",
+	  port,
+	  (c_port->rw_active == SCM_PORT_WRITE)
+	  ? "write"
+	  : ((c_port->rw_active == SCM_PORT_READ)
+	     ? "read"
+	     : "active?"),
+	  (c_port->rw_random ? "random" : "not-random"),
+	  ((c_port->read_pos >= c_port->read_end)
+	   ? "passed-the-end" : "before-end"));
+
+  return scm_from_int (my_getc (port));
+}
+#undef FUNC_NAME
+#endif
 
 
 
