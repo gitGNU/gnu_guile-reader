@@ -8,8 +8,7 @@
 @c %**end of header
 
 @set EDITION 1
-@set VERSION 0.2
-@c @set UPDATED 2005-04-26
+@include version.texi
 
 
 @ifinfo
@@ -71,7 +70,8 @@ approved by the Free Software Foundation.
 @node Top, Introduction, (dir), (dir)
 @top A Reader Framework for Guile
 
-This document describes Guile-Reader version @value{VERSION}.
+This document describes Guile-Reader version @value{VERSION}.  It was
+last updated in @value{UPDATED-MONTH}.
 
 This documentation is currently incomplete.  Details missing about the
 API can very likely be found in the C header files or the C source

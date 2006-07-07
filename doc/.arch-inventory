@@ -1,0 +1,5 @@
+# Generated files.
+
+precious ^(mdate-sh|guile-reader\.(info|ps|pdf|dvi)|(reader-lib|token-reader)-doc.texi|version\.texi)$
+
+# arch-tag: e8f30a3b-860f-4842-9da1-7680d2cf13a0
