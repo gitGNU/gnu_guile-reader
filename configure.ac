@@ -34,7 +34,7 @@ AC_CHECK_FUNCS([strncasecmp])
 
 # Gperf
 AC_PATH_PROG([GPERF], [gperf], [not-found])
-if test "x$gperf" = "xnot-found"; then
+if test "x$GPERF" = "xnot-found"; then
    AC_MSG_ERROR([GNU Gperf not found.  Please install it first.])
 fi
 
@@ -68,13 +68,13 @@ CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 
 AC_CONFIG_FILES([Makefile
+		 pre-inst-guile
 		 tests/Makefile
-		 tests/guile-for-test
 	         module/Makefile
 		 module/system/Makefile
 		 module/system/reader/Makefile
 		 doc/Makefile])
 
-AC_CONFIG_COMMANDS([guile-for-test], [chmod +x tests/guile-for-test])
+AC_CONFIG_COMMANDS([pre-inst-guile-exec], [chmod +x pre-inst-guile])
 
 AC_OUTPUT
