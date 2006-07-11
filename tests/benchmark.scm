@@ -26,6 +26,7 @@ exec ${GUILE-"${top_srcdir-..}/pre-inst-guile"} -l $0  \
 
 (define-module (benchmark)
   :use-module (system reader)
+  :use-module (system reader library)
   :use-module (ice-9 format)
   :export (benchmark))
 
@@ -73,15 +74,28 @@ exec ${GUILE-"${top_srcdir-..}/pre-inst-guile"} -l $0  \
 		    %files-to-load)
 	  (loop start (- iterations-left 1))))))
 
-
-(define (benchmark . args)
-  (let ((built-in (how-long read))
-	(guile-reader (how-long (default-reader))))
-    (format #t "Guile's built-in reader:        ~a~%" built-in)
-    (format #t "Guile-Reader's default reader:  ~a~%" guile-reader)
-    (format #t "improvement:                    ~2,2f times faster~%"
+(define (compare-readers msg make-built-in-read make-guile-reader-read)
+  (let ((built-in (how-long (make-built-in-read)))
+	(guile-reader (how-long (make-guile-reader-read))))
+    (format #t "* Comparing ~a~%~%" msg)
+    (format #t "  Guile's built-in reader:        ~a~%" built-in)
+    (format #t "  Guile-Reader's default reader:  ~a~%" guile-reader)
+    (format #t "  improvement:                    ~2,2f times faster~%~%"
 	    (/ built-in guile-reader 1.0))
     #t))
+
+
+(define (benchmark . args)
+  ;;(format #t "opts: ~a~%" (read-options))
+  (read-set! keywords 'prefix)
+  (read-disable 'copy)
+  (for-each compare-readers
+	    '("without position recording" "with position recording")
+	    (list (lambda () (read-disable 'positions) read)
+		  (lambda () (read-enable  'positions) read))
+	    (list (lambda () (make-guile-reader))
+		  (lambda ()
+		    (make-guile-reader #f 'reader/record-positions)))))
 
 (define main benchmark)
 
