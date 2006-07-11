@@ -109,12 +109,9 @@ token_spec_to_string (const scm_token_reader_spec_t *tr,
 }
 
 static void
-do_scm_set_source_position (SCM obj, SCM line, SCM column,
+do_scm_set_source_position (SCM obj, long line, int column,
 			    SCM filename)
 {
-  size_t len;
-  char *c_filename;
-
   debug ("%s: o=%p l=%p c=%p f=%p\n",
 	  __FUNCTION__, obj, line, column, filename);
 
@@ -123,29 +120,32 @@ do_scm_set_source_position (SCM obj, SCM line, SCM column,
     return;
 
   assert (scm_is_string (filename));
-  assert (scm_is_number (column));
-  assert (scm_is_number (line));
+  assert ((line >= 0L) && (column >= 0));
 
-  len = scm_c_string_length (filename);
-  c_filename = alloca (len + 1);
-  scm_to_locale_stringbuf (filename, c_filename, len);
-  c_filename[len] = 0;
+#ifdef DEBUG
+  {
+    size_t len;
+    char *c_filename;
 
-  debug ("%s (obj=%p[%s], line=%u, col=%u, file=\"%s\")\n",
-	 __FUNCTION__, (void *)obj,
-	 SCM_IMP (obj) ? "imm" : "non-imm",
-	 scm_to_uint (line), scm_to_uint (column),
-	 c_filename);
+    len = scm_c_string_length (filename);
+    c_filename = alloca (len + 1);
+    scm_to_locale_stringbuf (filename, c_filename, len);
+    c_filename[len] = 0;
+
+    debug ("%s (obj=%p[%s], line=%u, col=%u, file=\"%s\")\n",
+	   __FUNCTION__, (void *)obj,
+	   SCM_IMP (obj) ? "imm" : "non-imm",
+	   scm_to_uint (line), scm_to_uint (column),
+	   c_filename);
+  }
+#endif
 
   if ((SCM_NIMP (obj)) && (scm_is_pair (obj)))
     {
-      /* FIXME:  Why does `scm_set_source_property_x ()' expect the thing to
-	 be a pair?  */
-
       /* OBJ is a non-immediate Scheme value so we can set its source
 	 properties.  */
-      scm_set_source_property_x (obj, scm_sym_line, line);
-      scm_set_source_property_x (obj, scm_sym_column, column);
+      scm_set_source_property_x (obj, scm_sym_line, scm_from_long (line));
+      scm_set_source_property_x (obj, scm_sym_column, scm_from_int (column));
       scm_set_source_property_x (obj, scm_sym_filename, filename);
     }
 }
@@ -230,6 +230,13 @@ do_scm_make_reader_smob (scm_reader_t reader)
 
 /* Total size needed to store local variables.  */
 #define JIT_STACK_LOCAL_VARIABLES_SIZE (JIT_WORD_SIZE * 8)
+
+/* Fetch in RESULT_REG the pointer to the `scm_t_port' object corresponding
+   to the `SCM' object in PORT_REG (normally, V0).  This is equivalent to
+   `SCM_PTAB_ENTRY ()'.  */
+#define SCM_JIT_PTAB_ENTRY(_result_reg, _port_reg)	\
+  jit_ldxi_p ((_result_reg), (_port_reg), sizeof (SCM))
+
 
 /* Aid in register-level debugging.  */
 
@@ -345,8 +352,8 @@ generate_debug_registers (jit_state *lightning_state,
 #undef _jit
 
 /* Generate code that will fetch and store the current position information
-   of PORT.  The relevant information is made available on the stack.  The
-   usual register allocation invariants are assumed.  */
+   of PORT.  The relevant information is made available on the stack.  Expect
+   the port-as-`SCM' in V0 and the frame pointer in V2.  */
 static inline int
 generate_position_store (jit_state *lightning_state,
 			 char *start, size_t buffer_size)
@@ -355,33 +362,21 @@ generate_position_store (jit_state *lightning_state,
   debug ("%s (@%p)\n", __FUNCTION__, jit_get_ip ().ptr);
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
-  debug_pre_call ();
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_prepare (1);
-  jit_pusharg_p (JIT_V0);  /* port */
-  (void)jit_finish (scm_port_line);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  debug_post_call ();
-  jit_stxi_p (-JIT_STACK_POSITION_LINE, JIT_V2, JIT_RET);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  debug_pre_call ();
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_prepare (1);
-  jit_pusharg_p (JIT_V0);
-  (void)jit_finish (scm_port_column);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  debug_post_call ();
-  jit_stxi_p (-JIT_STACK_POSITION_COLUMN, JIT_V2, JIT_RET);
+  /* Load the C port structure into R0.  */
+  SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
 
+  /* Get the line (a `long') and column number (an `int') and save them onto
+     the stack.  */
+  jit_ldxi_l (JIT_R1, JIT_R0, offsetof (scm_t_port, line_number));
+  jit_ldxi_i (JIT_R2, JIT_R0, offsetof (scm_t_port, column_number));
+  jit_stxi_l (-JIT_STACK_POSITION_LINE, JIT_V2, JIT_R1);
+  jit_stxi_i (-JIT_STACK_POSITION_COLUMN, JIT_V2, JIT_R2);
   CHECK_CODE_SIZE (buffer_size, start, -1);
-  debug_pre_call ();
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_prepare (1);
-  jit_pusharg_p (JIT_V0);
-  (void)jit_finish (scm_port_filename);
-  debug_post_call ();
-  jit_stxi_p (-JIT_STACK_POSITION_FILENAME, JIT_V2, JIT_RET);
+
+  /* Same for the file name (an `SCM' object).  */
+  jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, file_name));
+  jit_stxi_p (-JIT_STACK_POSITION_FILENAME, JIT_V2, JIT_R1);
 
   /* XXX: We shouldn't need to call `scm_gc_protect ()' here since
      PORT is unlikely to be GC'd anyway.  */
@@ -579,16 +574,11 @@ generate_getc (jit_state *lightning_state,
   jit_insn *rw_check, *position_check, *eof_check,
     *random_access_check, *jump_to_end;
 
-  /* Fetch the `scm_t_port' object corresponding to the `SCM' object in V0.
-     This is equivalent to `SCM_PTAB_ENTRY ()'.  */
-#define FETCH_C_PORT(_reg)			\
-  jit_ldxi_p ((_reg), JIT_V0, sizeof (SCM))
-
   /* Throughout this piece of code, we try to keep the pointer to the C port
      structure in R0.  */
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
-  FETCH_C_PORT (JIT_R0);
+  SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
 
   /* Check whether read-write.  */
   jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, rw_active));
@@ -599,7 +589,7 @@ generate_getc (jit_state *lightning_state,
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (scm_flush);
-  FETCH_C_PORT (JIT_R0);
+  SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
   jit_patch (rw_check);
@@ -628,7 +618,7 @@ generate_getc (jit_state *lightning_state,
 
   /* Check whether `scm_fill_input ()' return `EOF'.  If so, return `EOF'.  */
   jit_retval_i (JIT_R1);
-  FETCH_C_PORT (JIT_R0);
+  SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
   eof_check = jit_bnei_i (jit_forward (), JIT_R1, EOF);
   jit_movi_i (JIT_V1, EOF);
   jump_to_end = jit_jmpi (jit_forward ());
@@ -650,8 +640,6 @@ generate_getc (jit_state *lightning_state,
     return -1;
 
   jit_patch (jump_to_end);
-
-#undef FETCH_C_PORT
 
   return 0;
 }
