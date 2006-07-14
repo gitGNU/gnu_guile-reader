@@ -150,11 +150,34 @@ do_scm_set_source_position (SCM obj, long line, int column,
     }
 }
 
+static inline int
+tr_handles_char (const scm_token_reader_spec_t *tr, char c)
+{
+  switch (tr->token.type)
+    {
+    case SCM_TOKEN_SINGLE:
+      return (c == tr->token.value.single);
+
+    case SCM_TOKEN_RANGE:
+      return ((c >= tr->token.value.range.low)
+	      && (c <= tr->token.value.range.high));
+
+    case SCM_TOKEN_SET:
+      return (index (tr->token.value.set, c) ? 1 : 0);
+
+    default:
+      return 0;
+    }
+
+  return 0;
+}
+
+
+
 #ifdef SCM_READER_USE_LIGHTNING
 
 /* The Lightning-based implementation of `scm_c_make_reader ()'.  */
 
-
 /* Run-time helper function.  */
 
 static void
@@ -1328,6 +1351,8 @@ struct scm_reader
   scm_token_reader_spec_t *token_readers;
   SCM fault_handler_proc;
   unsigned flags;
+
+  scm_token_reader_spec_t *eightbit_char_to_tr_map[256];
 };
 
 scm_reader_t
@@ -1350,6 +1375,9 @@ scm_c_make_reader (void *code_buffer,
   result = (struct scm_reader *)buffer;
   result->fault_handler_proc = fault_handler_proc;
   result->flags = flags;
+  memset (result->eightbit_char_to_tr_map, 0,
+	  sizeof (result->eightbit_char_to_tr_map));
+
   tr_copy = (scm_token_reader_spec_t *)(buffer + sizeof (*result));
 
   result->token_readers = tr_copy;
@@ -1362,6 +1390,36 @@ scm_c_make_reader (void *code_buffer,
 	return NULL;
 
       memcpy (tr_copy, tr, sizeof (*tr));
+
+      /* Fill out the character-to-token-reader map (for faster lookup).  */
+      switch (tr->token.type)
+	{
+	case SCM_TOKEN_SINGLE:
+	  result->eightbit_char_to_tr_map[(int)tr->token.value.single]
+	    = tr_copy;
+	  break;
+
+	case SCM_TOKEN_RANGE:
+	  {
+	    char c;
+	    for (c = tr->token.value.range.low;
+		 c <= tr->token.value.range.high;
+		 c++)
+	      result->eightbit_char_to_tr_map[(int)c] = tr_copy;
+	  }
+	  break;
+
+	case SCM_TOKEN_SET:
+	  {
+	    const char *p;
+	    for (p = tr->token.value.set; *p; p++)
+	      result->eightbit_char_to_tr_map[(int)*p] = tr_copy;
+	  }
+	  break;
+
+	default:
+	  abort ();
+	}
     }
 
   /* Copy the terminating zero.  */
@@ -1372,28 +1430,6 @@ scm_c_make_reader (void *code_buffer,
   *code_size += sizeof (*tr);
 
   return result;
-}
-
-static inline int
-tr_handles_char (const scm_token_reader_spec_t *tr, char c)
-{
-  switch (tr->token.type)
-    {
-    case SCM_TOKEN_SINGLE:
-      return (c == tr->token.value.single);
-
-    case SCM_TOKEN_RANGE:
-      return ((c >= tr->token.value.range.low)
-	      && (c <= tr->token.value.range.high));
-
-    case SCM_TOKEN_SET:
-      return (index (tr->token.value.set, c) ? 1 : 0);
-
-    default:
-      return 0;
-    }
-
-  return 0;
 }
 
 static SCM
@@ -1474,51 +1510,67 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
       else if (reader->flags & SCM_READER_FLAG_UPPER_CASE)
 	c = toupper (c);
 
-      for (tr = reader->token_readers;
-	   tr->token.type != SCM_TOKEN_UNDEF;
-	   tr++)
+      if ((c >= 0) && (c < 256))
+	tr = reader->eightbit_char_to_tr_map[c];
+      else
 	{
-	  if (tr_handles_char (tr, c))
+	  /* Currently, we don't support anything other than 8-bit
+	     characters, so this code is useless.  */
+	  for (tr = reader->token_readers;
+	       tr->token.type != SCM_TOKEN_UNDEF;
+	       tr++)
 	    {
-	      result = tr_invoke (tr, c, port, reader,
-				  top_level_reader);
-	      if ((result == SCM_UNSPECIFIED) && (!tr->escape))
-		goto doit;
-	      else
-		{
-		  if (reader->flags & SCM_READER_FLAG_POSITIONS)
-		    do_scm_set_source_position (result, line,
-						column, filename);
-
-		  return result;
-		}
+	      if (tr_handles_char (tr, c))
+		break;
 	    }
+
+	  if (tr->token.type == SCM_TOKEN_UNDEF)
+	    tr = NULL;
 	}
 
-      /* Unhandled character.  */
-      if (caller_handled)
+      if (tr)
 	{
-	  /* Caller will take care of C.  */
-	  scm_ungetc (c, port);
-	  return SCM_UNSPECIFIED;
+	  assert (tr_handles_char (tr, c));
+	  result = tr_invoke (tr, c, port, reader,
+			      top_level_reader);
+	  if ((result == SCM_UNSPECIFIED) && (!tr->escape))
+	    goto doit;
+	  else
+	    {
+	      if (reader->flags & SCM_READER_FLAG_POSITIONS)
+		do_scm_set_source_position (result, line,
+					    column, filename);
+
+	      return result;
+	    }
 	}
       else
 	{
-	  if (scm_procedure_p (reader->fault_handler_proc) == SCM_BOOL_T)
+	  /* Unhandled character.  */
+	  if (caller_handled)
 	    {
-	      /* Call the user-defined fault-handler.  */
-	      SCM s_reader;
-
-	      SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader,
-				   NULL, 0);
-	      return (scm_call_3 (reader->fault_handler_proc,
-				  SCM_MAKE_CHAR (c), port, s_reader));
+	      /* Caller will take care of C.  */
+	      scm_ungetc (c, port);
+	      return SCM_UNSPECIFIED;
 	    }
 	  else
 	    {
-	      /* No handler defined.  */
-	      scm_ungetc (c, port);
-	      return SCM_UNSPECIFIED;
+	      if (scm_procedure_p (reader->fault_handler_proc) == SCM_BOOL_T)
+		{
+		  /* Call the user-defined fault-handler.  */
+		  SCM s_reader;
+
+		  SCM_NEW_READER_SMOB (s_reader, scm_reader_type, reader,
+				       NULL, 0);
+		  return (scm_call_3 (reader->fault_handler_proc,
+				      SCM_MAKE_CHAR (c), port, s_reader));
+		}
+	      else
+		{
+		  /* No handler defined.  */
+		  scm_ungetc (c, port);
+		  return SCM_UNSPECIFIED;
+		}
 	    }
 	}
     }
@@ -2053,6 +2105,25 @@ SCM_DEFINE (scm_token_reader_documentation,
   return (c_tr->documentation
 	  ? scm_from_locale_string (c_tr->documentation)
 	  : SCM_BOOL_F);
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (scm_token_reader_handles_char_p, "token-reader-handles-char?",
+	    2, 0, 0,
+	    (SCM tr, SCM chr),
+	    "Return true if @var{tr} handles character @var{chr}.")
+#define FUNC_NAME s_scm_token_reader_handles_char_p
+{
+  char c_chr;
+  scm_token_reader_spec_t *c_tr;
+
+  scm_assert_smob_type (scm_token_reader_type, tr);
+  SCM_VALIDATE_CHAR (2, chr);
+
+  SCM_TOKEN_READER_SMOB_DATA (c_tr, tr);
+  c_chr = (char)SCM_CHAR (chr);
+
+  return scm_from_bool (tr_handles_char (c_tr, c_chr));
 }
 #undef FUNC_NAME
 
