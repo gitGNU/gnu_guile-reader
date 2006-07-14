@@ -1,4 +1,4 @@
-TESTS = scheme-reader.scm position.scm confinement.scm
+TESTS = scheme-reader.scm position.scm library.scm confinement.scm
 EXTRA_DIST = $(TESTS) benchmark.scm
 
 TESTS_ENVIRONMENT = top_srcdir=$(top_srcdir)
