@@ -112,8 +112,8 @@ static void
 do_scm_set_source_position (SCM obj, long line, int column,
 			    SCM filename)
 {
-  debug ("%s: o=%p l=%p c=%p f=%p\n",
-	  __FUNCTION__, obj, line, column, filename);
+  debug ("%s: o=%p l=%li c=%i f=%p\n",
+	  __FUNCTION__, (void *)obj, line, column, (void *)filename);
 
   if (filename == SCM_BOOL_F)
     /* Maybe the input port was not a file port.  */
@@ -1454,14 +1454,15 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
  doit:
   while (1)
     {
-      SCM column = SCM_BOOL_F, line = SCM_BOOL_F;
+      int column = 0;
+      long line = 0L;
       SCM filename = SCM_BOOL_F;
 
       if (reader->flags & SCM_READER_FLAG_POSITIONS)
 	{
-	  column = scm_port_column (port);
-	  line = scm_port_line (port);
-	  filename = scm_port_filename (port);
+	  column = SCM_COL (port);
+	  line = SCM_LINUM (port);
+	  filename = SCM_FILENAME (port);
 	}
 
       c = scm_getc (port);
@@ -1706,7 +1707,6 @@ scm_to_make_reader_flags (SCM flags)
 
   for (; flags != SCM_EOL; flags = SCM_CDR (flags), argnum++)
     {
-      unsigned c_flag;
       SCM flag_name = SCM_CAR (flags);
       size_t flag_name_len;
       char *c_flag_name;
