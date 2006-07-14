@@ -133,7 +133,8 @@ extern void scm_initialize_token_reader_library (void);
   SCM_DEFTOKEN_SET ("suf",   "srfi-4",         scm_read_srfi4_vector, 0, \
 		    "This is a sharp token reader, i.e. it reads an "	 \
 		    "SRFI-4 homogenous numeric vector once a @code{#} "	 \
-		    "character has been read.")
+		    "character has been read.  This token reader also "	 \
+		    "handles the boolean values @code{#f}.")
 #define SCM_TR_GUILE_BIT_VECTOR /* guile-bit-vector */			\
   SCM_DEFTOKEN_SINGLE ('*', "guile-bit-vector",				\
 		       scm_read_guile_bit_vector, 0,			\
@@ -147,6 +148,16 @@ extern void scm_initialize_token_reader_library (void);
 		    "R5RS boolean (@code{#f} or @code{#F}, @code{#t} "	\
 		    "or @code{#T}) once a @code{#} character has been "	\
 		    "read.")
+#define SCM_TR_BOOLEAN_SRFI_4 /* boolean-srfi-4 */			\
+  SCM_DEFTOKEN_SET ("tTF",  "boolean-srfi-4",    scm_read_boolean, 0,	\
+		    "This is a sharp token reader, i.e. it reads an "	\
+		    "R5RS boolean (@code{#t}, @code{#T}, @code{#F}, "	\
+		    "but @emph{not} @code{#f}) once a @code{#} "	\
+		    "character has been read.  Compared to the "	\
+		    "@code{boolean} token reader, this one is useful "	\
+		    "when SRFI-4 floating-point homogeneous vectors "	\
+		    "are to be used at the same time: the SRFI-4 TR "	\
+		    "will handle @code{#f} on its own.")
 #define SCM_TR_KEYWORD /* keyword */					\
   SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword, 0,	\
 		       "This token reader returns a keyword as found "	\
