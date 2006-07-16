@@ -766,6 +766,214 @@ generate_reader_epilogue (jit_state *lightning_state,
 }
 #undef _jit
 
+
+/* Generate an invocation of token reader TR, assuming all the usual register
+   invariants.  A jump to DO_AGAIN is generated when a NULL reader is
+   encountered.  If DEBUG is true (non-zero), additional debugging code is
+   generated.  */
+static inline int
+generate_token_reader_invocation (jit_state *lightning_state,
+				  const scm_token_reader_spec_t *tr,
+				  jit_insn *do_again,
+				  int debug,
+				  char *start, size_t buffer_size)
+{
+  static const char msg_start_c_call[] = "calling token reader `%s'...\n";
+  static const char msg_start_scm_call[] =
+    "calling Scheme token reader `%s'...\n";
+  static const char msg_start_reader_call[] =
+    "calling reader `%s'...\n";
+  static const char msg_end_of_call[] = "token reader `%s' finished\n";
+
+  switch (tr->reader.type)
+    {
+    case SCM_TOKEN_READER_C:
+      if (tr->reader.value.c_reader)
+	{
+	  /* Call the C reader function associated with this
+	     character.  */
+	  static const char *nameless = "<nameless>";
+	  const char *name = (tr->name ? tr->name : nameless);
+	  void *func = (void *)tr->reader.value.c_reader;
+
+	  if (debug)
+	    {
+	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      DO_DEBUG_2_PP (msg_start_c_call, JIT_R0,
+			     name, JIT_R1, do_like_printf);
+	    }
+
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  (void)jit_movi_p (JIT_R0, start);
+	  jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+
+	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_prepare (4);
+	  jit_pusharg_p (JIT_R1); /* top-level reader */
+	  jit_pusharg_p (JIT_R0); /* reader */
+	  jit_pusharg_p (JIT_V0); /* port */
+	  jit_pusharg_i (JIT_V1); /* character */
+	  (void)jit_finish (func);
+	  debug_post_call ();
+
+	  if (debug)
+	    {
+	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      jit_pushr_i (JIT_V1);
+	      jit_movr_p (JIT_V1, JIT_RET);
+	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
+			     name, JIT_R1, do_like_printf);
+	      jit_movr_p (JIT_RET, JIT_V1);
+	      jit_popr_i (JIT_V1);
+	    }
+	}
+      else
+	/* The NULL reader:  simply ignore the character that was just
+	   read and jump to DO_AGAIN.  This is useful for whitespaces.  */
+	(void)jit_jmpi (do_again);
+
+      break;
+
+    case SCM_TOKEN_READER_SCM:
+      /* Call the Scheme proc associated with this character.  */
+      if (scm_procedure_p (tr->reader.value.scm_reader) == SCM_BOOL_T)
+	{
+	  char spec_str[100];
+
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  token_spec_to_string (tr, spec_str);
+	  if (debug)
+	    {
+	      /* FIXME:  SPEC_STR must be computed at run-time!  */
+	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      DO_DEBUG_2_PP (msg_start_scm_call, JIT_R0,
+			     "spec_str", JIT_R1, do_like_printf);
+	    }
+
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+	  /* Save the current value of V1 (the char as an `int').  */
+	  jit_pushr_i (JIT_V1);
+
+	  /* Convert the character read to a Scheme char.  */
+	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_prepare (1);
+	  jit_pusharg_i (JIT_V1);
+	  (void)jit_finish (do_scm_make_char);
+	  debug_post_call ();
+	  jit_retval_p (JIT_V1);
+
+	  /* Same for the reader.  */
+	  (void)jit_movi_p (JIT_R0, start);
+	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_prepare (1);
+	  jit_pusharg_i (JIT_R0);
+	  jit_finish (do_scm_make_reader_smob);
+	  debug_post_call ();
+	  jit_retval_p (JIT_R0);
+
+	  /* Same for the top-level reader.  */
+	  jit_pushr_p (JIT_R0);
+	  jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_prepare (1);
+	  jit_pusharg_i (JIT_R2);
+	  jit_finish (do_scm_make_reader_smob);
+	  debug_post_call ();
+	  jit_retval_p (JIT_R2);
+	  jit_popr_p (JIT_R0);
+
+	  /* Actually call the Scheme procedure.  */
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
+	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_prepare (5);
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_pusharg_p (JIT_R2); /* top-level reader */
+	  jit_pusharg_p (JIT_R0); /* reader */
+	  jit_pusharg_p (JIT_V0); /* port */
+	  jit_pusharg_p (JIT_V1); /* character (Scheme) */
+	  jit_pusharg_p (JIT_R1); /* procedure */
+	  jit_finish (scm_call_4);
+	  debug_post_call ();
+
+	  /* Restore the C character.  */
+	  jit_popr_i (JIT_V1);
+
+	  if (debug)
+	    {
+	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      jit_pushr_i (JIT_V1);
+	      jit_retval_p (JIT_V1);
+	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
+			     "spec_str", JIT_R1, do_like_printf);
+	      jit_movr_p (JIT_RET, JIT_V1);
+	      jit_popr_i (JIT_V1);
+	    }
+	}
+      else
+	jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+
+      break;
+
+    case SCM_TOKEN_READER_READER:
+      if (tr->reader.value.reader)
+	{
+	  /* A simple C function call.  */
+	  char spec_str[100];
+
+	  token_spec_to_string (tr, spec_str);
+	  if (debug)
+	    {
+	      /* FIXME:  SPEC_STR must be computed at run-time!  */
+	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      DO_DEBUG_2_PP (msg_start_reader_call, JIT_R0,
+			     "spec_str", JIT_R1, do_like_printf);
+	    }
+
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+	  jit_movi_i (JIT_R0, 0); /* let the callee handle its things */
+	  debug_pre_call ();
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  jit_prepare (3);
+	  jit_pusharg_p (JIT_R2); /* top-level reader */
+	  jit_pusharg_i (JIT_R0); /* caller_handled */
+	  jit_pusharg_p (JIT_V0); /* port */
+	  jit_finish (tr->reader.value.reader);
+	  debug_post_call ();
+
+	  if (debug)
+	    {
+	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      jit_pushr_i (JIT_V1);
+	      jit_retval_p (JIT_V1);
+	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
+			     "spec_str", JIT_R1, do_like_printf);
+	      jit_movr_p (JIT_RET, JIT_V1);
+	      jit_popr_i (JIT_V1);
+	    }
+	}
+      else
+	/* The NULL reader:  simply ignore the character that was just
+	   read and jump to DO_AGAIN.  This is useful for whitespaces.  */
+	jit_jmpi (do_again);
+
+      break;
+
+    default:
+      scm_misc_error (__FUNCTION__, "unknown token reader type: ~A",
+		      scm_list_1 (SCM_I_MAKINUM ((int)tr->reader.type)));
+    }
+
+  return 0;
+}
+
 /* Generate code that handles an unexpected character (the character, a C
    integer, is expected to be in V1 at this point).  I.e., if the
    CALLER_HANDLED argument passed to the function being generated (this
@@ -888,12 +1096,6 @@ scm_c_make_reader (void *code_buffer,
 {
   static const char msg_getc[] = "got char: 0x%02x\n";
   static const char msg_found_token[] = "read token 0x%02x!\n";
-  static const char msg_start_c_call[] = "calling token reader `%s'...\n";
-  static const char msg_start_scm_call[] =
-    "calling Scheme token reader `%s'...\n";
-  static const char msg_start_reader_call[] =
-    "calling reader `%s'...\n";
-  static const char msg_end_of_call[] = "token reader `%s' finished\n";
 
   scm_reader_t result;
   char *start, *end;
@@ -1076,8 +1278,8 @@ scm_c_make_reader (void *code_buffer,
 			  scm_list_1 (SCM_I_MAKINUM ((int)tr->token.type)));
 	}
 
-      /* The code that gets executed when the character returned by `scm_getc
-	 ()' is equal to that of TOKEN_READER.  */
+      /* When the character just returned by `scm_getc ()' is handled by TR,
+	 then invoke it.  */
       CHECK_CODE_SIZE (buffer_size, start);
       if (flags & SCM_READER_FLAG_DEBUG)
 	{
@@ -1094,191 +1296,10 @@ scm_c_make_reader (void *code_buffer,
 	  CHECK_CODE_SIZE (buffer_size, start);
 	}
 
-      switch (tr->reader.type)
-	{
-	case SCM_TOKEN_READER_C:
-	  if (tr->reader.value.c_reader)
-	    {
-	      /* Call the C reader function associated with this
-		 character.  */
-	      static const char *nameless = "<nameless>";
-	      const char *name = (tr->name ? tr->name : nameless);
-	      void *func = (void *)tr->reader.value.c_reader;
-
-	      if (flags & SCM_READER_FLAG_DEBUG)
-		{
-		  CHECK_CODE_SIZE (buffer_size, start);
-		  DO_DEBUG_2_PP (msg_start_c_call, JIT_R0,
-				 name, JIT_R1, do_like_printf);
-		}
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      (void)jit_movi_p (JIT_R0, start);
-	      jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
-
-	      debug_pre_call ();
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_prepare (4);
-	      jit_pusharg_p (JIT_R1); /* top-level reader */
-	      jit_pusharg_p (JIT_R0); /* reader */
-	      jit_pusharg_p (JIT_V0); /* port */
-	      jit_pusharg_i (JIT_V1); /* character */
-	      (void)jit_finish (func);
-	      debug_post_call ();
-
-	      if (flags & SCM_READER_FLAG_DEBUG)
-		{
-		  CHECK_CODE_SIZE (buffer_size, start);
-		  jit_pushr_i (JIT_V1);
-		  jit_movr_p (JIT_V1, JIT_RET);
-		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
-				 name, JIT_R1, do_like_printf);
-		  jit_movr_p (JIT_RET, JIT_V1);
-		  jit_popr_i (JIT_V1);
-		}
-	    }
-	  else
-	    /* The NULL reader:  simply ignore the character that was just
-	       read and jump to DO_AGAIN.  This is useful for whitespaces.  */
-	    (void)jit_jmpi (do_again);
-
-	  break;
-
-	case SCM_TOKEN_READER_SCM:
-	  /* Call the Scheme proc associated with this character.  */
-	  if (scm_procedure_p (tr->reader.value.scm_reader) == SCM_BOOL_T)
-	    {
-	      char spec_str[100];
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      token_spec_to_string (tr, spec_str);
-	      if (flags & SCM_READER_FLAG_DEBUG)
-		{
-		  /* FIXME:  SPEC_STR must be computed at run-time!  */
-		  CHECK_CODE_SIZE (buffer_size, start);
-		  DO_DEBUG_2_PP (msg_start_scm_call, JIT_R0,
-				 "spec_str", JIT_R1, do_like_printf);
-		}
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-
-	      /* Save the current value of V1 (the char as an `int').  */
-	      jit_pushr_i (JIT_V1);
-
-	      /* Convert the character read to a Scheme char.  */
-	      debug_pre_call ();
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_prepare (1);
-	      jit_pusharg_i (JIT_V1);
-	      (void)jit_finish (do_scm_make_char);
-	      debug_post_call ();
-	      jit_retval_p (JIT_V1);
-
-	      /* Same for the reader.  */
-	      (void)jit_movi_p (JIT_R0, start);
-	      debug_pre_call ();
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_prepare (1);
-	      jit_pusharg_i (JIT_R0);
-	      jit_finish (do_scm_make_reader_smob);
-	      debug_post_call ();
-	      jit_retval_p (JIT_R0);
-
-	      /* Same for the top-level reader.  */
-	      jit_pushr_p (JIT_R0);
-	      jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
-	      debug_pre_call ();
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_prepare (1);
-	      jit_pusharg_i (JIT_R2);
-	      jit_finish (do_scm_make_reader_smob);
-	      debug_post_call ();
-	      jit_retval_p (JIT_R2);
-	      jit_popr_p (JIT_R0);
-
-	      /* Actually call the Scheme procedure.  */
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
-	      debug_pre_call ();
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_prepare (5);
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_pusharg_p (JIT_R2); /* top-level reader */
-	      jit_pusharg_p (JIT_R0); /* reader */
-	      jit_pusharg_p (JIT_V0); /* port */
-	      jit_pusharg_p (JIT_V1); /* character (Scheme) */
-	      jit_pusharg_p (JIT_R1); /* procedure */
-	      jit_finish (scm_call_4);
-	      debug_post_call ();
-
-	      /* Restore the C character.  */
-	      jit_popr_i (JIT_V1);
-
-	      if (flags & SCM_READER_FLAG_DEBUG)
-		{
-		  CHECK_CODE_SIZE (buffer_size, start);
-		  jit_pushr_i (JIT_V1);
-		  jit_retval_p (JIT_V1);
-		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
-				 "spec_str", JIT_R1, do_like_printf);
-		  jit_movr_p (JIT_RET, JIT_V1);
-		  jit_popr_i (JIT_V1);
-		}
-	    }
-	  else
-	    jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
-
-	  break;
-
-	case SCM_TOKEN_READER_READER:
-	  if (tr->reader.value.reader)
-	    {
-	      /* A simple C function call.  */
-	      char spec_str[100];
-
-	      token_spec_to_string (tr, spec_str);
-	      if (flags & SCM_READER_FLAG_DEBUG)
-		{
-		  /* FIXME:  SPEC_STR must be computed at run-time!  */
-		  CHECK_CODE_SIZE (buffer_size, start);
-		  DO_DEBUG_2_PP (msg_start_reader_call, JIT_R0,
-				 "spec_str", JIT_R1, do_like_printf);
-		}
-
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
-	      jit_movi_i (JIT_R0, 0); /* let the callee handle its things */
-	      debug_pre_call ();
-	      CHECK_CODE_SIZE (buffer_size, start);
-	      jit_prepare (3);
-	      jit_pusharg_p (JIT_R2); /* top-level reader */
-	      jit_pusharg_i (JIT_R0); /* caller_handled */
-	      jit_pusharg_p (JIT_V0); /* port */
-	      jit_finish (tr->reader.value.reader);
-	      debug_post_call ();
-
-	      if (flags & SCM_READER_FLAG_DEBUG)
-		{
-		  CHECK_CODE_SIZE (buffer_size, start);
-		  jit_pushr_i (JIT_V1);
-		  jit_retval_p (JIT_V1);
-		  DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
-				 "spec_str", JIT_R1, do_like_printf);
-		  jit_movr_p (JIT_RET, JIT_V1);
-		  jit_popr_i (JIT_V1);
-		}
-	    }
-	  else
-	    /* The NULL reader:  simply ignore the character that was just
-	       read and jump to DO_AGAIN.  This is useful for whitespaces.  */
-	    jit_jmpi (do_again);
-
-	  break;
-
-	default:
-	  scm_misc_error (__FUNCTION__, "unknown token reader type: ~A",
-			  scm_list_1 (SCM_I_MAKINUM ((int)tr->reader.type)));
-	}
+      if (generate_token_reader_invocation (&_jit, tr, do_again,
+					    flags & SCM_READER_FLAG_DEBUG,
+					    start, buffer_size))
+	return NULL;
 
       CHECK_CODE_SIZE (buffer_size, start);
 
