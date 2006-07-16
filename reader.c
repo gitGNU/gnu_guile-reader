@@ -778,6 +778,7 @@ generate_token_reader_invocation (jit_state *lightning_state,
 				  jit_insn *do_again,
 				  int debug, int positions,
 				  char *start, size_t buffer_size)
+#define _jit (* lightning_state)
 {
   static const char msg_start_c_call[] = "calling token reader `%s'...\n";
   static const char msg_start_scm_call[] =
@@ -988,6 +989,7 @@ generate_token_reader_invocation (jit_state *lightning_state,
 
   return 0;
 }
+#undef _jit
 
 /* Generate code that handles an unexpected character (the character, a C
    integer, is expected to be in V1 at this point).  I.e., if the
@@ -998,6 +1000,7 @@ static inline int
 generate_unexpected_character_handling (jit_state *lightning_state,
 					SCM fault_handler, int debug,
 					char *start, size_t buffer_size)
+#define _jit (* lightning_state)
 {
   jit_insn *ref;
 
@@ -1080,6 +1083,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
 
   return 0;
 }
+#undef _jit
 
 
 /* The top-level code-generating function.  */
