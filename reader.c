@@ -769,13 +769,14 @@ generate_reader_epilogue (jit_state *lightning_state,
 
 /* Generate an invocation of token reader TR, assuming all the usual register
    invariants.  A jump to DO_AGAIN is generated when a NULL reader is
-   encountered.  If DEBUG is true (non-zero), additional debugging code is
-   generated.  */
+   encountered or when an escaping reader returns `SCM_UNSPECIFIED'.  If
+   DEBUG is true (non-zero), additional debugging code is generated.  If
+   POSITIONS is true, then position-recording code is generated.  */
 static inline int
 generate_token_reader_invocation (jit_state *lightning_state,
 				  const scm_token_reader_spec_t *tr,
 				  jit_insn *do_again,
-				  int debug,
+				  int debug, int positions,
 				  char *start, size_t buffer_size)
 {
   static const char msg_start_c_call[] = "calling token reader `%s'...\n";
@@ -969,6 +970,20 @@ generate_token_reader_invocation (jit_state *lightning_state,
     default:
       scm_misc_error (__FUNCTION__, "unknown token reader type: ~A",
 		      scm_list_1 (SCM_I_MAKINUM ((int)tr->reader.type)));
+    }
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  if (!tr->escape)
+    /* When the reader returns SCM_UNSPECIFIED, then start again.
+       This is what, for instance, comment readers do in the
+       top-level reader.  */
+    jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
+
+  if (positions)
+    {
+      generate_position_set (&_jit, start, buffer_size);
+      CHECK_CODE_SIZE (buffer_size, start, -1);
     }
 
   return 0;
@@ -1298,22 +1313,9 @@ scm_c_make_reader (void *code_buffer,
 
       if (generate_token_reader_invocation (&_jit, tr, do_again,
 					    flags & SCM_READER_FLAG_DEBUG,
+					    flags & SCM_READER_FLAG_POSITIONS,
 					    start, buffer_size))
 	return NULL;
-
-      CHECK_CODE_SIZE (buffer_size, start);
-
-      if (!tr->escape)
-	/* When the reader returns SCM_UNSPECIFIED, then start again.
-	   This is what, for instance, comment readers do in the
-	   top-level reader.  */
-	jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
-
-      if (flags & SCM_READER_FLAG_POSITIONS)
-	{
-	  generate_position_set (&_jit, start, buffer_size);
-	  CHECK_CODE_SIZE (buffer_size, start);
-	}
 
       /* The reader's return value is already in JIT_RET, so we just have to
 	 return.  */
