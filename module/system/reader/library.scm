@@ -1,6 +1,6 @@
 ;;; library.scm  --  A framework for building Scheme-like readers.
 ;;;
-;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -18,12 +18,12 @@
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 (define-module (system reader library)
-  #:use-module (system reader)
-  #:use-module (system reader compat)
-  #:use-module (srfi srfi-1)
-  #:use-module (srfi srfi-11) ;; `let-values'
-  #:use-module (srfi srfi-17) ;; generalized `set!'
-  #:use-module (ice-9 optargs))
+  :use-module (system reader)
+  :use-module (system reader compat)
+  :use-module (srfi srfi-1)
+  :use-module (srfi srfi-11) ;; `let-values'
+  :use-module (srfi srfi-17) ;; generalized `set!'
+  :use-module (ice-9 optargs))
 
 ;;; Author:  Ludovic Courtès
 ;;;
@@ -52,21 +52,31 @@ token readers used by a top-level reader."
 	 (misc (token-reader-specification
 		(standard-token-reader 'guile-symbol-misc-chars)))
 	 (number '(#\0 . #\9)))
-    (filter (lambda (tr)
-	      (let ((spec (token-reader-specification tr)))
-		(not (or (eq? spec upper)
-			 (eq? spec lower)
-			 (eq? spec misc)
-			 (eq? spec number)))))
+    (filter (let ((symbol-specs (list upper lower misc number)))
+	      (lambda (tr)
+		(let ((spec (token-reader-specification tr)))
+		  (not (member spec symbol-specs)))))
 	    top-specs)))
 
 (define (make-colon-free-token-reader tr)
+  "If token reader @var{tr} handles the @code{:} (colon) character, remove it
+from its specification and return the new token reader."
   (let* ((spec (token-reader-specification tr))
 	 (proc (token-reader-procedure tr)))
     (make-token-reader (filter (lambda (chr)
 				 (not (char=? chr #\:)))
 			       spec)
 		       proc)))
+
+(define (ensure-colon-free-token-readers specs)
+  "For token readers listed in @var{specs} that handle the @code{:} (colon)
+character, remove @code{:} from their specification (using
+@code{make-colon-free-token-reader})."
+  (map (lambda (tr)
+	 (if (token-reader-handles-char? tr #\:)
+	     (make-colon-free-token-reader tr)
+	     tr))
+       specs))
 
 (define-public (alternate-guile-reader-token-readers options)
   "Given @var{options}, a list of symbols describing reader options relative
@@ -151,7 +161,7 @@ Allow for square brackets around S-expressions.
 		 (let* ((kw-tr (standard-token-reader 'keyword))
 			(kw-proc (token-reader-procedure kw-tr)))
 		   (cons (make-token-reader #\: kw-proc)
-			 top-specs)))
+                         (ensure-colon-free-token-readers top-specs))))
 
 		;; case-insensitive symbols
 		((case-insensitive)
@@ -161,8 +171,8 @@ Allow for square brackets around S-expressions.
 				r5rs-lower-case-number))
 			 (list (let ((tr (standard-token-reader
 					  'r5rs-lower-case-symbol-misc-chars)))
-				 (if (or (member 'colon-keywords processed)
-					 (member 'colon-keywords options))
+				 (if (or (memq 'colon-keywords processed)
+					 (memq 'colon-keywords options))
 				     (make-colon-free-token-reader tr)
 				     tr)))
 			 (filter-out-symbol-token-readers top-specs)))

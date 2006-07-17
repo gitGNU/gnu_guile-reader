@@ -1,6 +1,6 @@
 ;;; reader.scm  --  A framework for building Scheme-like readers.
 ;;;
-;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -29,6 +29,8 @@
 	     ;; accessors
 	     token-reader-procedure token-reader-specification
              token-reader-escape? token-reader-documentation
+
+	     token-reader-handles-char?
 
 	     ;; fault handler
 	     %reader-standard-fault-handler

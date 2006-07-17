@@ -39,7 +39,7 @@ const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
     SCM_TR_VECTOR,
     SCM_TR_SRFI_4,
     SCM_TR_GUILE_BIT_VECTOR,
-    SCM_TR_BOOLEAN,
+    SCM_TR_BOOLEAN_SRFI_4,
     SCM_TR_KEYWORD,
     SCM_TR_NUMBER_AND_RADIX,
     SCM_TR_GUILE_EXTENDED_SYMBOL,
