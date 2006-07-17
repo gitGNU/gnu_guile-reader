@@ -50,7 +50,7 @@ exec ${GUILE-"${top_srcdir-..}/pre-inst-guile"} -l $0  \
 
 ;; Number of iterations reading files.  Adjust this as a function of your
 ;; machine's CPU power.
-(define %iterations 30)
+(define %iterations 50)
 
 
 
@@ -64,10 +64,14 @@ exec ${GUILE-"${top_srcdir-..}/pre-inst-guile"} -l $0  \
 	    (loop (reader)))))))
 
 (define (how-long reader)
-  (let loop ((start (get-internal-run-time))
+
+  ;; `get-internal-run-time' includes both system and user time.
+  (define (time-elapsed) (tms:utime (times)))
+
+  (let loop ((start (time-elapsed))
 	     (iterations-left %iterations))
     (if (= 0 iterations-left)
-	(- (get-internal-run-time) start)
+	(- (time-elapsed) start)
 	(begin
 	  (for-each (lambda (file)
 		      (load-file-with-reader file reader))
