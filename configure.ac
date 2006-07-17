@@ -27,6 +27,8 @@ AC_C_CONST
 AC_C_INLINE
 AC_TYPE_SIZE_T
 
+AC_CHECK_SIZEOF([void *])
+
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
