@@ -314,6 +314,15 @@ do							\
 } while (0)
 
 
+/* Abort.  */
+static void
+guile_reader_abort (const void *v0, int v1, const void *v2)
+{
+  fprintf (stderr, "compiled reader aborting (v0=%p, v1=%i, v2=%p)\n",
+	   v0, v1, v2);
+  abort ();
+}
+
 static void
 do_debug_regs (unsigned line, int entering, void *sp, void *v2, void *v1)
 {
@@ -591,6 +600,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
    versions certainly).  */
 static inline int
 generate_getc (jit_state *lightning_state,
+	       int debug,
 	       char *start, size_t buffer_size)
 #define _jit (* lightning_state)
 {
@@ -664,10 +674,57 @@ generate_getc (jit_state *lightning_state,
 
   jit_patch (jump_to_end);
 
+
+  if (debug)
+    {
+      static const char msg_read[] = "getc returned %i\n";
+
+      (void)jit_movi_p (JIT_R2, msg_read);
+      jit_prepare (2);
+      jit_pusharg_i (JIT_V1);
+      jit_pusharg_p (JIT_R2);
+      (void)jit_finish (do_like_printf);
+
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+    }
+
   return 0;
 }
 #undef _jit
 #endif
+
+/* Reserve at least HOW_MUCH bytes starting after CODE_BUFFER.  Produce an
+   unconditional `jump' instruction right at CODE_BUFFER.  The exact location
+   of the HOW_MUCH bytes available is returned in RESULT.  */
+static inline int
+generate_space_reservation (jit_state *lightning_state, size_t how_much,
+			    char *start, size_t buffer_size,
+			    void **result)
+#define _jit (* lightning_state)
+{
+  jit_insn *jump;
+
+  jump = jit_jmpi (jit_forward ());
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  *result = (void *)jit_get_label ();
+
+  /* Fill the buffer with `nop's, thereby preserving alignment constraints. */
+  while (jit_get_ip ().ptr - (char *)*result < how_much)
+    {
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+      jit_nop ();
+    }
+
+  debug ("%s: %u bytes requested, %u bytes allocated\n", __FUNCTION__,
+	 how_much, jit_get_ip ().ptr - (char *)*result);
+
+  jit_patch (jump);
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  return 0;
+}
+#undef _jit
 
 /* Generate a prologue that reserves enough space on the stack to store the
    reader's local variables and store the original value of the stack pointer
@@ -766,6 +823,101 @@ generate_reader_epilogue (jit_state *lightning_state,
 }
 #undef _jit
 
+/* Generate code that aborts.  */
+static inline int
+generate_abortion (jit_state *lightning_state,
+		   char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  jit_prepare (3);
+  jit_pusharg_p (JIT_V2);
+  jit_pusharg_i (JIT_V1);
+  jit_pusharg_p (JIT_V0);
+  (void)jit_finish (guile_reader_abort);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  return 0;
+}
+#undef _jit
+
+/* Generate code that jumps to the location associated with the character
+   just read (in V1) according to JUMP_TABLE.  JUMP_TABLE is assumed to
+   contain only valid positions into code.  */
+static inline int
+generate_character_dispatch (jit_state *lightning_state,
+			     jit_insn **jump_table,
+			     int debug,
+			     char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  jit_insn *test;
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  if (debug)
+    {
+      static const char msg_dispatching[] = "dispatching for character `%i'\n";
+
+      jit_movi_p (JIT_R0, msg_dispatching);
+
+      jit_prepare (2);
+      jit_pusharg_i (JIT_V1);
+      jit_pusharg_p (JIT_R0);
+      (void)jit_finish (do_like_printf);
+
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+    }
+
+  /* Make sure the character just read is in the range [0;255].  */
+
+  test = jit_bgei_i (jit_forward (), JIT_V1, 0);
+  if (generate_abortion (&_jit, start, buffer_size))
+    return -1;
+
+  jit_patch (test);
+  test = jit_blei_i (jit_forward (), JIT_V1, 255);
+  if (generate_abortion (&_jit, start, buffer_size))
+    return -1;
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_patch (test);
+
+  /* Load the pointer at JUMP_TABLE + (V1 * sizeof (void *)).  */
+#if SIZEOF_VOID_P == 4
+  jit_lshi_i (JIT_R1, JIT_V1, 2);
+#elif SIZEOF_VOID_P == 8
+  jit_lshi_i (JIT_R1, JIT_V1, 3);
+#else
+# error "unsupported pointer size"
+#endif
+  jit_ldxi_p (JIT_R0, JIT_R1, jump_table);
+
+  if (debug)
+    {
+      static const char msg_jumping[] = "preparing to jump at %p\n";
+
+      jit_pushr_p (JIT_R0);
+
+      jit_movi_p (JIT_R1, msg_jumping);
+      jit_prepare (2);
+      jit_pusharg_p (JIT_R0);
+      jit_pusharg_p (JIT_R1);
+      (void)jit_finish (do_like_printf);
+
+      jit_popr_p (JIT_R0);
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+    }
+
+  /* Jump to the handling code.  */
+  jit_jmpr (JIT_R0);
+
+  CHECK_CODE_SIZE (buffer_size, start, -1);
+
+  return 0;
+}
+#undef _jit
 
 /* Generate an invocation of token reader TR, assuming all the usual register
    invariants.  A jump to DO_AGAIN is generated when a NULL reader is
@@ -1085,6 +1237,97 @@ generate_unexpected_character_handling (jit_state *lightning_state,
 }
 #undef _jit
 
+/* For each character CHR handled by TR, set JUMP_TABLE[CHR] to
+   HANDLER_CODE. */
+static void
+populate_jump_table_for_tr (const scm_token_reader_spec_t *tr,
+			    jit_insn **jump_table,
+			    jit_insn *handler_code)
+{
+  switch (tr->token.type)
+    {
+    case SCM_TOKEN_SINGLE:
+      jump_table[(int)tr->token.value.single] = handler_code;
+      break;
+
+    case SCM_TOKEN_RANGE:
+      {
+	int c;
+	for (c = (int)tr->token.value.range.low;
+	     c <= (int)tr->token.value.range.high;
+	     c++)
+	  jump_table[c] = handler_code;
+      }
+      break;
+
+    case SCM_TOKEN_SET:
+      {
+	const char *p;
+	for (p = tr->token.value.set; *p; p++)
+	  jump_table[(int)*p] = handler_code;
+      }
+      break;
+
+    default:
+      abort ();
+    }
+}
+
+/* Generate character-handling code, filling in JUMP_TABLE.  This code will
+   be used by the character-dispatch code when referring to JUMP_TABLE.
+   LOOP_START should be a pointer to the first instruction of the reader
+   loop.  The usual register invariants are assumed.  */
+static int
+generate_character_handling_code (jit_state *lightning_state,
+				  const scm_token_reader_spec_t *token_readers,
+				  jit_insn **jump_table,
+				  jit_insn *loop_start,
+				  unsigned flags,
+				  char *start, size_t buffer_size)
+#define _jit (* lightning_state)
+{
+  const scm_token_reader_spec_t *tr;
+
+  /* Populate the jump table: for each TR, generate an invocation followed by
+     a `ret'.  If the TR is a NULL token reader, then simply generate a jump
+     to LOOP_START.  */
+  for (tr = token_readers;
+       tr->token.type != SCM_TOKEN_UNDEF;
+       tr++)
+    {
+      jit_insn *handler_code;
+
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+
+      if (tr->reader.value.c_reader == NULL)
+	handler_code = loop_start;
+      else
+	{
+	  handler_code = jit_get_label ();
+	  if (generate_token_reader_invocation (&_jit, tr, loop_start,
+						flags & SCM_READER_FLAG_DEBUG,
+						flags
+						& SCM_READER_FLAG_POSITIONS,
+						start, buffer_size))
+	    return -1;
+
+	  /* The reader's return value is already in JIT_RET, so we just have
+	     to return.  */
+	  if (generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
+					start, buffer_size))
+	    return -1;
+
+	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	}
+
+      populate_jump_table_for_tr (tr, jump_table, handler_code);
+    }
+
+  return 0;
+}
+#undef _jit
+
+
 
 /* The top-level code-generating function.  */
 
@@ -1114,14 +1357,12 @@ scm_c_make_reader (void *code_buffer,
 		   size_t *code_size)
 {
   static const char msg_getc[] = "got char: 0x%02x\n";
-  static const char msg_found_token[] = "read token 0x%02x!\n";
 
   scm_reader_t result;
   char *start, *end;
-  jit_insn *jumps[20], *ref, *do_again, *jump_to_end;
-  size_t jump_count = 0;
-  const scm_token_reader_spec_t *tr;
+  jit_insn *do_again, *jump_to_end;
   int arg_port, arg_caller_handled, arg_top_level_reader;
+  jit_insn **jump_table;
 
   result = (scm_reader_t) (jit_set_ip (code_buffer).iptr);
   start = jit_get_ip ().ptr;
@@ -1145,6 +1386,16 @@ scm_c_make_reader (void *code_buffer,
 			    start, buffer_size);
   CHECK_CODE_SIZE (buffer_size, start);
 
+  /* Allocate room for a character jump table.  */
+  if (generate_space_reservation (&_jit, 256 * sizeof (*jump_table),
+				  start, buffer_size,
+				  (void **)&jump_table))
+    return NULL;
+
+  /* Clear the jump table.  */
+  memset (jump_table, 0, 256 * sizeof (*jump_table));
+
+  /* Beginning of the reader loop.  */
   CHECK_CODE_SIZE (buffer_size, start);
   do_again = jit_get_label ();
 
@@ -1171,7 +1422,9 @@ scm_c_make_reader (void *code_buffer,
 #else
   /* Use an inlined version of `scm_getc ()'.  The character just read is put
      in V1.  */
-  generate_getc (&_jit, start, buffer_size);
+  if (generate_getc (&_jit, flags & SCM_READER_FLAG_DEBUG,
+		     start, buffer_size))
+    return NULL;
 #endif
 
   /* Test whether we got `EOF'.  */
@@ -1203,156 +1456,49 @@ scm_c_make_reader (void *code_buffer,
       debug_post_call ();
     }
 
-  /* XXX: Instead of testing whether the character is handled by each TR, we
-     could instead just build a 256-byte array of jumps and directly use that
-     at run-time, therefore making dispatching O(1).  However, one good
-     reason not to do it is that (i) ports return `int's and (ii) ports may
-     well return wide characters in the foreseeable future.  */
-  for (tr = token_readers;
-       tr->token.type != SCM_TOKEN_UNDEF;
-       tr++)
-    {
-      CHECK_CODE_SIZE (buffer_size, start);
-
-      if (jump_count)
-	{
-	  /* Resolve the previous forward references.  */
-	  unsigned j;
-	  for (j = 0; j < jump_count; j++)
-	    jit_patch (jumps[j]);
-	  jump_count = 0;
-	}
-
-      switch (tr->token.type)
-	{
-	case SCM_TOKEN_SINGLE:
-	  /* Compare TR's single-char token against V1.  */
-	  jumps[jump_count++] =
-	    jit_bnei_i (jit_forward (), JIT_V1,
-			(int)tr->token.value.single);
-	  break;
-
-	case SCM_TOKEN_RANGE:
-	  /* Test whether V1 is within TR's range.  */
-	  {
-	    char low, high;
-
-	    if (tr->token.value.range.low
-		< tr->token.value.range.high)
-	      low = tr->token.value.range.low,
-		high = tr->token.value.range.high;
-	    else
-	      low = tr->token.value.range.high,
-		high = tr->token.value.range.low;
-
-	    jumps[jump_count++] =
-	      jit_blti_i (jit_forward (), JIT_V1, (int)low);
-	    jumps[jump_count++] =
-	      jit_bgti_i (jit_forward (), JIT_V1, (int)high);
-	  }
-	  break;
-
-	case SCM_TOKEN_SET:
-	  {
-	    /* Test whether V1 is part of TR's set.  */
-	    const char *tok;
-	    jit_insn *go_next_jumps[256];
-	    size_t go_next_jump_count = 0, j;
-
-	    if (flags & SCM_READER_FLAG_DEBUG)
-	      printf ("%s: token set contains %u chars\n",
-		      __FUNCTION__, strlen (tr->token.value.set));
-
-	    ref = NULL;
-	    for (tok = tr->token.value.set;
-		 *tok;
-		 tok++)
-	      {
-		CHECK_CODE_SIZE (buffer_size, start);
-
-		if (ref)
-		  jit_patch (ref);
-
-		ref = jit_bnei_i (jit_forward (), JIT_V1, (int)*tok);
-
-		/* Add a jump instruction to where processing takes
-		   place.  */
-		go_next_jumps[go_next_jump_count++] =
-		  jit_jmpi (jit_forward ());
-	      }
-
-	    if (ref)
-	      /* Mark the last `bnei' for future patching, so that it will
-		 jump to the next token reader considered.  */
-	      jumps[jump_count++] = ref;
-
-	    for (j = 0; j < go_next_jump_count; j++)
-	      jit_patch (go_next_jumps[j]);
-
-	    break;
-	  }
-
-	default:
-	  scm_misc_error (__FUNCTION__, "unknown token type: ~A",
-			  scm_list_1 (SCM_I_MAKINUM ((int)tr->token.type)));
-	}
-
-      /* When the character just returned by `scm_getc ()' is handled by TR,
-	 then invoke it.  */
-      CHECK_CODE_SIZE (buffer_size, start);
-      if (flags & SCM_READER_FLAG_DEBUG)
-	{
-	  (void)jit_movi_p (JIT_R0, msg_found_token);
-
-	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start);
-	  jit_prepare (2);
-	  jit_pusharg_i (JIT_V1);
-	  jit_pusharg_p (JIT_R0);
-	  (void)jit_finish (do_like_printf);
-	  debug_post_call ();
-
-	  CHECK_CODE_SIZE (buffer_size, start);
-	}
-
-      if (generate_token_reader_invocation (&_jit, tr, do_again,
-					    flags & SCM_READER_FLAG_DEBUG,
-					    flags & SCM_READER_FLAG_POSITIONS,
-					    start, buffer_size))
-	return NULL;
-
-      /* The reader's return value is already in JIT_RET, so we just have to
-	 return.  */
-      generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
-				start, buffer_size);
-      CHECK_CODE_SIZE (buffer_size, start);
-    }
-
-  if (jump_count)
-    {
-      /* Resolve the previous forward references.  */
-      unsigned j;
-      for (j = 0; j < jump_count; j++)
-	jit_patch (jumps[j]);
-      jump_count = 0;
-    }
-
-  /* When this point is reached, then no handler was specified for the
-     character we just read.  */
-  generate_unexpected_character_handling (&_jit, fault_handler,
-					  flags & SCM_READER_FLAG_DEBUG,
-					  start, buffer_size);
-  CHECK_CODE_SIZE (buffer_size, start);
-
-  generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
-			    start, buffer_size);
-  CHECK_CODE_SIZE (buffer_size, start);
+  /* Lookup the character just read into the jump table and jump there.  */
+  if (generate_character_dispatch (&_jit, jump_table,
+				   flags & SCM_READER_FLAG_DEBUG,
+				   start, buffer_size))
+    return NULL;
 
   /* This is where we get when `scm_getc ()' returned EOF.  */
   jit_patch (jump_to_end);
   jit_movi_p (JIT_RET, (void *)SCM_EOF_VAL);
   generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
 			    start, buffer_size);
+
+  /* Generate the character-handling code that will be used by the
+     character-dispatching code.  */
+  if (generate_character_handling_code (&_jit, token_readers,
+					jump_table, do_again, flags,
+					start, buffer_size))
+    return NULL;
+
+
+  {
+    /* Fill out the remaining of the jump table with jumps to
+       unexpected-character-handling code.  */
+    size_t chr;
+    jit_insn *unexpected_handling;
+
+    unexpected_handling = jit_get_label ();
+    if (generate_unexpected_character_handling (&_jit, fault_handler,
+						flags & SCM_READER_FLAG_DEBUG,
+						start, buffer_size))
+      return NULL;
+
+    if (generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
+				  start, buffer_size))
+      return NULL;
+
+    for (chr = 0; chr < 256; chr++)
+      {
+	if (jump_table[chr] == NULL)
+	  jump_table[chr] = unexpected_handling;
+      }
+  }
+
 
   end = jit_get_ip ().ptr;
   jit_flush_code (start, end);
