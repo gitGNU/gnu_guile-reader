@@ -3,7 +3,7 @@
 LTDL_LIBRARY_PATH="`pwd`/.libs"
 export LTDL_LIBRARY_PATH
 main='(module-ref (resolve-module '\''(test-library)) '\'main')'
-exec ${GUILE-"${top_srcdir-..}/pre-inst-guile"} -l $0  \
+exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;

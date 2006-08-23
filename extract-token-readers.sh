@@ -16,6 +16,5 @@ else
   shift
 fi
 
-cat "token-readers.h" | \
 grep '^#define SCM_TR_' | \
 sed -es'/^#define SCM_TR_\([A-Z0-9_]\+\) \/\* \([^ ]\+\) \*\/.*$/\2, SCM_TR_\1/g'

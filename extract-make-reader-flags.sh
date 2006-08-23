@@ -15,7 +15,6 @@ else
   shift
 fi
 
-cat "reader.h" | \
 grep '^#define SCM_READER_FLAG_' | \
 sed -es'/^#define SCM_READER_FLAG_\([A-Z0-9_]\+\).*\/\* \([^ ]\+\) \*\/.*$/\2, SCM_READER_FLAG_\1/g'
 

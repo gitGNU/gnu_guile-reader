@@ -15,7 +15,10 @@ EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 	     extract-token-readers.sh extract-make-reader-flags.sh	\
 	     compat.h
 
-AM_CFLAGS = -Wmissing-prototypes -Wall -g -O0
+# Some header files are generated (in builddir) and others are in srcdir.
+AM_CFLAGS = -I$(top_srcdir) -I$(top_builddir)
+
+AM_CFLAGS += -Wmissing-prototypes -Wall -g -O0
 
 if HAVE_INSTALLED_LIGHTNING
 
@@ -24,7 +27,7 @@ libguile_reader_la_CFLAGS = -Wno-unused-value
 
 endif
 
-snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
+snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS) $(AM_CFLAGS)
 
 
 %.c.x: %.c
@@ -34,17 +37,20 @@ snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 	$(CPP) $(CPPFLAGS) -DSCM_MAGIC_SNARF_DOCS $< > $@
 
 # Token reader lookup.
-token-reader-lookup.c: token-readers.h
-	./extract-token-readers.sh | \
+token-reader-lookup.c: $(top_srcdir)/token-readers.h
+	cat $< | \
+	$(top_srcdir)/extract-token-readers.sh | \
 	$(GPERF) -t -C -N _scm_token_reader_lookup > $@
 
-token-reader-list.c: token-readers.h
-	./extract-token-readers.sh --no-gperf-header | \
+token-reader-list.c: $(top_srcdir)/token-readers.h
+	cat $< | \
+	$(top_srcdir)/extract-token-readers.sh --no-gperf-header | \
 	cut -f 1 -d , | sort | sed -e's/^\(.*\)$$/"\1",/g' > $@
 
 # `make-reader' flags.
-make-reader-flags.c: reader.h
-	./extract-make-reader-flags.sh | \
+make-reader-flags.c: $(top_srcdir)/reader.h
+	cat $< | \
+	$(top_srcdir)/extract-make-reader-flags.sh | \
 	$(GPERF) -t -C -N _scm_to_make_reader_flag > $@
 
 # Jump to the sub-directories.

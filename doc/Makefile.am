@@ -8,5 +8,5 @@ BUILT_SOURCES = token-reader-doc.texi reader-lib-doc.texi version.texi
 
 token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/token-readers.h
 	main='(module-ref (resolve-module '\''(extract-doc)) '\'main')' &&  \
-	$(top_srcdir)/pre-inst-guile -l extract-doc.scm			    \
+	$(top_builddir)/pre-inst-guile -l $(srcdir)/extract-doc.scm	    \
 	   -c "(apply $$main (cdr (command-line)))" $<

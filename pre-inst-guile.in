@@ -23,6 +23,6 @@
 GUILE_LOAD_PATH="@abs_top_srcdir@/module:$GUILE_LOAD_PATH"
 export GUILE_LOAD_PATH
 
-exec @abs_top_srcdir@/libtool --mode=execute		\
-       -dlopen "@abs_top_srcdir@/libguile-reader.la"	\
+exec @abs_top_builddir@/libtool --mode=execute		\
+       -dlopen "@abs_top_builddir@/libguile-reader.la"	\
        @GUILE@ "$@"
