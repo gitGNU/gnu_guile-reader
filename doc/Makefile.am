@@ -1,6 +1,6 @@
 info_TEXINFOS = guile-reader.texi
 
-EXTRA_DIST = extract-doc.scm
+EXTRA_DIST = extract-doc.scm extract-c-doc.scm.in
 
 
 # Automatically extracted token reader documentation.
