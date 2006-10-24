@@ -5,7 +5,7 @@ shift
 
 exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
      -e '(apply main (cdr (command-line)))'   \
-     -- "$c_file" "@CPP@" "@CPPFLAGS@ -I@top_srcdir@" $@
+     -- "$c_file" "@CPP@" "@CPPFLAGS@ -I@top_srcdir@ -I@top_builddir@" $@
 !#
 
 ;;; extract-c-doc.scm  --  Output Texinfo from "snarffed" C files.
