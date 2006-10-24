@@ -19,7 +19,7 @@
 
 This file documents Guile Reader.
 
-Copyright @copyright{} 2005 Ludovic Court`es
+Copyright @copyright{} 2005, 2006 Ludovic Court`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -47,7 +47,7 @@ Edition @value{EDITION} @*
 @c Updated for Guile Reader @value{VERSION} @*
 @value{UPDATED} @*
 
-Copyright @copyright{} 2005 Ludovic Court`es
+Copyright @copyright{} 2005, 2006 Ludovic Court`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -300,8 +300,9 @@ handling white spaces may be done by defining a TR like this:
 (make-token-reader '(#\space #\newline #\tab) #f)
 @end smallexample
 
-@code{make-token-reader}
-FIXME:  Snarf doc from `reader.c'.
+@c Include part of API documentation snarffed from `reader.c'.
+@include make-token-reader-doc.texi
+
 
 @node Invoking a Reader from a TR, Token Reader Library, TR Calling Convention, Token Readers
 @subsection Invoking a Reader from a Token Reader
@@ -378,12 +379,8 @@ passed to @code{make-token-reader} as the procedure attached to
                      )))
 @end example
 
-FIXME:  Snarf doc from `reader.c'.
-@code{standard-token-reader}
-
-@code{token-reader-specification}
-@code{token-reader-procedure}
-@code{token-reader-escape?}
+@c Include part of API documentation snarffed from `reader.c'.
+@include token-reader-api-doc.texi
 
 
 @node Token Delimiters,  , Token Reader Library, Token Readers
@@ -510,8 +507,8 @@ calling reader may be unable to handle the @code{#\)} character so the
 S-exp token reader has to handle it by itself and needs to tell it to
 the reader.
 
-@code{make-reader}
-FIXME:  Snarf doc from `reader.c'.
+@c Include part of API documentation snarffed from `reader.c'.
+@include make-reader-doc.texi
 
 Currently, the flags that may be passed to token readers are the
 following:
@@ -548,13 +545,8 @@ procedure which returns a reader equivalent to Guile's built-in
 default reader made of re-usable token readers written in C
 (@pxref{Token Reader Library}).
 
-@itemize
-@item @code{default-reader}
-@item @code{default-reader-token-readers}
-@item @code{default-sharp-reader-token-readers}
-@end itemize
-
-FIXME:  Snarf doc from `reader-lib.c'.
+@c Include part of API documentation snarffed from `reader-lib.c'.
+@include reader-lib-api-doc.texi
 
 Additionally, the @code{(system reader library)} module exports a
 number of procedures that ease the re-use of readers.
