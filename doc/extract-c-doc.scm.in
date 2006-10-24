@@ -40,7 +40,8 @@ exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
   ;; 2. how to invoke the CPP (e.g., "cpp -E");
   ;; 3. additional CPP flags (e.g., "-I /usr/local/include");
   ;; 4. optionally, a list of Scheme procedure names whose documentation is
-  ;;    to be output.
+  ;;    to be output.  If no such list is passed, then documentation for
+  ;;    all the Scheme functions available in the C source file is issued.
   ;;
   (let* ((file (car args))
          (cpp+args (string-tokenize (cadr args)))
@@ -48,7 +49,7 @@ exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
          (cpp-flags (apply string-append (caddr args)
                            " -DSCM_MAGIC_SNARF_DOCS "
                            (cdr cpp+args)))
-         (procs (map string->symbol (cdddr args))))
+         (procs (cdddr args)))
     ;;(format (current-error-port) "cpp-flags: ~a~%" cpp-flags)
     (format (current-error-port) "extracting Texinfo doc from `~a'...  "
             file)
@@ -60,8 +61,10 @@ exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
                            (if (null? procs)
                                proc-doc-list
                                (filter (lambda (proc-doc)
-                                         (memq (assq-ref proc-doc 'scheme-name)
-                                               procs))
+                                         (let ((proc-name
+                                                (assq-ref proc-doc
+                                                          'scheme-name)))
+                                           (member proc-name procs)))
                                        proc-doc-list))))))
     (format (current-error-port) "done.~%")
     (exit 0)))
