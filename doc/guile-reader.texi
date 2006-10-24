@@ -19,7 +19,7 @@
 
 This file documents Guile Reader.
 
-Copyright @copyright{} 2005, 2006 Ludovic Court`es
+Copyright @copyright{} 2005, 2006 Ludovic Court@`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -47,7 +47,7 @@ Edition @value{EDITION} @*
 @c Updated for Guile Reader @value{VERSION} @*
 @value{UPDATED} @*
 
-Copyright @copyright{} 2005, 2006 Ludovic Court`es
+Copyright @copyright{} 2005, 2006 Ludovic Court@`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -73,17 +73,18 @@ approved by the Free Software Foundation.
 This document describes Guile-Reader version @value{VERSION}.  It was
 last updated in @value{UPDATED-MONTH}.
 
-This documentation is currently incomplete.  Details missing about the
+This documentation should be mostly complete.  Details missing about the
 API can very likely be found in the C header files or the C source
 files.
 
 @menu
-* Introduction::                
-* Overview::                    
-* API Reference::               
-* Internals::                   
-* Concept Index::               
-* Function Index::              
+* Introduction::                The goals of guile-reader.
+* Overview::                    How it works.
+* API Reference::               Using guile-reader.
+* Internals::                   Performance considerations.
+
+* Concept Index::               Concepts.
+* Function Index::              Scheme procedures and C functions.
 @end menu
 
 
@@ -114,14 +115,19 @@ each other, such as the DSSSL keyword syntax and the @inforef{Block
 Comments, SCSH block comments, guile}.  In short the current reader
 syntax is hardly extensible.
 
+@cindex SILex
 The idea of Guile Reader is to provide a framework allowing users to
 quickly define readers for whatever syntax they like.  While it is
-much simpler than a full-blown parser generator like Bison, its simple
-programming interface should make it very straightforward to implement
-readers, especially for Scheme-like syntaxes.  Best of all, Guile
-Reader comes with a library of components that can typically be used
-to construct a reader for the Scheme syntax.  And each one of this
-components may be reused at will when creating other readers.
+much simpler than a full-blown lexer generator like Flex or Danny
+Dub@'e's SILex (see @uref{http://www.iro.umontreal.ca/~dube/} for more
+information), its simple programming interface should make it very
+straightforward to implement readers, especially for Scheme-like
+syntaxes.  Best of all, Guile Reader comes with a library of
+components that can typically be used to construct a reader for the
+Scheme syntax.  And each one of this components may be reused at will
+when creating other readers.  On the other hand, one should be aware
+that this simpler API comes at the cost of a lack of consistency in
+some cases, as outlined in @xref{Token Delimiters}.
 
 @cindex read table
 Common Lisp has a similar mechanism to extend its reader which is
@@ -188,8 +194,8 @@ declarations available in the @code{<guile-reader/reader.h>} header
 file.
 
 @menu
-* Token Readers::               
-* Readers::                     
+* Token Readers::               The basic components of a reader.
+* Readers::                     How to build readers.
 @end menu
 
 @node Token Readers, Readers, API Reference, API Reference
@@ -300,6 +306,8 @@ handling white spaces may be done by defining a TR like this:
 (make-token-reader '(#\space #\newline #\tab) #f)
 @end smallexample
 
+The reference for @code{make-token-reader} is given below:
+
 @c Include part of API documentation snarffed from `reader.c'.
 @include make-token-reader-doc.texi
 
@@ -379,6 +387,8 @@ passed to @code{make-token-reader} as the procedure attached to
                      )))
 @end example
 
+The procedures available to manipulate token readers are listed below:
+
 @c Include part of API documentation snarffed from `reader.c'.
 @include token-reader-api-doc.texi
 
@@ -430,6 +440,11 @@ In the current design of guile-reader, this token delimiter issue
 creates a number of pitfalls when one is willing to change the current
 delimiters.  In particular, one has to be very careful about using TRs
 that consistently assume the same token delimiters.
+
+A ``real'' lexer generator such as Danny Dub@'e's SILex avoids such
+issues because it allows the definition of tokens using regular
+expressions.  However, its usage may be less trivial than that of
+guile-reader.
 
 
 @node Readers,  , Token Readers, API Reference
