@@ -157,7 +157,8 @@ extern void scm_initialize_token_reader_library (void);
 		    "@code{boolean} token reader, this one is useful "	\
 		    "when SRFI-4 floating-point homogeneous vectors "	\
 		    "are to be used at the same time: the SRFI-4 TR "	\
-		    "will handle @code{#f} on its own.")
+		    "will handle @code{#f} on its own (@pxref{"		\
+		    "Overlapping Token Readers}).")
 #define SCM_TR_KEYWORD /* keyword */					\
   SCM_DEFTOKEN_SINGLE (':',  "keyword",        scm_read_keyword, 0,	\
 		       "This token reader returns a keyword as found "	\
@@ -258,7 +259,8 @@ extern void scm_initialize_token_reader_library (void);
 		      "symbol.  For instance, it will be invoked if "	\
 		      "the string @code{123.123.123} is passed to the "	\
 		      "reader but this will actually yield a symbol "	\
-		      "instead of a reader.")
+		      "instead of a number (@pxref{Overlapping Token "	\
+		      "Readers}).")
 #define SCM_TR_GUILE_SYMBOL_LOWER_CASE /* guile-symbol-lower-case */	\
   SCM_DEFTOKEN_RANGE ('a', 'z', "guile-symbol-lower-case",		\
 		      scm_read_guile_mixed_case_symbol, 0,		\
@@ -298,8 +300,9 @@ extern void scm_initialize_token_reader_library (void);
 		       "=> (\"Hello \" (bold \"World\") \"!\")\n"	\
 		       "@end smallexample\n\n"				\
 		       "See @uref{http://www.inria.fr@/"		\
-		       "/mimosa/fp/Skribe, the Skribe web site} "	\
-		       "for more details.")
+		       "/mimosa/fp/Skribe, the Skribe web site} or "	\
+		       "@uref{http://www.nongnu.org/skribilo/, the "	\
+		       "Skribilo web site} for more details.")
 #define SCM_TR_SQUARE_BRACKET_SEXP /* square-bracket-sexp */			\
   SCM_DEFTOKEN_SINGLE ('[', "square-bracket-sexp", scm_read_sexp, 0,		\
 		       "Read an S-expression enclosed in square "		\
@@ -343,7 +346,8 @@ extern void scm_initialize_token_reader_library (void);
 		      "letter and return a symbol.  This token "	\
 		      "reader conforms with R6RS in that it is "	\
 		      "case-sensitive and recognizes square "		\
-		      "brackets as delimiters.")
+		      "brackets as delimiters (@pxref{Token "		\
+		      "Delimiters}).")
 #define SCM_TR_R6RS_SYMBOL_UPPER_CASE /* r6rs-symbol-upper-case */	\
   SCM_DEFTOKEN_RANGE ('A', 'Z', "r6rs-symbol-upper-case",		\
 		      scm_read_r6rs_symbol, 0,				\
@@ -351,7 +355,8 @@ extern void scm_initialize_token_reader_library (void);
 		      "letter and return a symbol.  This token "	\
 		      "reader conforms with R6RS in that it is "	\
 		      "case-sensitive and recognizes square "		\
-		      "brackets as delimiters.")
+		      "brackets as delimiters (@pxref{Token "		\
+		      "Delimiters}).")
 #define SCM_TR_R6RS_SYMBOL_MISC_CHARS /* r6rs-symbol-misc-chars */	\
   SCM_DEFTOKEN_SET ("{}~^:.+-/*%&@_<>!=?$",				\
 		    "r6rs-symbol-misc-chars",				\
@@ -361,7 +366,8 @@ extern void scm_initialize_token_reader_library (void);
 		    "symbol.  This token "				\
 		    "reader conforms with R6RS in that it is "		\
 		    "case-sensitive and recognizes square "		\
-		    "brackets as delimiters.")
+		    "brackets as delimiters (@pxref{Token "		\
+		    "Delimiters}).")
 #define SCM_TR_BRACE_FREE_SYMBOL_LOWER_CASE /* brace-free-symbol-lower-case */ \
   SCM_DEFTOKEN_RANGE ('a', 'z', "brace-free-symbol-lower-case",		       \
 		      scm_read_brace_free_symbol, 0,			       \

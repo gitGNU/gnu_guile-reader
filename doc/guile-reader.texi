@@ -115,19 +115,26 @@ each other, such as the DSSSL keyword syntax and the @inforef{Block
 Comments, SCSH block comments, guile}.  In short the current reader
 syntax is hardly extensible.
 
-@cindex SILex
 The idea of Guile Reader is to provide a framework allowing users to
-quickly define readers for whatever syntax they like.  While it is
-much simpler than a full-blown lexer generator like Flex or Danny
-Dub@'e's SILex (see @uref{http://www.iro.umontreal.ca/~dube/} for more
-information), its simple programming interface should make it very
-straightforward to implement readers, especially for Scheme-like
-syntaxes.  Best of all, Guile Reader comes with a library of
-components that can typically be used to construct a reader for the
-Scheme syntax.  And each one of this components may be reused at will
-when creating other readers.  On the other hand, one should be aware
-that this simpler API comes at the cost of a lack of consistency in
-some cases, as outlined in @xref{Token Delimiters}.
+quickly define readers for whatever syntax (or rather: variant of the
+Scheme syntax) they like.  Programs can then provide their own readers
+and, thanks to Guile's @code{current-reader} mechanism, have their
+code read with this reader.
+
+@cindex SILex
+@cindex lexer
+While it is much simpler than a full-blown lexer generator such as
+@uref{http://www.gnu.org/software/flex/, Flex},
+@uref{http://www.iro.umontreal.ca/~dube/, Danny Dub@'e's SILex} and
+@uref{http://www.inria.fr/mimosa/fp/Bigloo, Bigloo's RGC}, its simple
+programming interface should make it very straightforward to implement
+readers, especially for Scheme-like syntaxes.  Best of all, Guile
+Reader comes with a library of components that can typically be used
+to construct a reader for the Scheme syntax.  And each one of this
+components may be reused at will when creating other readers.  On the
+other hand, one should be aware that this simpler API comes at the
+cost of a lack of consistency in some cases, as outlined in
+@xref{Limitations}.
 
 @cindex read table
 Common Lisp has a similar mechanism to extend its reader which is
@@ -212,7 +219,7 @@ ones.
 * TR Calling Convention::       
 * Invoking a Reader from a TR::  
 * Token Reader Library::        
-* Token Delimiters::            
+* Limitations::                 
 @end menu
 
 @node Defining a New Token Reader, TR Calling Convention, Token Readers, Token Readers
@@ -351,7 +358,7 @@ must call @var{top-level-reader} which points to the top-level reader,
 i.e. the reader which yielded the invocation of the @code{#}
 sub-reader.
 
-@node Token Reader Library, Token Delimiters, Invoking a Reader from a TR, Token Readers
+@node Token Reader Library, Limitations, Invoking a Reader from a TR, Token Readers
 @subsection Token Reader Library
 
 @cindex token reader library
@@ -392,9 +399,19 @@ The procedures available to manipulate token readers are listed below:
 @c Include part of API documentation snarffed from `reader.c'.
 @include token-reader-api-doc.texi
 
+@node Limitations,  , Token Reader Library, Token Readers
+@subsection Limitations
 
-@node Token Delimiters,  , Token Reader Library, Token Readers
-@subsection Token Delimiters
+This section describes the main limitations and common pitfalls
+encountered when using guile-reader.
+
+@menu
+* Token Delimiters::            Dealing with token delimiters.
+* Overlapping Token Readers::   Token readers that syntactically overlap.
+@end menu
+
+@node Token Delimiters, Overlapping Token Readers, Limitations, Limitations
+@subsubsection Token Delimiters
 
 @cindex token delimiters
 As can be seen from the previous section, there exist, for instance,
@@ -445,6 +462,47 @@ A ``real'' lexer generator such as Danny Dub@'e's SILex avoids such
 issues because it allows the definition of tokens using regular
 expressions.  However, its usage may be less trivial than that of
 guile-reader.
+
+@node Overlapping Token Readers,  , Token Delimiters, Limitations
+@subsubsection Overlapping Token Readers
+
+As can be seen from the descriptions of the standard token readers
+(@pxref{Token Reader Library}), token readers sometimes ``overlap'',
+i.e., the set of input strings they match overlap.  For instance, the
+@code{boolean} token reader should match @code{#t}, @code{#T},
+@code{#f} or @code{#F}.  However, the @code{srfi-4} token reader also
+needs to match floating-point numeric vectors such as @code{#f32(1.0
+2.0 3.0)}.  Similarly, strings like @code{1} are, logically, handled
+by the @code{guile-number} (or similar) token reader; however, since a
+string like @code{1+} should be recognized as a @emph{symbol}, rather
+than a number, it must then be passed to one of the symbol token
+readers.
+
+In those two cases, the input sets of those two token readers
+@emph{overlap}.  In order for the resulting reader to work as
+expected, the two overlapping token readers need to somehow
+@emph{cooperate}.  In the first example, this is achieved by having
+the @code{srfi-4} TR read in strings starting with @code{#f} or
+@code{#F} and passing them to the @code{boolean-srfi-4} TR if need be.
+In the second case, this is done by having number TRs (e.g.,
+@code{guile-number}) explicitly check for non-digit characters and
+return a symbol instead of a number when a non-digit is encountered.
+
+It should be obvious from these two examples that this limitation
+impedes full separation of the various TRs.  Fortunately, there are
+not so many cases where such overlapping occurs when implementing
+readers for R5RS-like syntaxes.  The implementation of
+@code{make-alternate-guile-reader} (@pxref{Reader Library}) shows how
+such problems have been worked around.
+
+@cindex lexer
+Lexer generators such as @uref{http://www.gnu.org/software/flex/,
+Flex}, @uref{http://www.iro.umontreal.ca/~dube/, SILex} and Bigloo's
+RGC (@inforef{Regular Parsing, Bigloo's RGC, bigloo}, for details)
+obviously do not have this problem: all possible ``token'' types are
+defined using regular expressions and the string-handling code (e.g.,
+code that converts a string into a Scheme number) is only invoked once
+a full matching string has been found.
 
 
 @node Readers,  , Token Readers, API Reference
@@ -561,11 +619,15 @@ default reader made of re-usable token readers written in C
 (@pxref{Token Reader Library}).
 
 @c Include part of API documentation snarffed from `reader-lib.c'.
-@include reader-lib-api-doc.texi
+@include default-reader-doc.texi
 
 Additionally, the @code{(system reader library)} module exports a
 number of procedures that ease the re-use of readers.
 
+@c Include part of the API documentation snarffed from `reader-lib.c'.
+@include make-guile-reader-doc.texi
+
+@c Include part of the API documentation obtained from `library.scm'.
 @include reader-lib-doc.texi
 
 
@@ -616,11 +678,12 @@ future modification performed via Guile's built-in reader option
 interface will be confined to the calling module.
 
 @findex current-reader
-Starting from Guile 1.7.3, @code{current-reader} is a core binding
-bound to a fluid whose value should be either `#f' or a reader (i.e.,
-a @code{read}-like procedure).  The value of this fluid dictates the
-reader that is to be used by @code{primitive-load} and its value can
-be changed dynamically.
+Starting from Guile 1.8.0, @code{current-reader} is a core binding
+bound to a fluid whose value should be either @code{#f} or a reader
+(i.e., a @code{read}-like procedure).  The value of this fluid
+dictates the reader that is to be used by @code{primitive-load} and
+its value can be changed dynamically (see @inforef{Loading,
+@code{current-reader}, guile} for details).
 
 The confined variants of @code{read-options-interface} and
 @code{read-hash-extend} rely on this feature to make reader
@@ -662,6 +725,12 @@ startup time of a program.  For example, @code{make-guile-reader}
 initialized arrays of token readers.  It still needs to invoke
 @code{scm_c_make_reader ()}, but at least, token readers themselves
 are ``ready to use''.
+
+Scanners as generated by Flex or similar tools should theoretically be
+able to provide better performance because the input reading and
+pattern matching loop is self-contained, may fit in cache, and only
+has to perform function calls once a pattern has been fully
+recognized.
 
 
 @c *********************************************************************

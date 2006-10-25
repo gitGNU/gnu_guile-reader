@@ -9,7 +9,8 @@ BUILT_SOURCES = version.texi					\
 		make-token-reader-doc.texi			\
 		token-reader-api-doc.texi			\
 		make-reader-doc.texi				\
-		reader-lib-api-doc.texi
+		default-reader-doc.texi				\
+		make-guile-reader-doc.texi
 
 token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/token-readers.h
 	main='(module-ref (resolve-module '\''(extract-doc)) '\'main')' &&  \
@@ -31,6 +32,10 @@ token-reader-api-doc.texi: $(top_srcdir)/reader.c
 make-reader-doc.texi: $(top_srcdir)/reader.c
 	$(top_builddir)/doc/extract-c-doc.scm $^ make-reader > $@
 
-reader-lib-api-doc.texi: $(top_srcdir)/reader-lib.c
-	$(top_builddir)/doc/extract-c-doc.scm $^ > $@
+default-reader-doc.texi: $(top_srcdir)/reader-lib.c
+	$(top_builddir)/doc/extract-c-doc.scm $^ default-reader		\
+		default-sharp-reader default-reader-token-readers	\
+	 	default-sharp-reader-token-readers > $@
 
+make-guile-reader-doc.texi: $(top_srcdir)/reader-lib.c
+	$(top_builddir)/doc/extract-c-doc.scm $^ make-guile-reader > $@
