@@ -75,8 +75,11 @@ AC_CONFIG_FILES([Makefile
 	         module/Makefile
 		 module/system/Makefile
 		 module/system/reader/Makefile
-		 doc/Makefile])
+		 module/system/documentation/Makefile
+		 doc/Makefile
+		 doc/extract-c-doc.scm])
 
 AC_CONFIG_COMMANDS([pre-inst-guile-exec], [chmod +x pre-inst-guile])
+AC_CONFIG_COMMANDS([extract-c-doc-exec],  [chmod +x doc/extract-c-doc.scm])
 
 AC_OUTPUT

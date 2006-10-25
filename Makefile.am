@@ -13,7 +13,7 @@ CLEANFILES = $(BUILT_SOURCES)
 
 EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 	     extract-token-readers.sh extract-make-reader-flags.sh	\
-	     compat.h
+	     compat.h pre-inst-guile.in
 
 # Some header files are generated (in builddir) and others are in srcdir.
 AM_CFLAGS = -I$(top_srcdir) -I$(top_builddir)

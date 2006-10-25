@@ -1960,7 +1960,15 @@ scm_to_make_reader_flags (SCM flags)
 
 SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 1,
 	    (SCM token_readers, SCM fault_handler_proc, SCM flags),
-	    "Create a reader.")
+	    "Create a reader made of the token readers listed in "
+	    "@var{token_readers}.  @var{token_readers} should be a list "
+	    "of token readers returned by @code{make-token-reader} or "
+	    "@code{standard-token-reader} for instance.  The "
+	    "@var{fault_handler_proc} argument is optional "
+	    "and may be a three-argument procedure to call when an "
+	    "unexpected character is read.  @var{flags} is a rest "
+	    "argument which may contain a list of symbols representing "
+	    "reader compilation flags.")
 #define FUNC_NAME "make-reader"
 {
   SCM s_reader, *s_deps;
