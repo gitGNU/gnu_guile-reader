@@ -183,8 +183,9 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
   if (fault_handler != SCM_BOOL_F)
     {
       /* Prepare a (small) list of GC dependencies.  */
-      s_deps = scm_malloc (sizeof (*s_deps));
+      s_deps = scm_malloc (2 * sizeof (*s_deps));
       s_deps[0] = fault_handler;
+      s_deps[1] = SCM_BOOL_F;
     }
   else
     /* No GC dependencies.  */
