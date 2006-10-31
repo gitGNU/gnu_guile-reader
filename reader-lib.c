@@ -78,8 +78,8 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
 static size_t standard_reader_specs_size = 0;
 
 #ifdef DEBUG
-# define SHARP_READER_SIZE      10000
-# define TOP_LEVEL_READER_SIZE  12000
+# define SHARP_READER_SIZE      20000
+# define TOP_LEVEL_READER_SIZE  25000
 #else
 # define SHARP_READER_SIZE      4000
 # define TOP_LEVEL_READER_SIZE  5000

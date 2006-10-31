@@ -132,10 +132,10 @@ do_scm_set_source_position (SCM obj, long line, int column,
     scm_to_locale_stringbuf (filename, c_filename, len);
     c_filename[len] = 0;
 
-    debug ("%s (obj=%p[%s], line=%u, col=%u, file=\"%s\")\n",
+    debug ("%s (obj=%p[%s], line=%li, col=%i, file=\"%s\")\n",
 	   __FUNCTION__, (void *)obj,
 	   SCM_IMP (obj) ? "imm" : "non-imm",
-	   scm_to_uint (line), scm_to_uint (column),
+	   line, column,
 	   c_filename);
   }
 #endif
@@ -898,6 +898,8 @@ generate_character_dispatch (jit_state *lightning_state,
     {
       static const char msg_jumping[] = "preparing to jump at %p\n";
 
+      CHECK_CODE_SIZE (buffer_size, start, -1);
+
       jit_pushr_p (JIT_R0);
 
       jit_movi_p (JIT_R1, msg_jumping);
@@ -1304,6 +1306,10 @@ generate_character_handling_code (jit_state *lightning_state,
       else
 	{
 	  handler_code = jit_get_label ();
+	  debug ("TR `%s' handled @ %p\n",
+		 (tr->name == NULL) ? "<nameless>" : tr->name,
+		 jit_get_label ());
+
 	  if (generate_token_reader_invocation (&_jit, tr, loop_start,
 						flags & SCM_READER_FLAG_DEBUG,
 						flags
@@ -2372,7 +2378,7 @@ SCM_DEFINE (test_getc, "test-getc", 1, 0, 0,
       arg_port = jit_arg_p ();
       jit_getarg_p (JIT_V0, arg_port);
 
-      generate_getc (&lightning_state, start, sizeof (buffer));
+      generate_getc (&lightning_state, 1, start, sizeof (buffer));
       jit_movi_p (JIT_R0, msg_dbg);
 
       jit_prepare (2);
