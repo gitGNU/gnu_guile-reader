@@ -1988,9 +1988,13 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 1,
 	    "@code{standard-token-reader} for instance.  The "
 	    "@var{fault_handler_proc} argument is optional "
 	    "and may be a three-argument procedure to call when an "
-	    "unexpected character is read.  @var{flags} is a rest "
-	    "argument which may contain a list of symbols representing "
-	    "reader compilation flags.")
+	    "unexpected character is read.  When @var{fault_handler_proc} "
+	    "is invoked, it is passed the faulty character, input port, "
+	    "and reader; its return value, if any, is then returned by the "
+	    "reader.  If @var{fault_handler_proc} is not specified, then "
+	    "@code{%reader-standard-fault-handler} is used.  @var{flags} "
+	    "is a rest argument which may contain a list of symbols "
+	    "representing reader compilation flags.")
 #define FUNC_NAME "make-reader"
 {
   SCM s_reader, *s_deps;
@@ -2564,13 +2568,19 @@ token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
 /* The standard fault handler proc.  */
 SCM scm_reader_standard_fault_handler_proc = SCM_BOOL_F;
 
-static SCM
-scm_reader_standard_fault_handler (SCM chr, SCM port, SCM reader)
+SCM_DEFINE (scm_reader_standard_fault_handler,
+	    "%reader-standard-fault-handler", 3, 0, 0,
+	    (SCM chr, SCM port, SCM reader),
+	    "Throw a @code{read-error} exception indicating that character "
+	    "@var{chr} was read from @var{port} and could not be handled by "
+	    "@var{reader}.")
+#define FUNC_NAME s_scm_reader_standard_fault_handler
 {
   scm_i_input_error ("%reader-standard-fault-handler",
 		     port, "unhandled character: ~S", scm_list_1 (chr));
   return SCM_UNSPECIFIED;
 }
+#undef FUNC_NAME
 
 
 
@@ -2594,12 +2604,10 @@ scm_reader_init_bindings (void)
 		      3, 0, 0); /* XXX unfortunately, we are limited to 3
 				   compulsory arguments...  */
 
-  scm_reader_standard_fault_handler_proc =
-    scm_permanent_object (scm_c_define_gsubr
-			  ("%reader-standard-fault-handler", 3, 0, 0,
-			   scm_reader_standard_fault_handler));
-
 #include "reader.c.x"
+
+  scm_reader_standard_fault_handler_proc =
+    SCM_VARIABLE_REF (scm_c_lookup ("%reader-standard-fault-handler"));
 
   /* Initialize the other subsystems.  */
   scm_initialize_token_reader_library ();

@@ -134,7 +134,9 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
 	    "Make and return a new reader compatible with Guile's built-in "
 	    "reader.  This function call @code{make-reader} with "
 	    "@var{flags}.  Note that the sharp reader used by the returned "
-	    "reader is also instantiated using @var{flags}.")
+	    "reader is also instantiated using @var{flags}.  The value of "
+	    "@var{fault-handler} defaults to "
+	    "@code{%reader-standard-fault-handler}.")
 #define FUNC_NAME s_scm_make_guile_reader
 {
   SCM s_reader, *s_deps;
@@ -145,7 +147,7 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
   void *buffer;
 
   if (fault_handler == SCM_UNDEFINED)
-    fault_handler = SCM_BOOL_F;
+    fault_handler = scm_reader_standard_fault_handler_proc;
 
   if (fault_handler != SCM_BOOL_F)
     SCM_VALIDATE_PROC (1, fault_handler);

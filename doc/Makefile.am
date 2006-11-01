@@ -30,7 +30,8 @@ token-reader-api-doc.texi: $(top_srcdir)/reader.c
 	   token-reader-procedure 'token-reader-escape?' > $@
 
 make-reader-doc.texi: $(top_srcdir)/reader.c
-	$(top_builddir)/doc/extract-c-doc.scm $^ make-reader > $@
+	$(top_builddir)/doc/extract-c-doc.scm $^		\
+	   make-reader %reader-standard-fault-handler > $@
 
 default-reader-doc.texi: $(top_srcdir)/reader-lib.c
 	$(top_builddir)/doc/extract-c-doc.scm $^ default-reader		\

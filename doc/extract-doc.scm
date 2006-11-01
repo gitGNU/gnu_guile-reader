@@ -83,18 +83,18 @@
 	   (format #t "~a ~a@dots{}~%" (car args) (cdr args))))))
 
 (define (extract-module-doc module)
+  "Issue documentation for the documented procedures exported by
+@var{module}."
   (module-for-each (lambda (binding var)
 		     (let* ((obj (module-ref module binding))
 			    (doc (object-documentation obj)))
-		       (if (procedure? obj)
+		       (if (and (procedure? obj) doc)
 			   (let* ((src (procedure-source obj))
 				  (args (if src (cadr src) '())))
 			     (format #t "~%@deffn {Scheme Procedure} ~a "
 				     binding)
 			     (output-args args)
-			     (format #t "~a~%"
-				     (if doc doc
-					 "(documentation unavailable)"))
+			     (format #t "~a~%" doc)
 			     (format #t "@end deffn~%")))))
 		   (module-public-interface module)))
 

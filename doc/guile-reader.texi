@@ -583,7 +583,7 @@ the reader.
 @c Include part of API documentation snarffed from `reader.c'.
 @include make-reader-doc.texi
 
-Currently, the flags that may be passed to token readers are the
+Currently, the flags that may be passed to @code{make-reader} are the
 following:
 
 @itemize

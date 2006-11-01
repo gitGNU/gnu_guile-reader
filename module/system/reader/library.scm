@@ -195,13 +195,14 @@ Allow for square brackets around S-expressions.
 		(else top-specs))))))
 
 (define*-public (make-alternate-guile-reader options
-					     #:optional (fault-handler #f)
+					     #:optional (fault-handler %reader-standard-fault-handler)
 					     #:rest flags)
   "Return a newly created Guile reader with options @var{options} (a list of
 symbols, as for @code{alternate-guile-reader-token-readers}), with fault
 handler @var{fault-handler} and flags @var{flags}.  The @var{fault-handler}
 and @var{flags} arguments are the same as those passed to
-@code{make-reader}."
+@code{make-reader}.  By default, @var{fault-handler} is set to
+@var{%reader-standard-fault-handler}."
   (let-values (((sharp-specs top-specs)
 		(alternate-guile-reader-token-readers options)))
     (let* ((sharp (apply make-reader `(,sharp-specs ,fault-handler ,@flags)))

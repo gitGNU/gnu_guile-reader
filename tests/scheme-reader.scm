@@ -196,8 +196,7 @@ encountered."
     (line-comment-within-sexp . "(+ 2 ;; a line comment\n\t2)\n")
     (line-comment-finishing-sexp . "(f 2 ;; comment before bracket\n)\n")
 
-    ;; FIXME:  This last one currently fails.  In order not to fail, the API
-    ;; needs to be improved.
+    ;; comments within S-exps
     (scsh-block-comment-within-sexp . "(f #! a comment\n!#\n 2)\n\t\n")
     (scsh-block-comment-finishing-sexp . "(+ 2 #! a comment\n!#\n) ")))
 
