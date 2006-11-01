@@ -420,7 +420,7 @@ generate_position_store (jit_state *lightning_state,
 #undef _jit
 
 /* Generate code that will set the source properties of the expression just
-   read and available in register JIT_RET.  The relevant information is
+   read and available in register R0.  The relevant information is
    assumed to be stored on the stack.  The usual register allocation
    invariants are assumed.  */
 static inline int
@@ -434,7 +434,7 @@ generate_position_set (jit_state *lightning_state,
      this point (it used to contain the character read).  */
   CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_pushr_i (JIT_V1);  /* character as an `int' */
-  jit_retval_p (JIT_V1); /* Scheme expression just read */
+  jit_movr_p (JIT_V1, JIT_R0); /* Scheme expression just read */
 
   /* Pop back line, column and filename.  */
   CHECK_CODE_SIZE (buffer_size, start, -1);
@@ -453,9 +453,9 @@ generate_position_set (jit_state *lightning_state,
   (void)jit_finish (do_scm_set_source_position);
   debug_post_call ();
 
-  /* Put the expression read back in JIT_RET.  */
+  /* Put the expression read back in R0.  */
   CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_movr_p (JIT_RET, JIT_V1);
+  jit_movr_p (JIT_R0, JIT_V1);
   jit_popr_i (JIT_V1);
 
   return 0;
@@ -788,8 +788,9 @@ generate_reader_prologue (jit_state *lightning_state,
 }
 #undef _jit
 
-/* Generate code that restores the stack pointer from the frame pointer
-   and returns.  The usual register invariants are assumed.  */
+/* Generate code that restores the stack pointer from the frame pointer and
+   returns the value currently in R0.  The usual register invariants are
+   assumed.  */
 static inline int
 generate_reader_epilogue (jit_state *lightning_state,
 			  int debug,
@@ -800,7 +801,7 @@ generate_reader_epilogue (jit_state *lightning_state,
 
   if (debug)
     {
-      jit_pushr_p (JIT_RET);
+      jit_movr_p (JIT_V1, JIT_R0);
 
       (void)jit_movi_p (JIT_R0, msg_epilogue);
       debug_pre_call ();
@@ -812,10 +813,11 @@ generate_reader_epilogue (jit_state *lightning_state,
       debug_post_call ();
       CHECK_CODE_SIZE (buffer_size, start, -1);
 
-      jit_popr_p (JIT_RET);
+      jit_movr_p (JIT_R0, JIT_V1);
     }
 
   jit_movr_p (JIT_SP, JIT_V2);
+  jit_movr_p (JIT_RET, JIT_R0);
   jit_ret ();
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
@@ -925,7 +927,8 @@ generate_character_dispatch (jit_state *lightning_state,
    invariants.  A jump to DO_AGAIN is generated when a NULL reader is
    encountered or when an escaping reader returns `SCM_UNSPECIFIED'.  If
    DEBUG is true (non-zero), additional debugging code is generated.  If
-   POSITIONS is true, then position-recording code is generated.  */
+   POSITIONS is true, then position-recording code is generated.  The return
+   value of the token reader is left in R0.  */
 static inline int
 generate_token_reader_invocation (jit_state *lightning_state,
 				  const scm_token_reader_spec_t *tr,
@@ -973,14 +976,16 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  (void)jit_finish (func);
 	  debug_post_call ();
 
+	  jit_retval_p (JIT_R0);
+
 	  if (debug)
 	    {
 	      CHECK_CODE_SIZE (buffer_size, start, -1);
 	      jit_pushr_i (JIT_V1);
-	      jit_movr_p (JIT_V1, JIT_RET);
+	      jit_movr_p (JIT_V1, JIT_R0);
 	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 			     name, JIT_R1, do_like_printf);
-	      jit_movr_p (JIT_RET, JIT_V1);
+	      jit_movr_p (JIT_R0, JIT_V1);
 	      jit_popr_i (JIT_V1);
 	    }
 	}
@@ -1058,6 +1063,8 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  jit_finish (scm_call_4);
 	  debug_post_call ();
 
+	  jit_retval_p (JIT_R0);
+
 	  /* Restore the C character.  */
 	  jit_popr_i (JIT_V1);
 
@@ -1065,15 +1072,15 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	    {
 	      CHECK_CODE_SIZE (buffer_size, start, -1);
 	      jit_pushr_i (JIT_V1);
-	      jit_retval_p (JIT_V1);
+	      jit_movr_p (JIT_V1, JIT_R0);
 	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 			     "spec_str", JIT_R1, do_like_printf);
-	      jit_movr_p (JIT_RET, JIT_V1);
+	      jit_movr_p (JIT_R0, JIT_V1);
 	      jit_popr_i (JIT_V1);
 	    }
 	}
       else
-	jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+	jit_movi_p (JIT_R0, (void *)SCM_UNSPECIFIED);
 
       break;
 
@@ -1104,14 +1111,16 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  jit_finish (tr->reader.value.reader);
 	  debug_post_call ();
 
+	  jit_retval_p (JIT_R0);
+
 	  if (debug)
 	    {
 	      CHECK_CODE_SIZE (buffer_size, start, -1);
 	      jit_pushr_i (JIT_V1);
-	      jit_retval_p (JIT_V1);
+	      jit_movr_p (JIT_V1, JIT_R0);
 	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 			     "spec_str", JIT_R1, do_like_printf);
-	      jit_movr_p (JIT_RET, JIT_V1);
+	      jit_movr_p (JIT_R0, JIT_V1);
 	      jit_popr_i (JIT_V1);
 	    }
 	}
@@ -1129,11 +1138,13 @@ generate_token_reader_invocation (jit_state *lightning_state,
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
+  /* At this point, the return value of the token reader is in R0.  */
+
   if (!tr->escape)
     /* When the reader returns SCM_UNSPECIFIED, then start again.
        This is what, for instance, comment readers do in the
        top-level reader.  */
-    jit_beqi_p (do_again, JIT_RET, (void *)SCM_UNSPECIFIED);
+    jit_beqi_p (do_again, JIT_R0, (void *)SCM_UNSPECIFIED);
 
   if (positions)
     {
@@ -1149,7 +1160,9 @@ generate_token_reader_invocation (jit_state *lightning_state,
    integer, is expected to be in V1 at this point).  I.e., if the
    CALLER_HANDLED argument passed to the function being generated (this
    argument is expected to be on the stack) is true, then do nothing.
-   Otherwise, call FAULT_HANDLER.  */
+   Otherwise, call FAULT_HANDLER and leave its return value in R0.  If
+   FAULT_HANDLER is not a procedure, then `SCM_UNSPECIFIED' is left in
+   R0.  */
 static inline int
 generate_unexpected_character_handling (jit_state *lightning_state,
 					SCM fault_handler, int debug,
@@ -1161,8 +1174,9 @@ generate_unexpected_character_handling (jit_state *lightning_state,
   /* Check whether the CALLER_HANDLED argument is true, in which case
      we'll simply return the faulty character to PORT and return.  */
   CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_ldxi_i (JIT_R0, JIT_V2, -JIT_STACK_CALLER_HANDLED);
-  ref = jit_beqi_i (jit_forward (), JIT_R0, 0);
+  jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_CALLER_HANDLED);
+  ref = jit_beqi_i (jit_forward (), JIT_R1, 0);
+
   debug_pre_call ();
   CHECK_CODE_SIZE (buffer_size, start, -1);
   jit_prepare (2);
@@ -1172,7 +1186,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
   debug_post_call ();
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
-  (void)jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+  (void)jit_movi_p (JIT_R0, (void *)SCM_UNSPECIFIED);
   generate_reader_epilogue (&_jit, debug, start, buffer_size);
   CHECK_CODE_SIZE (buffer_size, start, -1);
 
@@ -1213,6 +1227,9 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       (void)jit_finish (scm_call_3);
       debug_post_call ();
 
+      /* Put FAULT_HANDLER's result in R0 in order to return it.  */
+      jit_retval (JIT_R0);
+
       jit_popr_p (JIT_V2); /* restore the frame pointer */
     }
   else
@@ -1230,7 +1247,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       (void)jit_finish (scm_ungetc);
       debug_post_call ();
 
-      (void)jit_movi_p (JIT_RET, (void *)SCM_UNSPECIFIED);
+      (void)jit_movi_p (JIT_R0, (void *)SCM_UNSPECIFIED);
     }
 
   CHECK_CODE_SIZE (buffer_size, start, -1);
@@ -1317,8 +1334,7 @@ generate_character_handling_code (jit_state *lightning_state,
 						start, buffer_size))
 	    return -1;
 
-	  /* The reader's return value is already in JIT_RET, so we just have
-	     to return.  */
+	  /* At this point, the reader's return value is in R0.  */
 	  if (generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
 					start, buffer_size))
 	    return -1;
@@ -1470,7 +1486,7 @@ scm_c_make_reader (void *code_buffer,
 
   /* This is where we get when `scm_getc ()' returned EOF.  */
   jit_patch (jump_to_end);
-  jit_movi_p (JIT_RET, (void *)SCM_EOF_VAL);
+  jit_movi_p (JIT_R0, (void *)SCM_EOF_VAL);
   generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
 			    start, buffer_size);
 
