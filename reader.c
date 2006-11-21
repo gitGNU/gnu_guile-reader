@@ -232,27 +232,44 @@ do_scm_make_reader_smob (scm_reader_t reader)
    - V1 contains at any time the character just returned by `scm_getc ()',
      i.e., a C integer;
 
-   - V2 contains the frame pointer, i.e. a pointer to the base of all stack
-     variables.
+   - V2 is currently unused (FIXME).
 
 
    Variables allocated on the stack
    --------------------------------
 
    The generated code stores a few variables on the stack, starting at the
-   frame pointer and going downwards.  The `JIT_STACK_' macros give the
-   offset of those variables.  */
+   frame pointer and going downwards.  The `stack_offsets_t' structure gives
+   the offset of those variables relative to `JIT_FP'.  */
 
-#define JIT_WORD_SIZE                 sizeof (void *)
 
-#define JIT_STACK_CALLER_HANDLED      JIT_WORD_SIZE
-#define JIT_STACK_TOP_LEVEL_READER    (JIT_WORD_SIZE * 2)
-#define JIT_STACK_POSITION_FILENAME   (JIT_WORD_SIZE * 3)
-#define JIT_STACK_POSITION_LINE       (JIT_WORD_SIZE * 4)
-#define JIT_STACK_POSITION_COLUMN     (JIT_WORD_SIZE * 5)
+typedef struct
+{
+  int caller_handled;
+  int top_level_reader;
+  int position_filename;
+  int position_line;
+  int position_column;
 
-/* Total size needed to store local variables.  */
-#define JIT_STACK_LOCAL_VARIABLES_SIZE (JIT_WORD_SIZE * 8)
+  int temp1;
+  int temp2;
+  int temp3;
+  int temp4;
+} stack_offsets_t;
+
+typedef struct
+{
+  /* Compilation flags */
+  unsigned flags;
+
+  /* Offset of the various local variables */
+  stack_offsets_t offsets;
+
+  /* Starting point and size of the compilation buffer */
+  const char *start;
+  size_t      buffer_size;
+} compilation_context_t;
+
 
 /* Fetch in RESULT_REG the pointer to the `scm_t_port' object corresponding
    to the `SCM' object in PORT_REG (normally, V0).  This is equivalent to
@@ -350,21 +367,21 @@ do_debug_regs (unsigned line, int entering, void *sp, void *v2, void *v1)
 static inline int
 generate_debug_registers (jit_state *lightning_state,
 			  int enter, unsigned line,
-			  char *start, size_t buffer_size)
+			  const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
-  jit_pushr_p (JIT_RET);
-  jit_pushr_p (JIT_R0);
-  jit_pushr_p (JIT_R1);
-  jit_pushr_p (JIT_R2);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_stxi_p (context->offsets.temp1, JIT_FP, JIT_RET);
+  jit_stxi_p (context->offsets.temp2, JIT_FP, JIT_R0);
+  jit_stxi_p (context->offsets.temp3, JIT_FP, JIT_R1);
+  jit_stxi_p (context->offsets.temp4, JIT_FP, JIT_R2);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_movi_ui (JIT_R0, line);
   jit_movi_i (JIT_R1, enter);
   jit_prepare (5);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   jit_pusharg_p (JIT_V1);
   jit_pusharg_p (JIT_V2);
   jit_pusharg_p (JIT_SP);
@@ -372,13 +389,13 @@ generate_debug_registers (jit_state *lightning_state,
   jit_pusharg_i (JIT_R0);
   (void)jit_finish (do_debug_regs);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_popr_p (JIT_R2);
-  jit_popr_p (JIT_R1);
-  jit_popr_p (JIT_R0);
-  jit_popr_p (JIT_RET);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+  jit_ldxi_p (JIT_R2,  JIT_FP, context->offsets.temp4);
+  jit_ldxi_p (JIT_R1,  JIT_FP, context->offsets.temp3);
+  jit_ldxi_p (JIT_R0,  JIT_FP, context->offsets.temp2);
+  jit_ldxi_p (JIT_RET, JIT_FP, context->offsets.temp1);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   return 0;
 }
 #undef _jit
@@ -388,12 +405,12 @@ generate_debug_registers (jit_state *lightning_state,
    the port-as-`SCM' in V0 and the frame pointer in V2.  */
 static inline int
 generate_position_store (jit_state *lightning_state,
-			 char *start, size_t buffer_size)
+			 const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   debug ("%s (@%p)\n", __FUNCTION__, jit_get_ip ().ptr);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Load the C port structure into R0.  */
   SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
@@ -402,18 +419,18 @@ generate_position_store (jit_state *lightning_state,
      the stack.  */
   jit_ldxi_l (JIT_R1, JIT_R0, offsetof (scm_t_port, line_number));
   jit_ldxi_i (JIT_R2, JIT_R0, offsetof (scm_t_port, column_number));
-  jit_stxi_l (-JIT_STACK_POSITION_LINE, JIT_V2, JIT_R1);
-  jit_stxi_i (-JIT_STACK_POSITION_COLUMN, JIT_V2, JIT_R2);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  jit_stxi_l (context->offsets.position_line, JIT_FP, JIT_R1);
+  jit_stxi_i (context->offsets.position_column, JIT_FP, JIT_R2);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Same for the file name (an `SCM' object).  */
   jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, file_name));
-  jit_stxi_p (-JIT_STACK_POSITION_FILENAME, JIT_V2, JIT_R1);
+  jit_stxi_p (context->offsets.position_filename, JIT_FP, JIT_R1);
 
   /* XXX: We shouldn't need to call `scm_gc_protect ()' here since
      PORT is unlikely to be GC'd anyway.  */
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   return 0;
 }
@@ -425,26 +442,26 @@ generate_position_store (jit_state *lightning_state,
    invariants are assumed.  */
 static inline int
 generate_position_set (jit_state *lightning_state,
-		       char *start, size_t buffer_size)
+		       const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   debug ("%s\n", __FUNCTION__);
 
-  /* Put the expression just read in V1 which is no longer used at
-     this point (it used to contain the character read).  */
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_pushr_i (JIT_V1);  /* character as an `int' */
+  /* Put the expression just read in V1 which is no longer used at this point
+     (it used to contain the character read as an `int').  */
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+  jit_stxi_i (context->offsets.temp1, JIT_FP, JIT_V1);
   jit_movr_p (JIT_V1, JIT_R0); /* Scheme expression just read */
 
   /* Pop back line, column and filename.  */
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_ldxi_p (JIT_R0, JIT_V2, -JIT_STACK_POSITION_LINE);
-  jit_ldxi_p (JIT_R1, JIT_V2, -JIT_STACK_POSITION_COLUMN);
-  jit_ldxi_p (JIT_R2, JIT_V2, -JIT_STACK_POSITION_FILENAME);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+  jit_ldxi_p (JIT_R0, JIT_FP, context->offsets.position_line);
+  jit_ldxi_p (JIT_R1, JIT_FP, context->offsets.position_column);
+  jit_ldxi_p (JIT_R2, JIT_FP, context->offsets.position_filename);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   debug_pre_call ();
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   jit_prepare (4);
   jit_pusharg_p (JIT_R2);
   jit_pusharg_p (JIT_R1);
@@ -454,9 +471,9 @@ generate_position_set (jit_state *lightning_state,
   debug_post_call ();
 
   /* Put the expression read back in R0.  */
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   jit_movr_p (JIT_R0, JIT_V1);
-  jit_popr_i (JIT_V1);
+  jit_ldxi_i (JIT_V1, JIT_FP, context->offsets.temp1);
 
   return 0;
 }
@@ -465,17 +482,17 @@ generate_position_set (jit_state *lightning_state,
 /* Generate code that converts the ASCII character in V1 to upper case.  */
 static inline int
 generate_to_upper (jit_state *lightning_state,
-		   char *start, size_t buffer_size)
+		   const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   jit_insn *lt_test, *gt_test;
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   lt_test = jit_blti_i (jit_forward (), JIT_V1, (int)'a');
   gt_test = jit_bgti_i (jit_forward (), JIT_V1, (int)'z');
   jit_movr_i (JIT_R0, JIT_V1);
   jit_subi_i (JIT_V1, JIT_R0, (int)('a' - 'A'));
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_patch (lt_test);
   jit_patch (gt_test);
@@ -487,17 +504,17 @@ generate_to_upper (jit_state *lightning_state,
 /* Generate code that converts the ASCII character in V1 to lower case.  */
 static inline int
 generate_to_lower (jit_state *lightning_state,
-		   char *start, size_t buffer_size)
+		   const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   jit_insn *lt_test, *gt_test;
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   lt_test = jit_blti_i (jit_forward (), JIT_V1, (int)'A');
   gt_test = jit_bgti_i (jit_forward (), JIT_V1, (int)'Z');
   jit_movr_i (JIT_R0, JIT_V1);
   jit_addi_i (JIT_V1, JIT_R0, (int)('a' - 'A'));
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_patch (lt_test);
   jit_patch (gt_test);
@@ -514,7 +531,7 @@ generate_to_lower (jit_state *lightning_state,
    character read from it is in V1.  Clobbers R1 and R2.  */
 static inline int
 generate_getc_update_port_position (jit_state *lightning_state,
-				    char *start, size_t buffer_size)
+				    const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   /* This code mimics the `switch' statement that appears at the end of the C
@@ -532,7 +549,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
   /* Backspace: decrease column number if greater than zero.  */
   test = jit_bnei_i (jit_forward (), JIT_V1, (int)'\b');
   jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   {
     jit_insn *lt_zero;
 
@@ -542,7 +559,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
     jit_patch (lt_zero);
   }
   bs_jump = jit_jmpi (jit_forward ());
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* New line: increase line number and reset column number.  */
   jit_patch (test);
@@ -553,7 +570,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
   jit_movi_i (JIT_R2, 0);
   jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
   nl_jump = jit_jmpi (jit_forward ());
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Reset: reset the column number.  */
   jit_patch (test);
@@ -561,7 +578,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
   jit_movi_i (JIT_R2, 0);
   jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
   reset_jump = jit_jmpi (jit_forward ());
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Tab: set column number to (C + 8 - (C % 8)).  */
   jit_patch (test);
@@ -572,14 +589,14 @@ generate_getc_update_port_position (jit_state *lightning_state,
   jit_subr_i (JIT_R1, JIT_R2, JIT_R1); /* R1 = R2-R1 */
   jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R1);
   tab_jump = jit_jmpi (jit_forward ());
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Default: increase column number.  */
   jit_patch (test);
   jit_ldxi_i (JIT_R1, JIT_R0, offsetof (scm_t_port, column_number));
   jit_addi_i (JIT_R2, JIT_R1, 1);
   jit_stxi_i (offsetof (scm_t_port, column_number), JIT_R0, JIT_R2);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* End of `switch' statement.  */
   jit_patch (alarm_jump);
@@ -600,8 +617,7 @@ generate_getc_update_port_position (jit_state *lightning_state,
    versions certainly).  */
 static inline int
 generate_getc (jit_state *lightning_state,
-	       int debug,
-	       char *start, size_t buffer_size)
+	       const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   jit_insn *rw_check, *position_check, *eof_check,
@@ -610,7 +626,7 @@ generate_getc (jit_state *lightning_state,
   /* Throughout this piece of code, we try to keep the pointer to the C port
      structure in R0.  */
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
 
   /* Check whether read-write.  */
@@ -623,7 +639,7 @@ generate_getc (jit_state *lightning_state,
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (scm_flush);
   SCM_JIT_PTAB_ENTRY (JIT_R0, JIT_V0);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_patch (rw_check);
 
@@ -633,7 +649,7 @@ generate_getc (jit_state *lightning_state,
   random_access_check = jit_beqi_i (jit_forward (), JIT_R1, 0);
   jit_movi_i (JIT_R1, SCM_PORT_READ);
   jit_stxi_i (offsetof (scm_t_port, rw_active), JIT_R0, JIT_R1);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_patch (random_access_check);
 
@@ -641,13 +657,13 @@ generate_getc (jit_state *lightning_state,
   jit_ldxi_p (JIT_R1, JIT_R0, offsetof (scm_t_port, read_pos));
   jit_ldxi_p (JIT_R2, JIT_R0, offsetof (scm_t_port, read_end));
   position_check = jit_bltr_p (jit_forward (), JIT_R1, JIT_R2);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Since `port->read_pos >= port->read_end', we must fill it again.  */
   jit_prepare (1);
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (scm_fill_input);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Check whether `scm_fill_input ()' return `EOF'.  If so, return `EOF'.  */
   jit_retval_i (JIT_R1);
@@ -655,7 +671,7 @@ generate_getc (jit_state *lightning_state,
   eof_check = jit_bnei_i (jit_forward (), JIT_R1, EOF);
   jit_movi_i (JIT_V1, EOF);
   jump_to_end = jit_jmpi (jit_forward ());
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_patch (position_check);
   jit_patch (eof_check);
@@ -666,16 +682,15 @@ generate_getc (jit_state *lightning_state,
   jit_ldxi_c (JIT_V1, JIT_R1, 0); /* the character */
   jit_addi_p (JIT_R2, JIT_R1, 1);
   jit_stxi_p (offsetof (scm_t_port, read_pos), JIT_R0, JIT_R2);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
-  if (generate_getc_update_port_position (lightning_state,
-					  start, buffer_size))
+  if (generate_getc_update_port_position (lightning_state, context))
     return -1;
 
   jit_patch (jump_to_end);
 
 
-  if (debug)
+  if (context->flags & SCM_READER_FLAG_DEBUG)
     {
       static const char msg_read[] = "getc returned %i\n";
 
@@ -685,7 +700,7 @@ generate_getc (jit_state *lightning_state,
       jit_pusharg_p (JIT_R2);
       (void)jit_finish (do_like_printf);
 
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
     }
 
   return 0;
@@ -698,7 +713,7 @@ generate_getc (jit_state *lightning_state,
    of the HOW_MUCH bytes available is returned in RESULT.  */
 static inline int
 generate_space_reservation (jit_state *lightning_state, size_t how_much,
-			    char *start, size_t buffer_size,
+			    const compilation_context_t *context,
 			    void **result)
 #define _jit (* lightning_state)
 {
@@ -706,13 +721,13 @@ generate_space_reservation (jit_state *lightning_state, size_t how_much,
 
   jump = jit_jmpi (jit_forward ());
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   *result = (void *)jit_get_label ();
 
   /* Fill the buffer with `nop's, thereby preserving alignment constraints. */
   while (jit_get_ip ().ptr - (char *)*result < how_much)
     {
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       jit_nop ();
     }
 
@@ -720,59 +735,63 @@ generate_space_reservation (jit_state *lightning_state, size_t how_much,
 	 how_much, jit_get_ip ().ptr - (char *)*result);
 
   jit_patch (jump);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   return 0;
 }
 #undef _jit
 
 /* Generate a prologue that reserves enough space on the stack to store the
-   reader's local variables and store the original value of the stack pointer
-   (which we'll refer to as the ``frame pointer'') in V2.  */
+   reader's local variables and update CONTEXT->OFFSETS accordingly.  */
 static inline int
 generate_reader_prologue (jit_state *lightning_state,
-			  int debug,
-			  char *start, size_t buffer_size)
+			  compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   static const char *msg_prologue = "reader prologue: SP is %p\n";
   jit_insn *ref;
 
-  if (debug)
+  context->offsets.caller_handled = jit_allocai (sizeof (void *));
+  context->offsets.top_level_reader = jit_allocai (sizeof (void *));
+  context->offsets.position_filename = jit_allocai (sizeof (void *));
+  context->offsets.position_line = jit_allocai (sizeof (void *));
+  context->offsets.position_column = jit_allocai (sizeof (void *));
+
+  context->offsets.temp1 = jit_allocai (sizeof (void *));
+  context->offsets.temp2 = jit_allocai (sizeof (void *));
+  context->offsets.temp3 = jit_allocai (sizeof (void *));
+  context->offsets.temp4 = jit_allocai (sizeof (void *));
+
+  if (context->flags & SCM_READER_FLAG_DEBUG)
     {
-      jit_pushr_p (JIT_R0);
-      jit_pushr_p (JIT_R1);
+      jit_stxi_p (context->offsets.temp1, JIT_FP, JIT_R0);
+      jit_stxi_p (context->offsets.temp2, JIT_FP, JIT_R1);
 
       (void)jit_movi_p (JIT_R0, msg_prologue);
-      jit_addi_p (JIT_R1, JIT_SP, 2 * sizeof (void *));
 
       jit_prepare (2);
       jit_pusharg_p (JIT_R1);
       jit_pusharg_p (JIT_R0);
       (void)jit_finish (do_like_printf);
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
-      jit_popr_p (JIT_R1);
-      jit_popr_p (JIT_R0);
+      jit_ldxi_p (JIT_R1, JIT_FP, context->offsets.temp2);
+      jit_ldxi_p (JIT_R0, JIT_FP, context->offsets.temp1);
     }
 
-  /* Set up the stack, saving space for local variables.  */
-  jit_movr_p (JIT_V2, JIT_SP);
-  jit_subi_p (JIT_SP, JIT_V2, JIT_STACK_LOCAL_VARIABLES_SIZE+16);
-
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* Store the CALLER_HANDLED argument (currently in V1) and the
      TOP_LEVEL_READER argument (in R2) on the stack.  */
-  jit_stxi_i (-JIT_STACK_CALLER_HANDLED, JIT_V2, JIT_V1);
+  jit_stxi_i (context->offsets.caller_handled, JIT_FP, JIT_V1);
   {
     /* If TOP_LEVEL_READER is NULL, then we'll advertise ourself as the
        top-level reader.  */
     ref = jit_bnei_p (jit_forward (), JIT_R2, NULL);
-    jit_movi_p (JIT_R2, start);
+    jit_movi_p (JIT_R2, context->start);
     jit_patch (ref);
-    jit_stxi_p (-JIT_STACK_TOP_LEVEL_READER, JIT_V2, JIT_R2);
-    CHECK_CODE_SIZE (buffer_size, start, -1);
+    jit_stxi_p (context->offsets.top_level_reader, JIT_FP, JIT_R2);
+    CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   }
 
   /* FIXME:  We should check the type of PORT here.  */
@@ -793,34 +812,32 @@ generate_reader_prologue (jit_state *lightning_state,
    assumed.  */
 static inline int
 generate_reader_epilogue (jit_state *lightning_state,
-			  int debug,
-			  char *start, size_t buffer_size)
+			  const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
-  static const char *msg_epilogue = "reader epilogue: restoring SP %p\n";
+  static const char *msg_epilogue = "reader epilogue: returning %p\n";
 
-  if (debug)
+  if (context->flags & SCM_READER_FLAG_DEBUG)
     {
       jit_movr_p (JIT_V1, JIT_R0);
 
       (void)jit_movi_p (JIT_R0, msg_epilogue);
       debug_pre_call ();
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       jit_prepare (2);
-      jit_pusharg_p (JIT_V2);
+      jit_pusharg_p (JIT_V1);
       jit_pusharg_p (JIT_R0);
       (void)jit_finish (do_like_printf);
       debug_post_call ();
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
       jit_movr_p (JIT_R0, JIT_V1);
     }
 
-  jit_movr_p (JIT_SP, JIT_V2);
   jit_movr_p (JIT_RET, JIT_R0);
   jit_ret ();
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   return 0;
 }
 #undef _jit
@@ -828,10 +845,10 @@ generate_reader_epilogue (jit_state *lightning_state,
 /* Generate code that aborts.  */
 static inline int
 generate_abortion (jit_state *lightning_state,
-		   char *start, size_t buffer_size)
+		   const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   jit_prepare (3);
   jit_pusharg_p (JIT_V2);
@@ -839,7 +856,7 @@ generate_abortion (jit_state *lightning_state,
   jit_pusharg_p (JIT_V0);
   (void)jit_finish (guile_reader_abort);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   return 0;
 }
@@ -851,14 +868,13 @@ generate_abortion (jit_state *lightning_state,
 static inline int
 generate_character_dispatch (jit_state *lightning_state,
 			     jit_insn **jump_table,
-			     int debug,
-			     char *start, size_t buffer_size)
+			     const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   jit_insn *test;
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  if (debug)
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+  if (context->flags & SCM_READER_FLAG_DEBUG)
     {
       static const char msg_dispatching[] = "dispatching for character `%i'\n";
 
@@ -869,21 +885,21 @@ generate_character_dispatch (jit_state *lightning_state,
       jit_pusharg_p (JIT_R0);
       (void)jit_finish (do_like_printf);
 
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
     }
 
   /* Make sure the character just read is in the range [0;255].  */
 
   test = jit_bgei_i (jit_forward (), JIT_V1, 0);
-  if (generate_abortion (&_jit, start, buffer_size))
+  if (generate_abortion (&_jit, context))
     return -1;
 
   jit_patch (test);
   test = jit_blei_i (jit_forward (), JIT_V1, 255);
-  if (generate_abortion (&_jit, start, buffer_size))
+  if (generate_abortion (&_jit, context))
     return -1;
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   jit_patch (test);
 
   /* Load the pointer at JUMP_TABLE + (V1 * sizeof (void *)).  */
@@ -896,13 +912,13 @@ generate_character_dispatch (jit_state *lightning_state,
 #endif
   jit_ldxi_p (JIT_R0, JIT_R1, jump_table);
 
-  if (debug)
+  if (context->flags & SCM_READER_FLAG_DEBUG)
     {
       static const char msg_jumping[] = "preparing to jump at %p\n";
 
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
-      jit_pushr_p (JIT_R0);
+      jit_stxi_p (context->offsets.temp1, JIT_FP, JIT_R0);
 
       jit_movi_p (JIT_R1, msg_jumping);
       jit_prepare (2);
@@ -910,14 +926,14 @@ generate_character_dispatch (jit_state *lightning_state,
       jit_pusharg_p (JIT_R1);
       (void)jit_finish (do_like_printf);
 
-      jit_popr_p (JIT_R0);
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      jit_ldxi_p (JIT_R0, JIT_FP, context->offsets.temp1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
     }
 
   /* Jump to the handling code.  */
   jit_jmpr (JIT_R0);
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   return 0;
 }
@@ -933,8 +949,7 @@ static inline int
 generate_token_reader_invocation (jit_state *lightning_state,
 				  const scm_token_reader_spec_t *tr,
 				  jit_insn *do_again,
-				  int debug, int positions,
-				  char *start, size_t buffer_size)
+				  const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   static const char msg_start_c_call[] = "calling token reader `%s'...\n";
@@ -955,19 +970,19 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  const char *name = (tr->name ? tr->name : nameless);
 	  void *func = (void *)tr->reader.value.c_reader;
 
-	  if (debug)
+	  if (context->flags & SCM_READER_FLAG_DEBUG)
 	    {
-	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	      DO_DEBUG_2_PP (msg_start_c_call, JIT_R0,
 			     name, JIT_R1, do_like_printf);
 	    }
 
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
-	  (void)jit_movi_p (JIT_R0, start);
-	  jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+	  (void)jit_movi_p (JIT_R0, context->start);
+	  jit_ldxi_i (JIT_R1, JIT_FP, context->offsets.top_level_reader);
 
 	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (4);
 	  jit_pusharg_p (JIT_R1); /* top-level reader */
 	  jit_pusharg_p (JIT_R0); /* reader */
@@ -978,15 +993,15 @@ generate_token_reader_invocation (jit_state *lightning_state,
 
 	  jit_retval_p (JIT_R0);
 
-	  if (debug)
+	  if (context->flags & SCM_READER_FLAG_DEBUG)
 	    {
-	      CHECK_CODE_SIZE (buffer_size, start, -1);
-	      jit_pushr_i (JIT_V1);
+	      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+	      jit_stxi_i (context->offsets.temp1, JIT_FP, JIT_V1);
 	      jit_movr_p (JIT_V1, JIT_R0);
 	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 			     name, JIT_R1, do_like_printf);
 	      jit_movr_p (JIT_R0, JIT_V1);
-	      jit_popr_i (JIT_V1);
+	      jit_ldxi_i (JIT_V1, JIT_FP, context->offsets.temp1);
 	    }
 	}
       else
@@ -1002,24 +1017,24 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	{
 	  char spec_str[100];
 
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  token_spec_to_string (tr, spec_str);
-	  if (debug)
+	  if (context->flags & SCM_READER_FLAG_DEBUG)
 	    {
 	      /* FIXME:  SPEC_STR must be computed at run-time!  */
-	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	      DO_DEBUG_2_PP (msg_start_scm_call, JIT_R0,
 			     "spec_str", JIT_R1, do_like_printf);
 	    }
 
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
 	  /* Save the current value of V1 (the char as an `int').  */
-	  jit_pushr_i (JIT_V1);
+	  jit_stxi_i (context->offsets.temp1, JIT_FP, JIT_V1);
 
 	  /* Convert the character read to a Scheme char.  */
 	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (1);
 	  jit_pusharg_i (JIT_V1);
 	  (void)jit_finish (do_scm_make_char);
@@ -1027,9 +1042,9 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  jit_retval_p (JIT_V1);
 
 	  /* Same for the reader.  */
-	  (void)jit_movi_p (JIT_R0, start);
+	  (void)jit_movi_p (JIT_R0, context->start);
 	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (1);
 	  jit_pusharg_i (JIT_R0);
 	  jit_finish (do_scm_make_reader_smob);
@@ -1037,24 +1052,24 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  jit_retval_p (JIT_R0);
 
 	  /* Same for the top-level reader.  */
-	  jit_pushr_p (JIT_R0);
-	  jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+	  jit_stxi_p (context->offsets.temp2, JIT_FP, JIT_R0);
+	  jit_ldxi_i (JIT_R2, JIT_FP, context->offsets.top_level_reader);
 	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (1);
 	  jit_pusharg_i (JIT_R2);
 	  jit_finish (do_scm_make_reader_smob);
 	  debug_post_call ();
 	  jit_retval_p (JIT_R2);
-	  jit_popr_p (JIT_R0);
+	  jit_ldxi_p (JIT_R0, JIT_FP, context->offsets.temp2);
 
 	  /* Actually call the Scheme procedure.  */
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_movi_p (JIT_R1, (void *)tr->reader.value.scm_reader);
 	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (5);
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_pusharg_p (JIT_R2); /* top-level reader */
 	  jit_pusharg_p (JIT_R0); /* reader */
 	  jit_pusharg_p (JIT_V0); /* port */
@@ -1066,17 +1081,17 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  jit_retval_p (JIT_R0);
 
 	  /* Restore the C character.  */
-	  jit_popr_i (JIT_V1);
+	  jit_ldxi_i (JIT_V1, JIT_FP, context->offsets.temp1);
 
-	  if (debug)
+	  if (context->flags & SCM_READER_FLAG_DEBUG)
 	    {
-	      CHECK_CODE_SIZE (buffer_size, start, -1);
-	      jit_pushr_i (JIT_V1);
+	      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+	      jit_stxi_i (context->offsets.temp1, JIT_FP, JIT_V1);
 	      jit_movr_p (JIT_V1, JIT_R0);
 	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 			     "spec_str", JIT_R1, do_like_printf);
 	      jit_movr_p (JIT_R0, JIT_V1);
-	      jit_popr_i (JIT_V1);
+	      jit_ldxi_i (JIT_V1, JIT_FP, context->offsets.temp1);
 	    }
 	}
       else
@@ -1091,19 +1106,19 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	  char spec_str[100];
 
 	  token_spec_to_string (tr, spec_str);
-	  if (debug)
+	  if (context->flags & SCM_READER_FLAG_DEBUG)
 	    {
 	      /* FIXME:  SPEC_STR must be computed at run-time!  */
-	      CHECK_CODE_SIZE (buffer_size, start, -1);
+	      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	      DO_DEBUG_2_PP (msg_start_reader_call, JIT_R0,
 			     "spec_str", JIT_R1, do_like_printf);
 	    }
 
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
-	  jit_ldxi_i (JIT_R2, JIT_V2, -JIT_STACK_TOP_LEVEL_READER);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+	  jit_ldxi_i (JIT_R2, JIT_FP, context->offsets.top_level_reader);
 	  jit_movi_i (JIT_R0, 0); /* let the callee handle its things */
 	  debug_pre_call ();
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (3);
 	  jit_pusharg_p (JIT_R2); /* top-level reader */
 	  jit_pusharg_i (JIT_R0); /* caller_handled */
@@ -1113,15 +1128,15 @@ generate_token_reader_invocation (jit_state *lightning_state,
 
 	  jit_retval_p (JIT_R0);
 
-	  if (debug)
+	  if (context->flags & SCM_READER_FLAG_DEBUG)
 	    {
-	      CHECK_CODE_SIZE (buffer_size, start, -1);
-	      jit_pushr_i (JIT_V1);
+	      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+	      jit_stxi_i (context->offsets.temp1, JIT_FP, JIT_V1);
 	      jit_movr_p (JIT_V1, JIT_R0);
 	      DO_DEBUG_2_PP (msg_end_of_call, JIT_R0,
 			     "spec_str", JIT_R1, do_like_printf);
 	      jit_movr_p (JIT_R0, JIT_V1);
-	      jit_popr_i (JIT_V1);
+	      jit_ldxi_i (JIT_V1, JIT_FP, context->offsets.temp1);
 	    }
 	}
       else
@@ -1136,7 +1151,7 @@ generate_token_reader_invocation (jit_state *lightning_state,
 		      scm_list_1 (SCM_I_MAKINUM ((int)tr->reader.type)));
     }
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* At this point, the return value of the token reader is in R0.  */
 
@@ -1146,10 +1161,10 @@ generate_token_reader_invocation (jit_state *lightning_state,
        top-level reader.  */
     jit_beqi_p (do_again, JIT_R0, (void *)SCM_UNSPECIFIED);
 
-  if (positions)
+  if (context->flags & SCM_READER_FLAG_POSITIONS)
     {
-      generate_position_set (&_jit, start, buffer_size);
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      generate_position_set (&_jit, context);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
     }
 
   return 0;
@@ -1165,30 +1180,30 @@ generate_token_reader_invocation (jit_state *lightning_state,
    R0.  */
 static inline int
 generate_unexpected_character_handling (jit_state *lightning_state,
-					SCM fault_handler, int debug,
-					char *start, size_t buffer_size)
+					SCM fault_handler,
+					const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   jit_insn *ref;
 
   /* Check whether the CALLER_HANDLED argument is true, in which case
      we'll simply return the faulty character to PORT and return.  */
-  CHECK_CODE_SIZE (buffer_size, start, -1);
-  jit_ldxi_i (JIT_R1, JIT_V2, -JIT_STACK_CALLER_HANDLED);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
+  jit_ldxi_i (JIT_R1, JIT_FP, context->offsets.caller_handled);
   ref = jit_beqi_i (jit_forward (), JIT_R1, 0);
 
   debug_pre_call ();
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
   jit_prepare (2);
   jit_pusharg_p (JIT_V0); /* port */
   jit_pusharg_i (JIT_V1); /* character */
   (void)jit_finish (scm_ungetc);
   debug_post_call ();
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   (void)jit_movi_p (JIT_R0, (void *)SCM_UNSPECIFIED);
-  generate_reader_epilogue (&_jit, debug, start, buffer_size);
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  generate_reader_epilogue (&_jit, context);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   if (scm_procedure_p (fault_handler) == SCM_BOOL_T)
     {
@@ -1196,29 +1211,30 @@ generate_unexpected_character_handling (jit_state *lightning_state,
 
       /* Else, since CALLER_HANDLED is false, call the user-defined fault
 	 handler.  */
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
-      jit_pushr_p (JIT_V2); /* save the frame pointer */
+      jit_stxi_p (context->offsets.temp1, JIT_FP,
+		  JIT_V2); /* save V2 */
 
-      (void)jit_movi_p (JIT_R1, start);
+      (void)jit_movi_p (JIT_R1, context->start);
       jit_prepare (1);
       jit_pusharg_p (JIT_R1);
       (void)jit_finish (do_scm_make_reader_smob);
       jit_retval_p (JIT_V2);
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
       debug_pre_call ();
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       jit_prepare (1);
       jit_pusharg_i (JIT_V1);
       (void)jit_finish (do_scm_make_char);
       jit_retval_p (JIT_R1);
       debug_post_call ();
 
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       (void)jit_movi_p (JIT_R0, (void *)fault_handler);
       debug_pre_call ();
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       jit_prepare (4);
       jit_pusharg_p (JIT_V2);  /* reader */
       jit_pusharg_p (JIT_V0);  /* port */
@@ -1230,7 +1246,8 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       /* Put FAULT_HANDLER's result in R0 in order to return it.  */
       jit_retval (JIT_R0);
 
-      jit_popr_p (JIT_V2); /* restore the frame pointer */
+      jit_ldxi_p (JIT_V2, JIT_FP,  /* restore V2 */
+		  context->offsets.temp1);
     }
   else
     {
@@ -1238,9 +1255,9 @@ generate_unexpected_character_handling (jit_state *lightning_state,
 
       /* CALLER_HANDLED is false and the user did not define any method to
 	 handle this situation so return the faulty character to PORT.  */
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       debug_pre_call ();
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
       jit_prepare (2);
       jit_pusharg_p (JIT_V0); /* port */
       jit_pusharg_i (JIT_V1); /* character */
@@ -1250,7 +1267,7 @@ generate_unexpected_character_handling (jit_state *lightning_state,
       (void)jit_movi_p (JIT_R0, (void *)SCM_UNSPECIFIED);
     }
 
-  CHECK_CODE_SIZE (buffer_size, start, -1);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   return 0;
 }
@@ -1301,8 +1318,7 @@ generate_character_handling_code (jit_state *lightning_state,
 				  const scm_token_reader_spec_t *token_readers,
 				  jit_insn **jump_table,
 				  jit_insn *loop_start,
-				  unsigned flags,
-				  char *start, size_t buffer_size)
+				  const compilation_context_t *context)
 #define _jit (* lightning_state)
 {
   const scm_token_reader_spec_t *tr;
@@ -1316,7 +1332,7 @@ generate_character_handling_code (jit_state *lightning_state,
     {
       jit_insn *handler_code;
 
-      CHECK_CODE_SIZE (buffer_size, start, -1);
+      CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
       if (tr->reader.value.c_reader == NULL)
 	handler_code = loop_start;
@@ -1328,18 +1344,14 @@ generate_character_handling_code (jit_state *lightning_state,
 		 jit_get_label ());
 
 	  if (generate_token_reader_invocation (&_jit, tr, loop_start,
-						flags & SCM_READER_FLAG_DEBUG,
-						flags
-						& SCM_READER_FLAG_POSITIONS,
-						start, buffer_size))
+						context))
 	    return -1;
 
 	  /* At this point, the reader's return value is in R0.  */
-	  if (generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
-					start, buffer_size))
+	  if (generate_reader_epilogue (&_jit, context))
 	    return -1;
 
-	  CHECK_CODE_SIZE (buffer_size, start, -1);
+	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	}
 
       populate_jump_table_for_tr (tr, jump_table, handler_code);
@@ -1381,6 +1393,7 @@ scm_c_make_reader (void *code_buffer,
   static const char msg_getc[] = "got char: 0x%02x\n";
 
   scm_reader_t result;
+  compilation_context_t context;
   char *start, *end;
   jit_insn *do_again, *jump_to_end;
   int arg_port, arg_caller_handled, arg_top_level_reader;
@@ -1388,6 +1401,11 @@ scm_c_make_reader (void *code_buffer,
 
   result = (scm_reader_t) (jit_set_ip (code_buffer).iptr);
   start = jit_get_ip ().ptr;
+
+  /* Initialize (part of) the compilation context.  */
+  context.start = start;
+  context.buffer_size = buffer_size;
+  context.flags = flags;
 
   /* Take three arguments (the port, an `int', and the top-level reader) and
      put them into V0 and V1 (preserved accross function calls) and R2 (not
@@ -1401,16 +1419,14 @@ scm_c_make_reader (void *code_buffer,
   jit_getarg_p (JIT_R2, arg_top_level_reader);
 
 
-  /* Assuming the stack grows downwards, reserve some space for local
-     variables and store the ``frame pointer'' (i.e. the beginning of the
-     local variables array) in V2.  */
-  generate_reader_prologue (&_jit, flags & SCM_READER_FLAG_DEBUG,
-			    start, buffer_size);
+  /* Reserve some space for local variables, thereby finishing the
+     initialization of CONTEXT.  */
+  generate_reader_prologue (&_jit, &context);
   CHECK_CODE_SIZE (buffer_size, start);
 
   /* Allocate room for a character jump table.  */
   if (generate_space_reservation (&_jit, 256 * sizeof (*jump_table),
-				  start, buffer_size,
+				  &context,
 				  (void **)&jump_table))
     return NULL;
 
@@ -1425,7 +1441,7 @@ scm_c_make_reader (void *code_buffer,
     {
       /* Before invoking `scm_getc ()', keep track of the current position of
 	 PORT.  */
-      generate_position_store (&_jit, start, buffer_size);
+      generate_position_store (&_jit, &context);
       CHECK_CODE_SIZE (buffer_size, start);
     }
 
@@ -1444,8 +1460,7 @@ scm_c_make_reader (void *code_buffer,
 #else
   /* Use an inlined version of `scm_getc ()'.  The character just read is put
      in V1.  */
-  if (generate_getc (&_jit, flags & SCM_READER_FLAG_DEBUG,
-		     start, buffer_size))
+  if (generate_getc (&_jit, &context))
     return NULL;
 #endif
 
@@ -1456,12 +1471,12 @@ scm_c_make_reader (void *code_buffer,
 
   if (flags & SCM_READER_FLAG_UPPER_CASE)
     {
-      generate_to_upper (&_jit, start, buffer_size);
+      generate_to_upper (&_jit, &context);
       CHECK_CODE_SIZE (buffer_size, start);
     }
   else if (flags & SCM_READER_FLAG_LOWER_CASE)
     {
-      generate_to_lower (&_jit, start, buffer_size);
+      generate_to_lower (&_jit, &context);
       CHECK_CODE_SIZE (buffer_size, start);
     }
 
@@ -1479,22 +1494,19 @@ scm_c_make_reader (void *code_buffer,
     }
 
   /* Lookup the character just read into the jump table and jump there.  */
-  if (generate_character_dispatch (&_jit, jump_table,
-				   flags & SCM_READER_FLAG_DEBUG,
-				   start, buffer_size))
+  if (generate_character_dispatch (&_jit, jump_table, &context))
     return NULL;
 
   /* This is where we get when `scm_getc ()' returned EOF.  */
   jit_patch (jump_to_end);
   jit_movi_p (JIT_R0, (void *)SCM_EOF_VAL);
-  generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
-			    start, buffer_size);
+  generate_reader_epilogue (&_jit, &context);
 
   /* Generate the character-handling code that will be used by the
      character-dispatching code.  */
   if (generate_character_handling_code (&_jit, token_readers,
-					jump_table, do_again, flags,
-					start, buffer_size))
+					jump_table, do_again,
+					&context))
     return NULL;
 
 
@@ -1506,12 +1518,10 @@ scm_c_make_reader (void *code_buffer,
 
     unexpected_handling = jit_get_label ();
     if (generate_unexpected_character_handling (&_jit, fault_handler,
-						flags & SCM_READER_FLAG_DEBUG,
-						start, buffer_size))
+						&context))
       return NULL;
 
-    if (generate_reader_epilogue (&_jit, flags & SCM_READER_FLAG_DEBUG,
-				  start, buffer_size))
+    if (generate_reader_epilogue (&_jit, &context))
       return NULL;
 
     for (chr = 0; chr < 256; chr++)
