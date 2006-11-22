@@ -78,8 +78,8 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
 static size_t standard_reader_specs_size = 0;
 
 #ifdef DEBUG
-# define SHARP_READER_SIZE      10000
-# define TOP_LEVEL_READER_SIZE  12000
+# define SHARP_READER_SIZE      20000
+# define TOP_LEVEL_READER_SIZE  25000
 #else
 # define SHARP_READER_SIZE      4000
 # define TOP_LEVEL_READER_SIZE  5000
@@ -134,7 +134,9 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
 	    "Make and return a new reader compatible with Guile's built-in "
 	    "reader.  This function call @code{make-reader} with "
 	    "@var{flags}.  Note that the sharp reader used by the returned "
-	    "reader is also instantiated using @var{flags}.")
+	    "reader is also instantiated using @var{flags}.  The value of "
+	    "@var{fault-handler} defaults to "
+	    "@code{%reader-standard-fault-handler}.")
 #define FUNC_NAME s_scm_make_guile_reader
 {
   SCM s_reader, *s_deps;
@@ -145,7 +147,7 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
   void *buffer;
 
   if (fault_handler == SCM_UNDEFINED)
-    fault_handler = SCM_BOOL_F;
+    fault_handler = scm_reader_standard_fault_handler_proc;
 
   if (fault_handler != SCM_BOOL_F)
     SCM_VALIDATE_PROC (1, fault_handler);
@@ -183,8 +185,9 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
   if (fault_handler != SCM_BOOL_F)
     {
       /* Prepare a (small) list of GC dependencies.  */
-      s_deps = scm_malloc (sizeof (*s_deps));
+      s_deps = scm_malloc (2 * sizeof (*s_deps));
       s_deps[0] = fault_handler;
+      s_deps[1] = SCM_BOOL_F;
     }
   else
     /* No GC dependencies.  */

@@ -186,6 +186,14 @@ extern SCM scm_from_reader_spec (const scm_token_reader_spec_t *spec,
    ``escape'' its parent reader returning SCM_UNSPECIFIED.  */
 extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
 
+
+/* The standard fault handler.  */
+extern SCM scm_reader_standard_fault_handler (SCM chr, SCM port, SCM reader);
+
+/* The `SCM' version (a Scheme procedure) of the above function.  */
+extern SCM scm_reader_standard_fault_handler_proc;
+
+
 
 /* Convenience macros for static initialization of C token readers.  */
 
@@ -233,9 +241,6 @@ extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
     .documentation = NULL				\
   }
 
-
-/* A standard reader fault handler.  */
-extern SCM scm_reader_standard_fault_handler_proc;
 
 /* The SMOB type associated to `scm_reader_t', `scm_token_reader_spec_t', and
    `scm_token_reader_t'.  */
