@@ -232,7 +232,7 @@ do_scm_make_reader_smob (scm_reader_t reader)
    - V1 contains at any time the character just returned by `scm_getc ()',
      i.e., a C integer;
 
-   - V2 is currently unused (FIXME).
+   - V2 contains the top-level reader.
 
 
    Variables allocated on the stack
@@ -246,7 +246,6 @@ do_scm_make_reader_smob (scm_reader_t reader)
 typedef struct
 {
   int caller_handled;
-  int top_level_reader;
   int position_filename;
   int position_line;
   int position_column;
@@ -752,7 +751,6 @@ generate_reader_prologue (jit_state *lightning_state,
   jit_insn *ref;
 
   context->offsets.caller_handled = jit_allocai (sizeof (void *));
-  context->offsets.top_level_reader = jit_allocai (sizeof (void *));
   context->offsets.position_filename = jit_allocai (sizeof (void *));
   context->offsets.position_line = jit_allocai (sizeof (void *));
   context->offsets.position_column = jit_allocai (sizeof (void *));
@@ -781,18 +779,15 @@ generate_reader_prologue (jit_state *lightning_state,
 
   CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
-  /* Store the CALLER_HANDLED argument (currently in V1) and the
-     TOP_LEVEL_READER argument (in R2) on the stack.  */
+  /* Store the CALLER_HANDLED argument (currently in V1) on the stack.  */
   jit_stxi_i (context->offsets.caller_handled, JIT_FP, JIT_V1);
-  {
-    /* If TOP_LEVEL_READER is NULL, then we'll advertise ourself as the
-       top-level reader.  */
-    ref = jit_bnei_p (jit_forward (), JIT_R2, NULL);
-    jit_movi_p (JIT_R2, context->start);
-    jit_patch (ref);
-    jit_stxi_p (context->offsets.top_level_reader, JIT_FP, JIT_R2);
-    CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
-  }
+
+  /* If TOP_LEVEL_READER is NULL, then we'll advertise ourself as the
+     top-level reader.  */
+  ref = jit_bnei_p (jit_forward (), JIT_V2, NULL);
+  jit_movi_p (JIT_V2, context->start);
+  jit_patch (ref);
+  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 
   /* FIXME:  We should check the type of PORT here.  */
 
@@ -979,12 +974,11 @@ generate_token_reader_invocation (jit_state *lightning_state,
 
 	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  (void)jit_movi_p (JIT_R0, context->start);
-	  jit_ldxi_i (JIT_R1, JIT_FP, context->offsets.top_level_reader);
 
 	  debug_pre_call ();
 	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (4);
-	  jit_pusharg_p (JIT_R1); /* top-level reader */
+	  jit_pusharg_p (JIT_V2); /* top-level reader */
 	  jit_pusharg_p (JIT_R0); /* reader */
 	  jit_pusharg_p (JIT_V0); /* port */
 	  jit_pusharg_i (JIT_V1); /* character */
@@ -1053,11 +1047,10 @@ generate_token_reader_invocation (jit_state *lightning_state,
 
 	  /* Same for the top-level reader.  */
 	  jit_stxi_p (context->offsets.temp2, JIT_FP, JIT_R0);
-	  jit_ldxi_i (JIT_R2, JIT_FP, context->offsets.top_level_reader);
 	  debug_pre_call ();
 	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (1);
-	  jit_pusharg_i (JIT_R2);
+	  jit_pusharg_i (JIT_V2);
 	  jit_finish (do_scm_make_reader_smob);
 	  debug_post_call ();
 	  jit_retval_p (JIT_R2);
@@ -1115,12 +1108,11 @@ generate_token_reader_invocation (jit_state *lightning_state,
 	    }
 
 	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
-	  jit_ldxi_i (JIT_R2, JIT_FP, context->offsets.top_level_reader);
 	  jit_movi_i (JIT_R0, 0); /* let the callee handle its things */
 	  debug_pre_call ();
 	  CHECK_CODE_SIZE (context->buffer_size, context->start, -1);
 	  jit_prepare (3);
-	  jit_pusharg_p (JIT_R2); /* top-level reader */
+	  jit_pusharg_p (JIT_V2); /* top-level reader */
 	  jit_pusharg_i (JIT_R0); /* caller_handled */
 	  jit_pusharg_p (JIT_V0); /* port */
 	  jit_finish (tr->reader.value.reader);
@@ -1416,7 +1408,7 @@ scm_c_make_reader (void *code_buffer,
   arg_caller_handled = jit_arg_i ();
   jit_getarg_i (JIT_V1, arg_caller_handled);
   arg_top_level_reader = jit_arg_p ();
-  jit_getarg_p (JIT_R2, arg_top_level_reader);
+  jit_getarg_p (JIT_V2, arg_top_level_reader);
 
 
   /* Reserve some space for local variables, thereby finishing the
