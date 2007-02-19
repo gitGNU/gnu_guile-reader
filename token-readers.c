@@ -145,8 +145,7 @@ scm_read_sexp (int chr, SCM port, scm_reader_t reader,
      symbol (see SCM_SYM_DOT below).  */
   register int c;
   register SCM tmp;
-  register SCM tl, tl2 = SCM_EOL;
-  SCM ans, ans2 = SCM_EOL;
+  register SCM tl, ans = SCM_EOL;
   int terminating_char = 0;
 
   switch (chr)
@@ -306,7 +305,7 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
 	  case '"':
 	  case '\\':
 	    break;
-#if SCM_ENABLE_ELISP
+#if 0 /* SCM_ENABLE_ELISP */
 	  case '(':
 	  case ')':
 	    if (SCM_ESCAPED_PARENS_P)
