@@ -3,6 +3,8 @@
 
 AC_PREREQ(2.59)
 AC_INIT(guile-reader, 0.3, ludovic.courtes@laas.fr)
+AC_CONFIG_AUX_DIR(build-aux)
+
 AM_INIT_AUTOMAKE(guile-reader, 0.3)
 
 AC_CONFIG_SRCDIR([reader.c])
