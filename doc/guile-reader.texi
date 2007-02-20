@@ -39,7 +39,7 @@ approved by the Free Software Foundation.
 @titlepage
 @title A Reader Framework for Guile
 @subtitle for Guile-Reader @value{VERSION}
-@author Ludovic Courtès
+@author Ludovic Court@`es
 
 @page
 @vskip 0pt plus 1filll
@@ -94,26 +94,29 @@ files.
 @chapter Introduction
 
 Guile currently provides limited extensibility of its reader, by means
-of @inforef{Reader Extensions, @code{read-hash-extend}, guile}, for
-instance, or @inforef{Scheme Read, @code{read-enable}, guile}.
+of @code{read-hash-extend} (@pxref{Reader Extensions,
+@code{read-hash-extend},, guile, Guile Reference Manual}), for
+instance, or @code{read-enable} (@pxref{Scheme Read,
+@code{read-enable},, guile, Guile Reference Manual}).
 @uref{http://srfi.schemers.org/srfi-10/srfi-10.html, SRFI-10} tries to
 propose a generic, portable, extension mechanism similar to
 @code{read-hash-extend} but limited to @code{#,} sequences.  Moreover,
-while this may not always be desirable, those extension facilities
+while this may not always be desirable, all these extension facilities
 have a global effect, changing the behavior of the sole reader
 implementation available at run-time.  This makes it impossible to
 have, for instance, one module consider names starting with @code{:}
 as symbols, while another considers them as keywords.
 
 Extensions such as the read syntax for SRFI-4 numeric vectors
-(@inforef{Uniform Numeric Vectors, SRFI-4 vectors, guile}, for more
-information) had to be added to Guile's built-in C reader.  Syntactic
-extensions that did not appeal the majority of users, like Emacs-Lisp
-vectors, are @code{#ifdef}'d within the reader code and are not
-available by default.  Moreover, some extensions are incompatible with
-each other, such as the DSSSL keyword syntax and the @inforef{Block
-Comments, SCSH block comments, guile}.  In short the current reader
-syntax is hardly extensible.
+(@pxref{Uniform Numeric Vectors, SRFI-4 vectors,, guile, Guile
+Reference Manual}) had to be added to Guile's built-in C reader.
+Syntactic extensions that did not appeal the majority of users, like
+Emacs-Lisp vectors, are @code{#ifdef}'d within the reader code and are
+not available by default.  Moreover, some extensions are incompatible
+with each other, such as the DSSSL keyword syntax and SCSH block
+comments (@pxref{Block Comments, SCSH block comments,, guile, Guile
+Reference Manual}).  In short the current reader syntax is hardly
+extensible.
 
 The idea of Guile Reader is to provide a framework allowing users to
 quickly define readers for whatever syntax (or rather: variant of the
@@ -133,14 +136,17 @@ Reader comes with a library of components that can typically be used
 to construct a reader for the Scheme syntax.  And each one of this
 components may be reused at will when creating other readers.  On the
 other hand, one should be aware that this simpler API comes at the
-cost of a lack of consistency in some cases, as outlined in
-@xref{Limitations}.
+cost of a lack of consistency in some cases, as outlined later in this
+manual (@pxref{Limitations}).
 
 @cindex read table
 Common Lisp has a similar mechanism to extend its reader which is
-called the @dfn{read table}.  It is, however, less powerful in that it
-assumes a single reader instance (which is @emph{not} a good
-assumption for an interpreter).
+called the @dfn{read table}.  The
+@uref{http://www.iro.umontreal.ca/~gambit/, Gambit Scheme system} also
+provides an implementation of read tables.  It is, however, less
+flexible and perhaps inconvenient for an interpreter since it assumes
+a single reader instance.  On the other hand, it allows the reader and
+writer to be kept consistent, which guile-reader does not address.
 
 
 @c chapter ----------------------------------------------------------
