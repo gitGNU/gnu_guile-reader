@@ -1,5 +1,5 @@
 ;;;
-;;; Copyright 2005, 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2006, 2007  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -37,7 +37,7 @@
   (define (show-char-escaped chr)
     (string-append "#\\"
 		   (case chr
-		     ((#\{ #\} #\\ #\@) "@")
+		     ((#\{ #\} #\@) "@")
 		     (else ""))
 		   (string-drop (with-output-to-string
 				  (lambda ()
@@ -59,13 +59,13 @@
 	  (else
 	   (error "invalid character specification" spec))))
 
-  (format #t "~%@multitable @c @columnfractions .25 .25 .50~%")
+  (format #t "~%@multitable @columnfractions .25 .25 .50~%")
   (format #t "@headitem Token Reader~%@tab Character Spec.~%@tab Description~%~%")
   (for-each (lambda (tr-name)
 	      (let* ((tr (standard-token-reader tr-name))
 		     (spec-doc (char-spec-doc (token-reader-specification tr)))
 		     (doc (token-reader-documentation tr)))
-		(format #t "@item @code{~a}~%@tab ~a~%@tab ~a~%"
+		(format #t "@item @code{~a}~%@tab ~a~%@tab ~a~%~%"
 			tr-name spec-doc doc)))
 	    (sort (standard-token-reader-names)
 		  (lambda (s1 s2)
