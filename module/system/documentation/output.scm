@@ -1,6 +1,6 @@
 ;;; output.scm  --  Output documentation "snarffed" from C files in Texi/GDF.
 ;;;
-;;; Copyright 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2006, 2007  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -18,10 +18,11 @@
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 (define-module (system documentation output)
+  :use-module (srfi srfi-1)
   :use-module (srfi srfi-13)
   :autoload   (system documentation c-snarf) (run-cpp-and-extract-snarfing)
 
-  :export (schemify-name
+  :export (schemify-name scheme-procedure-texi-line
            procedure-gdf-string procedure-texi-documentation
            output-procedure-texi-documentation-from-c-file))
 
@@ -58,23 +59,47 @@ form, e.g., one with dashed instead of underscores, etc."
 ;;; GDF = Guile Documentation Format
 ;;;
 
+(define (scheme-procedure-texi-line proc-name args
+                                    required-args optional-args
+                                    rest-arg?)
+  "Return a Texinfo string describing the Scheme procedure named
+@var{proc-name}, whose arguments are listed in @var{args} (a list of strings)
+and whose signature is defined by @var{required-args}, @var{optional-args}
+and @var{rest-arg?}."
+  (string-append "@deffn {Scheme Procedure} " proc-name " "
+                 (string-join (take args required-args) " ")
+                 (string-join (take (drop args required-args)
+                                    (+ optional-args
+                                       (if rest-arg? 1 0)))
+                              " [" 'prefix)
+                 (if rest-arg? "...]" "")
+                 (make-string optional-args #\])))
+
 (define (procedure-gdf-string proc-doc)
   "Issue a Texinfo/GDF docstring corresponding to @var{proc-doc}, a
 documentation alist as returned by @code{parse-snarfed-line}.  To produce
 actual GDF-formatted doc, the resulting string must be processed by
 @code{makeinfo}."
-  (let* ((proc-name (assq-ref proc-doc 'scheme-name))
-         (args (assq-ref proc-doc 'arguments))
-         (location (assq-ref proc-doc 'location))
-         (file-name (car location))
-         (line (cadr location))
+  (let* ((proc-name     (assq-ref proc-doc 'scheme-name))
+         (args          (assq-ref proc-doc 'arguments))
+         (signature     (assq-ref proc-doc 'signature))
+         (required-args (assq-ref signature 'required))
+         (optional-args (assq-ref signature 'optional))
+         (rest-arg?     (assq-ref signature 'rest?))
+         (location      (assq-ref proc-doc 'location))
+         (file-name     (car location))
+         (line          (cadr location))
          (documentation (assq-ref proc-doc 'documentation)))
     (string-append "" ;; form feed
                    proc-name (string #\newline)
                    (format #f "@c snarfed from ~a:~a~%"
                            file-name line)
-                   "@deffn {Scheme Procedure} " proc-name " "
-                   (string-join (map schemify-name args) " ")
+
+                   (scheme-procedure-texi-line proc-name
+                                               (map schemify-name args)
+                                               required-args optional-args
+                                               rest-arg?)
+
                    (string #\newline)
                    documentation (string #\newline)
                    "@end deffn" (string #\newline))))
@@ -84,18 +109,28 @@ actual GDF-formatted doc, the resulting string must be processed by
 alist as returned by @var{parse-snarfed-line}.  The resulting Texinfo string
 is meant for use in a manual since it also documents the corresponding C
 function."
-  (let* ((proc-name (assq-ref proc-doc 'scheme-name))
-         (c-name (assq-ref proc-doc 'c-name))
-         (args (assq-ref proc-doc 'arguments))
-         (location (assq-ref proc-doc 'location))
-         (file-name (car location))
-         (line (cadr location))
+  (let* ((proc-name     (assq-ref proc-doc 'scheme-name))
+         (c-name        (assq-ref proc-doc 'c-name))
+         (args          (assq-ref proc-doc 'arguments))
+         (signature     (assq-ref proc-doc 'signature))
+         (required-args (assq-ref signature 'required))
+         (optional-args (assq-ref signature 'optional))
+         (rest-arg?     (assq-ref signature 'rest?))
+         (location      (assq-ref proc-doc 'location))
+         (file-name     (car location))
+         (line          (cadr location))
          (documentation (assq-ref proc-doc 'documentation)))
   (string-append (string #\newline)
 		 (format #f "@c snarfed from ~a:~a~%"
 			 file-name line)
-		 "@deffn {Scheme Procedure} " proc-name " "
-		 (string-join (map schemify-name args) " ")
+
+                 ;; document the Scheme procedure
+                 (scheme-procedure-texi-line proc-name
+                                             (map schemify-name args)
+                                             required-args optional-args
+                                             rest-arg?)
+
+                 ;; document the C function
                  (string #\newline)
                  "@deffnx {C Function} " c-name " ("
                  (if (null? args)
