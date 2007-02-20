@@ -4,8 +4,6 @@ New in guile-reader 0.3
     produce an inline version of `scm_getc ()', provided token readers
     allocate less memory from the heap).
 
-  * Fully compatible and feature-equivalent with both 1.8 and 1.6.
-
   * Improved test suite.
 
   * Bug fixes.

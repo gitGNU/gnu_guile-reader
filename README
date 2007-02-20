@@ -1,5 +1,5 @@
-guile-reader, an extensible, fast, reader framework for Guile
-=============================================================
+Guile-Reader, an extensible, fast, reader framework for GNU Guile
+=================================================================
 
 Introduction
 ------------
@@ -27,9 +27,9 @@ reader using basic building-blocks such as an R5RS string reader, an
 S-exp reader, etc., or even user-defined readers.
 
 In order to achieve performance equivalent (or better?) to Guile's C
-hand-coded reader, guile-reader relies on GNU Lightning to compile
-readers to native code.  For compatibility, a Lightning-free, slower
-implementation is available for platforms not supported by Lightning.
+hand-coded reader, guile-reader relies on GNU lightning to compile
+readers to native code.  For compatibility, a lightning-free, slower
+implementation is available for platforms not supported by lightning.
 
 
 Availability
@@ -45,25 +45,32 @@ If you want do discuss about it, do not hesitate to subscribe to the
 `guile-reader-devel' mailing list from there.
 
 Source code if managed by GNU Arch and is currently available in the
-archives located at the following URLs (depending on the version):
+archives located at the following URL:
 
-  http://www.laas.fr/~lcourtes/software/arch-2004/
-  http://www.laas.fr/~lcourtes/software/arch-2005/
+  http://arch.sv.gnu.org/archives/guile-reader/
 
 In order to fetch source code from there, you may run the following
 commands:
 
-  $ tla register-archive http://www.laas.fr/~lcourtes/software/arch-2004/
-  $ tla get lcourtes@laas.fr--2004-libre/guile-reader--devo--0.2  \
-        guile-reader-0.2
+  $ tla register-archive http://arch.sv.gnu.org/archives/guile-reader/
+  $ tla get guile-reader@sv.gnu.org/guile-reader--devo--0.3  \
+        guile-reader
 
-This will fetch the source and put it in the `guile-reader-0.2'
-directory.
+This will fetch the source and put it in the `guile-reader' directory.
+
+
+Installation
+------------
+
+Guile-reader is written for Guile 1.8.x.  For optimal performance, you
+may want to get GNU lightning 1.2b or later (on platforms supported by
+GNU lightning).
+
 
 Thanks in advance for your feedback!  :-)
 
 
 
-August 2005.
+February 2007.
 
 Ludovic Courtès <ludovic.courtes@laas.fr>.

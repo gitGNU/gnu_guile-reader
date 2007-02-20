@@ -19,7 +19,7 @@
 
 This file documents Guile Reader.
 
-Copyright @copyright{} 2005, 2006 Ludovic Court@`es
+Copyright @copyright{} 2005, 2006, 2007 Ludovic Court@`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -47,7 +47,7 @@ Edition @value{EDITION} @*
 @c Updated for Guile Reader @value{VERSION} @*
 @value{UPDATED} @*
 
-Copyright @copyright{} 2005, 2006 Ludovic Court@`es
+Copyright @copyright{} 2005, 2006, 2007 Ludovic Court@`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -146,6 +146,16 @@ assumption for an interpreter).
 @c chapter ----------------------------------------------------------
 @node Overview, API Reference, Introduction, Top
 @chapter Overview
+
+@cindex reader library
+Guile-reader allows for the construction of readers capable of
+understanding various syntactic variants.  The simplest way to use it
+is through its @dfn{reader library} that allows one to pick and choose
+various commonly used syntactic extensions to the standard Scheme
+syntax (@pxref{Reader Library}).  However, guile-reader also provides
+a finer-grain programming interface allowing the construction of
+virtually any reader, with its own syntactic specificities.  The
+following sections focus primarily on this capability.
 
 @cindex reader
 @cindex token reader
@@ -251,7 +261,13 @@ when implementing the various Scheme read syntaxes prefixed by the
 @code{#} character: one can create a reader for @code{#}, and then
 turn it into a token reader that is part of the top-level reader.
 
-The next section explains the token reader calling convention.
+The reference for @code{make-token-reader} is given below:
+
+@c Include part of API documentation snarffed from `reader.c'.
+@include make-token-reader-doc.texi
+
+The next section explains the token reader calling convention, i.e.,
+how the @var{proc} argument to @code{make-token-reader} is invoked.
 
 
 @node TR Calling Convention, Invoking a Reader from a TR, Defining a New Token Reader, Token Readers
@@ -312,11 +328,6 @@ handling white spaces may be done by defining a TR like this:
 @smallexample
 (make-token-reader '(#\space #\newline #\tab) #f)
 @end smallexample
-
-The reference for @code{make-token-reader} is given below:
-
-@c Include part of API documentation snarffed from `reader.c'.
-@include make-token-reader-doc.texi
 
 
 @node Invoking a Reader from a TR, Token Reader Library, TR Calling Convention, Token Readers
@@ -639,12 +650,11 @@ number of procedures that ease the re-use of readers.
 @findex read-disable
 @findex read-set!
 @findex read-hash-extend
-Guile's core read subsystem (@inforef{Scheme Read, , guile}, for
-details) provides an interface to customize its reader, namely via the
-@code{read-options} (@inforef{Reader Options, Guile's built-in reader
-option, guile}, for more information) and @code{read-hash-extend}
-(@inforef{Reader Extensions, @code{read-hash-extend}, guile}, for
-details) procedures.
+Guile's core read subsystem provides an interface to customize its
+reader, namely via the @code{read-options} (@pxref{Scheme Read,,,
+guile, Guile Reference Manual}) and @code{read-hash-extend}
+(@pxref{Reader Extensions, @code{read-hash-extend},, guile, Guile
+Reference Manual}) procedures.
 
 The main problem with this approach is that changing the reader's
 options using these procedures has a global effect since there is only
@@ -659,7 +669,6 @@ DSSSL-style keywords, while another needs SCSH-style block comments.
 
 @cindex confinement
 @cindex reader confinement
-@cindex compatibility
 @findex read-options-interface
 In @code{(system reader confinement)}, guile-reader offers an
 implementation of @code{read-option-interface} and
@@ -682,8 +691,8 @@ Starting from Guile 1.8.0, @code{current-reader} is a core binding
 bound to a fluid whose value should be either @code{#f} or a reader
 (i.e., a @code{read}-like procedure).  The value of this fluid
 dictates the reader that is to be used by @code{primitive-load} and
-its value can be changed dynamically (see @inforef{Loading,
-@code{current-reader}, guile} for details).
+its value can be changed dynamically (@pxref{Loading,
+@code{current-reader},, guile, Guile Reference Manual}).
 
 The confined variants of @code{read-options-interface} and
 @code{read-hash-extend} rely on this feature to make reader
@@ -691,12 +700,12 @@ customizations local to the file being loaded.  This way, invocations
 of these functions from within a file being loaded by
 @code{primitive-load} take effect immediately.
 
-@cindex forward-compatibility
-When using a version of Guile that does not support the
-@code{current-reader} feature, the @code{(system reader compat)}
-module defines a new @code{current-reader} core binding and redefines
-@code{primitive-load} in order to provide compatibility with newer
-versions of Guile.
+@c @cindex forward-compatibility
+@c When using a version of Guile that does not support the
+@c @code{current-reader} feature, the @code{(system reader compat)}
+@c module defines a new @code{current-reader} core binding and redefines
+@c @code{primitive-load} in order to provide compatibility with newer
+@c versions of Guile.
 
 
 @c chapter ----------------------------------------------------------
@@ -705,11 +714,14 @@ versions of Guile.
 
 In order to not have to trade too much performance for flexibility,
 guile-reader dynamically compiles code for the readers defined using
-GNU Lightning @inforef{Overview, Introduction to GNU Lightning,
-lightning}.  As of version 1.2, GNU Lightning can generate code for
-the PowerPC, SPARC, and IA32 architectures.  For other platforms,
-guile-reader provides an alternative (slower) implementation that does
-not depend on it.
+GNU @emph{lightning} (@pxref{Overview, Introduction to GNU
+@emph{lightning},, lightning, Using and Porting GNU
+@emph{lightning}}).  As of version 1.2b, GNU @emph{lightning} can
+generate code for the PowerPC, SPARC, and IA32 architectures.  For
+other platforms, guile-reader provides an alternative (slower) C
+implementation that does not depend on it.  Using the
+@emph{lightning}-generated readers typically provides a 5% performance
+improvement over the static C implementation.
 
 Re-using token readers written in C, as explained in @xref{Token
 Reader Library}, does not imply any additional cost: the underlying C
