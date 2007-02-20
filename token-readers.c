@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006, 2007  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
