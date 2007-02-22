@@ -70,11 +70,11 @@ approved by the Free Software Foundation.
 @node Top, Introduction, (dir), (dir)
 @top A Reader Framework for Guile
 
-This document describes Guile-Reader version @value{VERSION}.  It was
-last updated in @value{UPDATED-MONTH}.
+This document describes Guile-Reader version @value{VERSION}, for GNU
+Guile 1.8.  It was last updated in @value{UPDATED-MONTH}.
 
-This documentation should be mostly complete.  Details missing about the
-API can very likely be found in the C header files or the C source
+This documentation should be mostly complete.  Details about the C API
+are omitted from this manual.  They can be found in the public header
 files.
 
 @menu
@@ -141,12 +141,14 @@ manual (@pxref{Limitations}).
 
 @cindex read table
 Common Lisp has a similar mechanism to extend its reader which is
-called the @dfn{read table}.  The
-@uref{http://www.iro.umontreal.ca/~gambit/, Gambit Scheme system} also
-provides an implementation of read tables.  It is, however, less
-flexible and perhaps inconvenient for an interpreter since it assumes
-a single reader instance.  On the other hand, it allows the reader and
-writer to be kept consistent, which guile-reader does not address.
+called the @dfn{read
+table}. @uref{http://www.iro.umontreal.ca/~gambit/, Gambit Scheme},
+for instance, also provides an implementation of read tables.
+However, it appears to have limitations similar to Guile's
+@code{read-enable} and @code{read-hash-extend} in terms of
+possibilities for syntax extension.  On the other hand, it allows the
+reader and writer to be kept consistent, which guile-reader does not
+address.
 
 
 @c chapter ----------------------------------------------------------
@@ -169,12 +171,13 @@ Before going into the details of the reader framework API, let us have
 a quick overview of what this is.  Basically, guile-reader introduces
 two objects: @dfn{readers} and @dfn{token readers}.  Readers can be
 thought of, simply, as procedures like Scheme's @code{read}
-@inforef{Input, R5RS, r5rs}, i.e. procedures that take one (optional)
-argument, namely the port to read from.  We will see later that
-readers as defined by guile-reader can actually receive two more
-arguments (@pxref{Defining a New Reader}).  A reader, like
-@code{read}, reads a sequence of characters (the @dfn{external
-representation} of some object) and returns a Scheme object.
+(@pxref{Input, R5RS,, r5rs, Revised^5 Report on the Algorithmic
+Language Scheme}), i.e., procedures that take one (optional) argument,
+namely the port to read from.  We will see later that readers as
+defined by guile-reader can actually receive two more arguments
+(@pxref{Defining a New Reader}).  A reader, like @code{read}, reads a
+sequence of characters (the @dfn{external representation} of some
+object) and returns a Scheme object.
 
 Token readers (TRs, for short) are the building block of a reader.  A
 token reader is basically an association between a character or set of
@@ -286,15 +289,15 @@ A token reader's procedure is passed four arguments:
 @item the character that was read and which triggered its call;  in
 the S-exp example, this would be @code{(};
 @item the port to read from;
-@item the reader which performed this invocation, i.e. either an
+@item the reader which performed this invocation, i.e., either an
 @code{scm_reader_t} object (if the token reader is written in C) or a
 four-argument Scheme procedure (if the token reader is written in
 Scheme);
 @cindex top-level reader
 @item the top-level reader which yielded this invocation and which may
 be different from the previous argument in the case a token reader was
-made from a reader; the next section, @xref{Invoking a Reader from a
-TR}, will detail the use of these two arguments.
+made from a reader; the use of these two arguments will be detailed in
+the next section, @ref{Invoking a Reader from a TR}.
 @end itemize
 
 It must return a Scheme object resulting from the interpretation of
@@ -321,10 +324,10 @@ This behavior may, however, be overridden by passing
 @cindex SCSH block comments
 A reader that includes this TR will return @code{*unspecified*} once a
 line comment has been read.  This is particularly useful, for
-instance, when implementing @code{#!} block comments (@inforef{Block
-Comments, SCSH block comments, guile}, for more information) as a TR
-attached to @code{#\!} within the @code{#\#} sub-reader
-(@pxref{Defining a New Token Reader}).
+instance, when implementing @code{#!} block comments (@pxref{Block
+Comments, SCSH block comments,, guile, Guile Reference Manual}, for
+more information) as a TR attached to @code{#\!} within the @code{#\#}
+sub-reader (@pxref{Defining a New Token Reader}).
 
 Finally, the procedure passed to @code{make-token-reader} may be
 @code{#f}, in which case the resulting TR will just have the effect of
@@ -349,11 +352,11 @@ be able to call the reader that is being used to actually read those
 objects.
 
 The need for the @var{top-level-reader} argument passed to token
-readers may be illustrated looking at the implementation of vectors
-read syntax, @inforef{Vector Syntax, , guile}.  One may implement the
-vector reader as a token reader of the @code{#} sub-reader
-(@pxref{Defining a New Token Reader}).  The vector token reader may be
-implemented like this:
+readers may be illustrated looking at the implementation of the vector
+read syntax (@pxref{Vector Syntax,,, guile, Guile Reference Manual}).
+One may implement the vector reader as a token reader of the @code{#}
+sub-reader (@pxref{Defining a New Token Reader}).  The vector token
+reader may be implemented like this:
 
 @example
 (lambda (chr port reader top-level-reader)
@@ -372,7 +375,7 @@ list, @var{sexp-read} should @emph{not} invoke @var{reader} because
 @var{reader} only knows about @code{#}-prefixed object syntaxes.  For
 this reason, in order to be consistent in re-usable, the S-exp reader
 must call @var{top-level-reader} which points to the top-level reader,
-i.e. the reader which yielded the invocation of the @code{#}
+i.e., the reader which yielded the invocation of the @code{#}
 sub-reader.
 
 @node Token Reader Library, Limitations, Invoking a Reader from a TR, Token Readers
@@ -435,9 +438,9 @@ As can be seen from the previous section, there exist, for instance,
 an surprisingly high number of symbol token readers.  The reason for
 this is that different syntax variants define different @dfn{token
 delimiters}.  Token delimiters are characters that help the reader
-determine where tokens that require implicit termination do
-terminate.  Quoting R5RS (@inforef{Lexical structure, R5RS' lexical
-structure, r5rs}, for details):
+determine where tokens that require implicit termination do terminate.
+Quoting R5RS (@pxref{Lexical structure, R5RS' lexical structure,,
+r5rs, Revised^5 Report on the Algorithmic Language Scheme}):
 
 @quotation
 Tokens which require implicit termination (identifiers, numbers,
@@ -515,11 +518,12 @@ such problems have been worked around.
 @cindex lexer
 Lexer generators such as @uref{http://www.gnu.org/software/flex/,
 Flex}, @uref{http://www.iro.umontreal.ca/~dube/, SILex} and Bigloo's
-RGC (@inforef{Regular Parsing, Bigloo's RGC, bigloo}, for details)
-obviously do not have this problem: all possible ``token'' types are
-defined using regular expressions and the string-handling code (e.g.,
-code that converts a string into a Scheme number) is only invoked once
-a full matching string has been found.
+RGC (@pxref{Regular Parsing, Bigloo's RGC,, bigloo, Bigloo@comma{} A
+``Practical Scheme Compiler''---User Manual}) obviously do not have
+this problem: all possible ``token'' types are defined using regular
+expressions and the string-handling code (e.g., code that converts a
+string into a Scheme number) is only invoked once a full matching
+string has been found.
 
 
 @node Readers,  , Token Readers, API Reference
@@ -608,14 +612,15 @@ following:
 @item @code{reader/record-positions} will yield a reader that records
 the position of the expression read, which is mostly useful for
 debugging purposes; this information may then be accessed via source
-properties @inforef{Procedure Properties, source properties, guile}.
+properties (@pxref{Procedure Properties, source properties,, guile,
+Guile Reference Manual}).
 
 @item @code{reader/lower-case} will have the yielded reader convert to
 lower-case all the letters that it reads; note that this is not
-sufficient to implement symbol case-insensitivity as shown
-@inforef{Reader options, here, guile}.  For this, the token reader(s)
-that read symbols must also convert all subsequent characters to
-lower-case.
+sufficient to implement symbol case-insensitivity as shown in @ref{Reader
+options,,, guile, Guile Reference Manual}.  For this, the token
+reader(s) that read symbols must also convert all subsequent
+characters to lower-case.
 
 @item @code{reader/upper-case} will have the yielded reader convert to
 upper-case all the letters that it reads; again, that is not
