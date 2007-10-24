@@ -1,6 +1,22 @@
-;; arch-tag: 1bde8076-76ed-429c-b8d4-167b54c123bd
-
+Things To Do
+============
 
 * compatibility with Guile 1.[64]
 
 * augment the reader library: R5RS, Guile, Guile + keywords, Skribe
+
+* use Gnulib
+
+* fixes from the new reader in Guile 1.8.3
+
+** see `SCM_WHITE_SPACES' in `read.h'
+** augment `scm_read_number_and_radix ()' for `e', etc.
+** must pass `fractions.test'
+** see miscellaneous `#' syntaxes, e.g., `#@'
+** `read_token ()': use `CHAR_IS_DELIMITER ()'
+** `read_token ()': signal *READ == BUFSIZE
+** use `string-concatenate'
+
+;;; Local Variables
+;;; mode: outline
+;;; End:
