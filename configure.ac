@@ -2,13 +2,22 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(guile-reader, 0.3, ludovic.courtes@laas.fr)
+AC_INIT(guile-reader, 0.3, ludo@gnu.org)
 AC_CONFIG_AUX_DIR(build-aux)
 
-AM_INIT_AUTOMAKE(guile-reader, 0.3)
+AM_INIT_AUTOMAKE([gnu no-define check-news])
 
 AC_CONFIG_SRCDIR([reader.c])
 AC_CONFIG_HEADER([config.h reader-config.h])
+
+AC_ARG_WITH([guilemoduledir],
+  [use the specified installation path for Guile modules],
+  [case "x$withval" in
+     xyes|xno) guilemoduledir="";;
+     *)        guilemoduledir="$withval";;
+   esac],
+  [guilemoduledir=""])
+   
 
 # Checks for programs.
 AC_PROG_CC
@@ -51,17 +60,14 @@ if test "x$guile_snarf" = "xnot-found"; then
 fi
 GUILE_SITE_DIR
 
-# Make sure we are using Guile 1.7+.
-#GUILE_CHECK_RETVAL([have_guile_1_7], [(string>=? (version) "1.7")])
-
 clean_LDFLAGS="$LDFLAGS"
 clean_CFLAGS="$CFLAGS"
 LDFLAGS="$LDFLAGS $GUILE_LDFLAGS"
 CFLAGS="$CFLAGS $GUILE_CFLAGS"
 
-AC_CHECK_FUNC([scm_take_u8vector], [have_guile_1_7=yes], [have_guile_1_7=no])
-if test "x$have_guile_1_7" != "xyes"; then
-  AC_MSG_ERROR([You need Guile 1.7.x or higher.])
+AC_CHECK_FUNC([scm_take_u8vector], [have_guile_1_8=yes], [have_guile_1_8=no])
+if test "x$have_guile_1_8" != "xyes"; then
+  AC_MSG_ERROR([You need Guile 1.8.x or higher.])
 fi
 
 # `scm_c_locale_stringn_to_number ()' was introduced after 1.8.0.  It is
@@ -71,13 +77,25 @@ AC_CHECK_FUNCS([scm_c_locale_stringn_to_number scm_i_mem2number])
 CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 
+
+pkgdatadir="$datadir/$PACKAGE_NAME"
+if test "x$guilemoduledir" = "x"; then
+  guilemoduledir="$pkgdatadir"
+fi
+AC_SUBST([guilemoduledir])
+
+if test "$guilemoduledir" != "$GUILE_SITE"; then
+   # Guile won't be able to locate the module "out of the box", so
+   # warn the user.
+   AC_MSG_WARN([`guilemoduledir' ($guilemoduledir) is different from `GUILE_SITE' ($GUILE_SITE).])
+   AC_MSG_WARN([Make sure to adjust the `GUILE_LOAD_PATH' environment variable accordingly,])
+   AC_MSG_WARN([or re-run `configure' with `--with-guilemoduledir=$GUILE_SITE'.])
+fi
+
 AC_CONFIG_FILES([Makefile
 		 pre-inst-guile
 		 tests/Makefile
 	         module/Makefile
-		 module/system/Makefile
-		 module/system/reader/Makefile
-		 module/system/documentation/Makefile
 		 doc/Makefile
 		 doc/extract-c-doc.scm])
 

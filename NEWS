@@ -1,5 +1,7 @@
 New in Guile-Reader 0.4
 
+  * configure: New `--with-guilemoduledir' option.
+
   * Switch from GNU Arch to Git for version control
 
 New in guile-reader 0.3
