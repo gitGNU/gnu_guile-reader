@@ -10,7 +10,9 @@ extract_c_doc =							\
 	             -e '(apply main (cdr (command-line)))'	\
 		     --
 
-AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir) $(CPPFLAGS)
+AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)		\
+	      -I$(top_srcdir)/src -I$(top_builddir)/src	\
+              $(CPPFLAGS)
 
 # Automatically extracted token reader documentation.
 BUILT_SOURCES = version.texi					\
@@ -23,7 +25,7 @@ BUILT_SOURCES = version.texi					\
 
 CLEANFILES = $(BUILT_SOURCES)
 
-token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/token-readers.h
+token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/src/token-readers.h
 	main='(module-ref (resolve-module '\''(extract-doc)) '\'main')' &&  \
 	$(top_builddir)/pre-inst-guile -l $(srcdir)/extract-doc.scm	    \
 	   -c "(apply $$main (cdr (command-line)))" $<
@@ -32,24 +34,24 @@ token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/token-readers.h
 # Doc snarffed from C files.
 #
 
-make-token-reader-doc.texi: $(top_srcdir)/reader.c
+make-token-reader-doc.texi: $(top_srcdir)/src/reader.c
 	$(extract_c_doc) "$^" "$(CPP)" "$(AM_CPPFLAGS)" \
 		make-token-reader > $@
 
-token-reader-api-doc.texi: $(top_srcdir)/reader.c
+token-reader-api-doc.texi: $(top_srcdir)/src/reader.c
 	$(extract_c_doc) "$^" "$(CPP)" "$(AM_CPPFLAGS)"		\
 	   standard-token-reader token-reader-specification	\
 	   token-reader-procedure 'token-reader-escape?' > $@
 
-make-reader-doc.texi: $(top_srcdir)/reader.c
+make-reader-doc.texi: $(top_srcdir)/src/reader.c
 	$(extract_c_doc) "$^" "$(CPP)" "$(AM_CPPFLAGS)"		\
 	   make-reader %reader-standard-fault-handler > $@
 
-default-reader-doc.texi: $(top_srcdir)/reader-lib.c
+default-reader-doc.texi: $(top_srcdir)/src/reader-lib.c
 	$(extract_c_doc) "$^" "$(CPP)" "$(AM_CPPFLAGS)"			\
 		default-sharp-reader default-reader-token-readers	\
 	 	default-sharp-reader-token-readers > $@
 
-make-guile-reader-doc.texi: $(top_srcdir)/reader-lib.c
+make-guile-reader-doc.texi: $(top_srcdir)/src/reader-lib.c
 	$(extract_c_doc) "$^" "$(CPP)" "$(AM_CPPFLAGS)" \
 		make-guile-reader > $@

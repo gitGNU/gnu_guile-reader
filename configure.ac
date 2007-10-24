@@ -7,8 +7,8 @@ AC_CONFIG_AUX_DIR(build-aux)
 
 AM_INIT_AUTOMAKE([gnu no-define check-news])
 
-AC_CONFIG_SRCDIR([reader.c])
-AC_CONFIG_HEADER([config.h reader-config.h])
+AC_CONFIG_SRCDIR([src/reader.c])
+AC_CONFIG_HEADER([config.h src/reader-config.h])
 
 AC_ARG_WITH([guilemoduledir],
   [use the specified installation path for Guile modules],
@@ -94,11 +94,11 @@ fi
 
 AC_CONFIG_FILES([Makefile
 		 pre-inst-guile
+		 src/Makefile
 		 tests/Makefile
 	         module/Makefile
 		 doc/Makefile])
 
 AC_CONFIG_COMMANDS([pre-inst-guile-exec], [chmod +x pre-inst-guile])
-AC_CONFIG_COMMANDS([extract-c-doc-exec],  [chmod +x doc/extract-c-doc.scm])
 
 AC_OUTPUT

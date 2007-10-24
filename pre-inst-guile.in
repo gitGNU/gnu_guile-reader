@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
+# Copyright (C) 2006, 2007  Ludovic Courtès  <ludo@gnu.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,6 +23,6 @@
 GUILE_LOAD_PATH="@abs_top_srcdir@/module:$GUILE_LOAD_PATH"
 export GUILE_LOAD_PATH
 
-exec @abs_top_builddir@/libtool --mode=execute		\
-       -dlopen "@abs_top_builddir@/libguile-reader.la"	\
+exec @abs_top_builddir@/libtool --mode=execute			\
+       -dlopen "@abs_top_builddir@/src/libguile-reader.la"	\
        @GUILE@ "$@"
