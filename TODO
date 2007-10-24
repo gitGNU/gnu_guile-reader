@@ -7,15 +7,15 @@ Things To Do
 
 * use Gnulib
 
+* add "Quick Start" section to the manual
+
 * fixes from the new reader in Guile 1.8.3
 
-** see `SCM_WHITE_SPACES' in `read.h'
 ** augment `scm_read_number_and_radix ()' for `e', etc.
 ** must pass `fractions.test'
 ** see miscellaneous `#' syntaxes, e.g., `#@'
 ** `read_token ()': use `CHAR_IS_DELIMITER ()'
 ** `read_token ()': signal *READ == BUFSIZE
-** use `string-concatenate'
 
 ;;; Local Variables
 ;;; mode: outline
