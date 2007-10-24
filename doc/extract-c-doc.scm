@@ -44,7 +44,7 @@
             file)
 
     ;; Don't mention the name of C functions.
-    (*document-c-functions?* #f)
+    (*document-c-functions?* #t)
 
     (let ((proc-doc-list
            (run-cpp-and-extract-snarfing file cpp cpp-flags)))
