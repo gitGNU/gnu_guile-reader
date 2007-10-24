@@ -44,19 +44,16 @@ Savannah at:
 If you want do discuss about it, do not hesitate to subscribe to the
 `guile-reader-devel' mailing list from there.
 
-Source code if managed by GNU Arch and is currently available in the
-archives located at the following URL:
+Source code if managed using Git (http://git.or.cz/).  A copy of the
+repository can be obtained using:
 
-  http://arch.sv.gnu.org/archives/guile-reader/
+  git-clone git://git.sv.gnu.org/guile-reader.git
 
-In order to fetch source code from there, you may run the following
-commands:
+Alternatively, the repository can be browsed online at:
 
-  $ tla register-archive http://arch.sv.gnu.org/archives/guile-reader/
-  $ tla get guile-reader@sv.gnu.org/guile-reader--devo--0.3  \
-        guile-reader
+  http://git.sv.gnu.org/gitweb/?p=guile-reader.git;a=summary
 
-This will fetch the source and put it in the `guile-reader' directory.
+Happy hacking!
 
 
 Installation
