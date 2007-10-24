@@ -8,7 +8,7 @@ readerinclude_HEADERS = reader.h reader-config.h	\
 			token-readers.h reader-lib.h
 BUILT_SOURCES = token-reader-lookup.c token-reader-list.c	\
 		make-reader-flags.c				\
-                reader-lib.c.x token-readers.c.x reader.c.x
+                reader-lib.x token-readers.x reader.x
 CLEANFILES = $(BUILT_SOURCES)
 
 EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
@@ -23,11 +23,9 @@ AM_CFLAGS   = $(GCC_CFLAGS)
 snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 
-%.c.x: %.c
+.c.x:
 	$(guile_snarf) -o $@ $< $(snarfcppopts)
 
-%.doc: %.c
-	$(CPP) $(AM_CPPFLAGS) $(CPPFLAGS) -DSCM_MAGIC_SNARF_DOCS $< > $@
 
 # Token reader lookup.
 token-reader-lookup.c: $(srcdir)/token-readers.h

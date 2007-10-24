@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2007  Ludovic Courtès  <ludovic.courtes@laas.fr>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -267,7 +267,7 @@ scm_initialize_reader_library (void)
        tr->token.type != SCM_TOKEN_UNDEF;
        tr++, standard_reader_specs_size++);
 
-#include "reader-lib.c.x"
+#include "reader-lib.x"
 }
 
 /* arch-tag: e7438c42-4225-4a7d-9957-a64b2226b4e5

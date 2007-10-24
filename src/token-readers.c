@@ -998,5 +998,5 @@ SCM_DEFINE (scm_standard_token_reader_names,
 void
 scm_initialize_token_reader_library (void)
 {
-#include "token-readers.c.x"
+#include "token-readers.x"
 }

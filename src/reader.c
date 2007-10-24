@@ -2606,7 +2606,7 @@ scm_reader_init_bindings (void)
 		      3, 0, 0); /* XXX unfortunately, we are limited to 3
 				   compulsory arguments...  */
 
-#include "reader.c.x"
+#include "reader.x"
 
   scm_reader_standard_fault_handler_proc =
     SCM_VARIABLE_REF (scm_c_lookup ("%reader-standard-fault-handler"));
