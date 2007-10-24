@@ -24,14 +24,33 @@ AC_PROG_CC
 AC_LIBTOOL_DLOPEN
 AC_PROG_LIBTOOL
 
+if test "x$GCC" = "xyes"; then
+  # Enable useful GCC compilation flags.
+  GCC_CFLAGS="-Wall"
+  GCC_CFLAGS="-Wcast-align -Wpointer-arith $GCC_CFLAGS"
+  GCC_CFLAGS="-Winline -Wdeclaration-after-statement $GCC_CFLAGS"
+else
+  GCC_CFLAGS=""
+fi
+AC_SUBST([GCC_CFLAGS])
+
 # Checks for libraries.
 
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h string.h strings.h])
 
-LIGHTNING_CONFIGURE_IF_NOT_FOUND([],
-  [AC_MSG_WARN([GNU Lightning not found.  Make sure it is not installable on your platform!])])
+LIGHTNING_CONFIGURE_IF_NOT_FOUND(
+  [if test "x$GCC" = "xyes"; then
+    # lightning's macros yield a lot of unused return values.  In addition,
+    # `jit_get_ip ()' yields this warning:
+    #
+    #    dereferencing type-punned pointer will break strict-aliasing rules
+    #
+    # ... hence the `-fno-strict-aliasing'.
+    GCC_CFLAGS="$GCC_CFLAGS -Wno-unused-value -fno-strict-aliasing"
+   fi],
+  [AC_MSG_WARN([GNU lightning not found.  Make sure it is not installable on your platform!])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

@@ -16,25 +16,18 @@ EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 	     compat.h
 
 # Some header files are generated (in builddir) and others are in srcdir.
-AM_CFLAGS = -I$(srcdir) -I$(builddir) -I$(top_builddir)
+AM_CPPFLAGS = -I$(srcdir) -I$(builddir) -I$(top_builddir)
+AM_CFLAGS   = $(GCC_CFLAGS)
 
-AM_CFLAGS += -Wmissing-prototypes -Wall -g -O0
 
-if HAVE_INSTALLED_LIGHTNING
-
-# Tell GCC to not complain about what Lightning does.
-libguile_reader_la_CFLAGS = -Wno-unused-value
-
-endif
-
-snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS) $(AM_CFLAGS)
+snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 
 %.c.x: %.c
 	$(guile_snarf) -o $@ $< $(snarfcppopts)
 
 %.doc: %.c
-	$(CPP) $(CPPFLAGS) -DSCM_MAGIC_SNARF_DOCS $< > $@
+	$(CPP) $(AM_CPPFLAGS) $(CPPFLAGS) -DSCM_MAGIC_SNARF_DOCS $< > $@
 
 # Token reader lookup.
 token-reader-lookup.c: $(srcdir)/token-readers.h
