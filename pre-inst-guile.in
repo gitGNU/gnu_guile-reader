@@ -20,7 +20,7 @@
 # and produce the documentation.
 
 
-GUILE_LOAD_PATH="@abs_top_srcdir@/module:$GUILE_LOAD_PATH"
+GUILE_LOAD_PATH="@abs_top_srcdir@/modules:$GUILE_LOAD_PATH"
 export GUILE_LOAD_PATH
 
 exec @abs_top_builddir@/libtool --mode=execute			\

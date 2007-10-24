@@ -1,4 +1,4 @@
 # Jump to the sub-directories.
-SUBDIRS = src module doc tests
+SUBDIRS = src modules doc tests
 
 EXTRA_DIST = pre-inst-guile.in

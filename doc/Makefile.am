@@ -2,7 +2,7 @@ info_TEXINFOS = guile-reader.texi
 
 EXTRA_DIST = extract-doc.scm extract-c-doc.scm
 
-GUILE_FOR_BUILD = $(GUILE) -L $(top_srcdir)/module
+GUILE_FOR_BUILD = $(GUILE) -L $(top_srcdir)/modules
 
 # Basic command to run the C doc extractor.
 extract_c_doc =							\

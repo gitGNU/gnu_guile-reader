@@ -115,7 +115,7 @@ AC_CONFIG_FILES([Makefile
 		 pre-inst-guile
 		 src/Makefile
 		 tests/Makefile
-	         module/Makefile
+	         modules/Makefile
 		 doc/Makefile])
 
 AC_CONFIG_COMMANDS([pre-inst-guile-exec], [chmod +x pre-inst-guile])
