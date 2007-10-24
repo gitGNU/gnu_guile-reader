@@ -1,0 +1,12 @@
+*.c.texi
+guile-reader.info*
+version.texi
+stamp-vti
+extract-c-doc.scm
+default-reader-doc.texi
+make-guile-reader-doc.texi
+make-reader-doc.texi
+make-token-reader-doc.texi
+reader-lib-doc.texi
+token-reader-api-doc.texi
+token-reader-doc.texi
