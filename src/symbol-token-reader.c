@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006, 2007  Ludovic Courtès  <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -41,8 +41,8 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 		scm_reader_t top_level_reader)
 {
   int c;
-  SCM result, result_str = SCM_BOOL_F;
-  char c_num[1024];
+  SCM result, result_str = SCM_EOL;
+  char c_num[SYMBOL_BUFFER_SIZE];
   size_t c_num_len = 0;
   unsigned saw_point = 0, saw_plus_or_minus = 0, saw_leading_sign = 0;
   unsigned saw_exponent = 0, saw_at_sign = 0;
@@ -87,16 +87,11 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 
       c_num[c_num_len++] = (char)c;
 
-      if (c_num_len + 1 >= sizeof (c_num))
+      if ((c_num_len + 1 >= sizeof (c_num)) || scm_is_pair (result_str))
 	{
 	  /* Start flushing the symbol to a Scheme string.  */
-	  if (result_str == SCM_BOOL_F)
-	    result_str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
-
-	  result_str =
-	    scm_string_append (scm_list_2
-			       (result_str,
-				scm_from_locale_stringn (c_num, c_num_len)));
+	  result_str = scm_cons (scm_from_locale_stringn (c_num, c_num_len),
+				 result_str);
 	  c_num_len = 0;
 	}
 
@@ -112,17 +107,10 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 	return_symbol = 1;
     }
 
-  if (result_str != SCM_BOOL_F)
+  if (scm_is_pair (result_str))
     {
       /* So we're using a Scheme string.  */
-      if (c_num_len)
-	{
-	  result_str =
-	    scm_string_append (scm_list_2
-			       (result_str,
-				scm_from_locale_stringn (c_num, c_num_len)));
-	}
-
+      result_str = scm_string_concatenate (scm_reverse_x (result_str, SCM_EOL));
       if (scm_c_string_length (result_str) == 0)
 	scm_i_input_error(__FUNCTION__, port,
 			  "invalid number syntax", SCM_EOL);
@@ -166,8 +154,8 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
 		scm_reader_t top_level_reader)
 {
   int c;
-  SCM result = SCM_BOOL_F;
-  char c_id[1024];
+  SCM result = SCM_EOL;
+  char c_id[SYMBOL_BUFFER_SIZE];
   size_t c_id_len = 0;
 
   c = chr;
@@ -197,30 +185,20 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
 	    }
 	}
 
-      if (c_id_len + 1 >= sizeof (c_id))
+      if ((c_id_len + 1 >= sizeof (c_id)) || (scm_is_pair (result)))
 	{
 	  /* Start flushing the symbol to a Scheme string.  */
-	  if (result == SCM_BOOL_F)
-	    result = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
-
-	  result =
-	    scm_string_append (scm_list_2
-			       (result,
-				scm_from_locale_stringn (c_id, c_id_len)));
+	  result = scm_cons (scm_from_locale_stringn (c_id, c_id_len),
+			     result);
 	  c_id_len = 0;
 	}
 
       c = scm_getc (port);
     }
 
-  if (result != SCM_BOOL_F)
+  if (scm_is_pair (result))
     {
-      if (c_id_len)
-	result =
-	  scm_string_append (scm_list_2
-			     (result,
-			      scm_from_locale_stringn (c_id, c_id_len)));
-
+      result = scm_string_concatenate (scm_reverse_x (result, SCM_EOL));
       result = scm_string_to_symbol (result);
     }
   else

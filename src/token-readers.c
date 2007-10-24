@@ -280,8 +280,8 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
   /* For strings smaller than C_STR, this function creates only one Scheme
      object (the string returned).  */
 
-  SCM str = SCM_BOOL_F;
-  char c_str[1024];
+  SCM str = SCM_EOL;
+  char c_str[512];
   unsigned c_str_len = 0;
   int c;
 
@@ -295,13 +295,7 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
       if (c_str_len + 1 >= sizeof (c_str))
 	{
 	  /* Flush the C buffer onto a Scheme string.  */
-	  SCM addy;
-
-	  if (str == SCM_BOOL_F)
-	    str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
-
-	  addy = scm_from_locale_stringn (c_str, c_str_len);
-	  str = scm_string_append_shared (scm_list_2 (str, addy));
+	  str = scm_cons (scm_from_locale_stringn (c_str, c_str_len), str);
 
 	  c_str_len = 0;
 	}
@@ -372,17 +366,9 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
     }
 
   if (c_str_len > 0)
-    {
-      SCM addy;
+    str = scm_cons (scm_from_locale_stringn (c_str, c_str_len), str);
 
-      addy = scm_from_locale_stringn (c_str, c_str_len);
-      if (str == SCM_BOOL_F)
-	str = addy;
-      else
-	str = scm_string_append_shared (scm_list_2 (str, addy));
-    }
-  else
-    str = (str == SCM_BOOL_F) ? scm_nullstr : str;
+  str = scm_string_concatenate (scm_reverse_x (str, SCM_EOL));
 
   return str;
 }
@@ -397,6 +383,9 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
    Both the symbol TR and the number TR rely on the definition of delimiter
    characters which varies, for instance, between R5RS and R6RS.  So we'll
    generate both of them here.  */
+
+/* Size of the on-stack buffer.  */
+#define SYMBOL_BUFFER_SIZE  256
 
 
 #define SYMBOL_TR_NAME scm_read_guile_mixed_case_symbol
