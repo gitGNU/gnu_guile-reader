@@ -44,8 +44,17 @@
 
 
 /* `isblank' is only in C99.  */
-#define CHAR_IS_BLANK(_chr)					\
-  (((_chr) == ' ') || ((_chr) == '\t') || ((_chr) == '\n'))
+#define CHAR_IS_BLANK_(_chr)					\
+  (((_chr) == ' ') || ((_chr) == '\t') || ((_chr) == '\n')	\
+   || ((_chr) == '\f') || ((_chr) == '\r'))
+
+#ifdef MSDOS
+# define CHAR_IS_BLANK(_chr)			\
+  ((CHAR_IS_BLANK_ (chr)) || ((_chr) == 26))
+#else
+# define CHAR_IS_BLANK CHAR_IS_BLANK_
+#endif
+
 
 /* R5RS one-character delimiters (see section 7.1.1, ``Lexical
    structure'').  */

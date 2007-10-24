@@ -7,7 +7,7 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
-;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2007  Ludovic Courtès <ludovic.courtes@laas.fr>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -120,6 +120,7 @@ encountered."
   ;; reader.
   '((string . "\"hello\"")
     (string-with-backslash . "\"hello \\\"world\\\"\"")
+    (symbols-with-cr . "first-symbol\rsecond-symbol")
     (number . "777")
     (floating-number . "3.14")
     (positive-number . "+12")
@@ -249,7 +250,7 @@ encountered."
           (format #t (string-append fmt "~%") fmt-arg)
           (exit 1))))
 
-    failed))
+    (exit failed)))
 
 (define main scheme-reader)
 
