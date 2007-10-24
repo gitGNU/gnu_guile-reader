@@ -1,6 +1,6 @@
 ;;; output.scm  --  Output documentation "snarffed" from C files in Texi/GDF.
 ;;;
-;;; Copyright 2006, 2007  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2006, 2007  Free Software Foundation
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -20,11 +20,13 @@
 (define-module (system documentation output)
   :use-module (srfi srfi-1)
   :use-module (srfi srfi-13)
+  :use-module (srfi srfi-39)
   :autoload   (system documentation c-snarf) (run-cpp-and-extract-snarfing)
 
   :export (schemify-name scheme-procedure-texi-line
            procedure-gdf-string procedure-texi-documentation
-           output-procedure-texi-documentation-from-c-file))
+           output-procedure-texi-documentation-from-c-file
+           *document-c-functions?*))
 
 ;;; Author:  Ludovic Courtès
 ;;;
@@ -47,17 +49,25 @@ form, e.g., one with dashed instead of underscores, etc."
                 (if (eq? chr #\_)
                     #\-
                     chr))
-              (if (string-suffix? "_p" str)
-                  (string-append (substring str 0
-                                            (- (string-length str) 2))
-                                 "?")
-                  str)))
+              (cond ((string-suffix? "_p" str)
+                     (string-append (substring str 0
+                                               (- (string-length str) 2))
+                                    "?"))
+                    ((string-suffix? "_x" str)
+                     (string-append (substring str 0
+                                               (- (string-length str) 2))
+                                    "!"))
+                    (else str))))
 
 
 ;;;
 ;;; Issuing Texinfo and GDF-formatted doc (i.e., `guile-procedures.texi').
 ;;; GDF = Guile Documentation Format
 ;;;
+
+(define *document-c-functions?*
+  ;; Whether to mention C function names along with Scheme procedure names.
+  (make-parameter #t))
 
 (define (scheme-procedure-texi-line proc-name args
                                     required-args optional-args
@@ -67,7 +77,7 @@ form, e.g., one with dashed instead of underscores, etc."
 and whose signature is defined by @var{required-args}, @var{optional-args}
 and @var{rest-arg?}."
   (string-append "@deffn {Scheme Procedure} " proc-name " "
-                 (string-join (take args required-args) " ")
+                 (string-join (take args required-args))
                  (string-join (take (drop args required-args)
                                     (+ optional-args
                                        (if rest-arg? 1 0)))
@@ -129,17 +139,21 @@ function."
                                              (map schemify-name args)
                                              required-args optional-args
                                              rest-arg?)
-
-                 ;; document the C function
                  (string #\newline)
-                 "@deffnx {C Function} " c-name " ("
-                 (if (null? args)
-                     "void"
-                     (string-join (map (lambda (arg)
-                                         (string-append "SCM " arg))
-                                       args)
-                                  ", "))
-                 ")" (string #\newline)
+
+                 (if (*document-c-functions?*)
+                     (string-append
+                      ;; document the C function
+                      "@deffnx {C Function} " c-name " ("
+                      (if (null? args)
+                          "void"
+                          (string-join (map (lambda (arg)
+                                              (string-append "SCM " arg))
+                                            args)
+                                       ", "))
+                      ")" (string #\newline))
+                     "")
+
 		 documentation (string #\newline)
                  "@end deffn" (string #\newline))))
 
@@ -157,5 +171,10 @@ function."
 
 
 ;;; output.scm ends here
+
+;;; Local Variables:
+;;; mode: scheme
+;;; coding: latin-1
+;;; End:
 
 ;;; arch-tag: 20ca493a-6f1a-4d7f-9d24-ccce0d32df49

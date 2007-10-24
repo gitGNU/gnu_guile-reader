@@ -96,8 +96,7 @@ AC_CONFIG_FILES([Makefile
 		 pre-inst-guile
 		 tests/Makefile
 	         module/Makefile
-		 doc/Makefile
-		 doc/extract-c-doc.scm])
+		 doc/Makefile])
 
 AC_CONFIG_COMMANDS([pre-inst-guile-exec], [chmod +x pre-inst-guile])
 AC_CONFIG_COMMANDS([extract-c-doc-exec],  [chmod +x doc/extract-c-doc.scm])

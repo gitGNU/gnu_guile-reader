@@ -1,16 +1,6 @@
-#!/bin/sh
-
-c_file="$1"
-shift
-
-exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
-     -e '(apply main (cdr (command-line)))'   \
-     -- "$c_file" "@CPP@" "@CPPFLAGS@ -I@top_srcdir@ -I@top_builddir@" $@
-!#
-
 ;;; extract-c-doc.scm  --  Output Texinfo from "snarffed" C files.
 ;;;
-;;; Copyright 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2006, 2007  Free Software Foundation
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -27,13 +17,14 @@ exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+;;; Written by Ludovic Courtès <ludo@chbouib.org>.
+
 (use-modules (system documentation c-snarf)
              (system documentation output)
 
              (srfi srfi-1))
 
-
-(define (main . args)
+(define (main file cpp+args cpp-flags . procs)
   ;; Arguments:
   ;;
   ;; 1. C file to be processed;
@@ -43,29 +34,31 @@ exec @GUILE@ -L @top_srcdir@/module -l "$0"   \
   ;;    to be output.  If no such list is passed, then documentation for
   ;;    all the Scheme functions available in the C source file is issued.
   ;;
-  (let* ((file (car args))
-         (cpp+args (string-tokenize (cadr args)))
-         (cpp (car cpp+args))
-         (cpp-flags (apply string-append (caddr args)
-                           " -DSCM_MAGIC_SNARF_DOCS "
-                           (cdr cpp+args)))
-         (procs (cdddr args)))
+  (let* ((cpp+args  (string-tokenize cpp+args))
+         (cpp       (car cpp+args))
+         (cpp-flags (append (cdr cpp+args)
+                            (string-tokenize cpp-flags)
+                            (list "-DSCM_MAGIC_SNARF_DOCS "))))
     ;;(format (current-error-port) "cpp-flags: ~a~%" cpp-flags)
     (format (current-error-port) "extracting Texinfo doc from `~a'...  "
             file)
+
+    ;; Don't mention the name of C functions.
+    (*document-c-functions?* #f)
+
     (let ((proc-doc-list
-           (run-cpp-and-extract-snarfing file cpp
-                                         (string-tokenize cpp-flags))))
-      (display (apply string-append
-                      (map procedure-texi-documentation
-                           (if (null? procs)
-                               proc-doc-list
-                               (filter (lambda (proc-doc)
-                                         (let ((proc-name
-                                                (assq-ref proc-doc
-                                                          'scheme-name)))
-                                           (member proc-name procs)))
-                                       proc-doc-list))))))
+           (run-cpp-and-extract-snarfing file cpp cpp-flags)))
+      (display "@c Automatically generated, do not edit.\n")
+      (display (string-concatenate
+                (map procedure-texi-documentation
+                     (if (null? procs)
+                         proc-doc-list
+                         (filter (lambda (proc-doc)
+                                   (let ((proc-name
+                                          (assq-ref proc-doc
+                                                    'scheme-name)))
+                                     (member proc-name procs)))
+                                 proc-doc-list))))))
     (format (current-error-port) "done.~%")
     (exit 0)))
 

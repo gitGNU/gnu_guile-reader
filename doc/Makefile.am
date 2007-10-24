@@ -1,7 +1,14 @@
 info_TEXINFOS = guile-reader.texi
 
-EXTRA_DIST = extract-doc.scm extract-c-doc.scm.in
+EXTRA_DIST = extract-doc.scm extract-c-doc.scm
 
+GUILE_FOR_BUILD = $(GUILE) -L $(top_srcdir)/module
+
+# Basic command to run the C doc extractor.
+extract_c_doc =							\
+  $(GUILE_FOR_BUILD) -l "$(srcdir)/extract-c-doc.scm"		\
+	             -e '(apply main (cdr (command-line)))'	\
+		     --
 
 # Automatically extracted token reader documentation.
 BUILT_SOURCES = version.texi					\
@@ -24,21 +31,23 @@ token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/token-readers.h
 #
 
 make-token-reader-doc.texi: $(top_srcdir)/reader.c
-	$(top_builddir)/doc/extract-c-doc.scm $^ make-token-reader > $@
+	$(extract_c_doc) "$^" "$(CPP)" "$(CPPFLAGS)" \
+		make-token-reader > $@
 
 token-reader-api-doc.texi: $(top_srcdir)/reader.c
-	$(top_builddir)/doc/extract-c-doc.scm $^			\
+	$(extract_c_doc) "$^" "$(CPP)" "$(CPPFLAGS)"		\
 	   standard-token-reader token-reader-specification	\
 	   token-reader-procedure 'token-reader-escape?' > $@
 
 make-reader-doc.texi: $(top_srcdir)/reader.c
-	$(top_builddir)/doc/extract-c-doc.scm $^		\
+	$(extract_c_doc) "$^" "$(CPP)" "$(CPPFLAGS)"		\
 	   make-reader %reader-standard-fault-handler > $@
 
 default-reader-doc.texi: $(top_srcdir)/reader-lib.c
-	$(top_builddir)/doc/extract-c-doc.scm $^ default-reader		\
+	$(extract_c_doc) "$^" "$(CPP)" "$(CPPFLAGS)"			\
 		default-sharp-reader default-reader-token-readers	\
 	 	default-sharp-reader-token-readers > $@
 
 make-guile-reader-doc.texi: $(top_srcdir)/reader-lib.c
-	$(top_builddir)/doc/extract-c-doc.scm $^ make-guile-reader > $@
+	$(extract_c_doc) "$^" "$(CPP)" "$(CPPFLAGS)" \
+		make-guile-reader > $@
