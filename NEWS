@@ -11,6 +11,8 @@ New in Guile-Reader 0.4
   * Packaging
 
     * configure: New `--with-guilemoduledir' option
+    * Various build fixes
+    * Improve tree layout
     * Switch from GNU Arch to Git for version control
 
 New in guile-reader 0.3

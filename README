@@ -27,7 +27,7 @@ reader using basic building-blocks such as an R5RS string reader, an
 S-exp reader, etc., or even user-defined readers.
 
 In order to achieve performance equivalent (or better?) to Guile's C
-hand-coded reader, guile-reader relies on GNU lightning to compile
+hand-coded reader, Guile-Reader relies on GNU lightning to compile
 readers to native code.  For compatibility, a lightning-free, slower
 implementation is available for platforms not supported by lightning.
 
@@ -35,7 +35,7 @@ implementation is available for platforms not supported by lightning.
 Availability
 ------------
 
-Guile-reader is available under the GNU General Public License, version
+Guile-Reader is available under the GNU General Public License, version
 2 or later, at your option (see file `COPYING').  It is hosted by
 Savannah at:
 
@@ -59,7 +59,7 @@ Happy hacking!
 Installation
 ------------
 
-Guile-reader is written for Guile 1.8.x.  For optimal performance, you
+Guile-Reader is written for Guile 1.8.x.  For optimal performance, you
 may want to get GNU lightning 1.2b or later (on platforms supported by
 GNU lightning).
 
@@ -68,6 +68,6 @@ Thanks in advance for your feedback!  :-)
 
 
 
-February 2007.
+December 2007.
 
-Ludovic Courtès <ludovic.courtes@laas.fr>.
+Ludovic Courtès <ludo@gnu.org>.
