@@ -4,6 +4,10 @@ New in Guile-Reader 0.4
 
     * Recognize CR (ASCII 0x0d) and others as token delimiters
 
+  * Documentation
+
+    * New "Quick Start" section
+
   * Packaging
 
     * configure: New `--with-guilemoduledir' option

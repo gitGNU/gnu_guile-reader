@@ -78,9 +78,10 @@ are omitted from this manual.  They can be found in the public header
 files.
 
 @menu
-* Introduction::                The goals of guile-reader.
+* Introduction::                The goals of Guile-Reader.
 * Overview::                    How it works.
-* API Reference::               Using guile-reader.
+* Quick Start::                 For the impatient.
+* API Reference::               Using Guile-Reader.
 * Internals::                   Performance considerations.
 
 * Concept Index::               Concepts.
@@ -152,7 +153,7 @@ address.
 
 
 @c chapter ----------------------------------------------------------
-@node Overview, API Reference, Introduction, Top
+@node Overview, Quick Start, Introduction, Top
 @chapter Overview
 
 @cindex reader library
@@ -188,7 +189,7 @@ procedure that reads an S-expression.  Likewise, lower-case and
 upper-case letters associated with the appropriate procedure form a
 token reader for symbols.
 
-In guile-reader, TRs may be written either in Scheme or in C, and they
+In Guile-Reader, TRs may be written either in Scheme or in C, and they
 can even be a reader produced by guile-reader itself.  Unless it is a
 reader, the procedure (or C function) used to create a TR will receive
 four arguments:
@@ -201,10 +202,109 @@ the S-exp example, this would be @code{(};
 @item the top-level reader which yielded this invocation.
 @end itemize
 
-The next section will provide details about the API.
+The next section shows how to get started with Guile-Reader, using a
+high-level API.  Details about of the programming interface are given in
+the API reference (@pxref{API Reference}).
+
 
 @c chapter ----------------------------------------------------------
-@node API Reference, Internals, Overview, Top
+@node Quick Start, API Reference, Overview, Top
+@chapter Quick Start
+
+The simplest way to get started and to produce customized readers is
+through the high-level API provided by the @code{(system reader
+library)} module.  As the name suggests, this module provides a library
+of readily usable readers.  The @code{make-alternate-guile-reader}
+procedure gives access to these readers.  It can be passed a list of
+symbols describing reader options, such as whether you want support for
+DSSSL keywords, @uref{http://srfi.schemers.org/srfi-62/srfi-62.html,
+SRFI-62 comments}, @uref{http://srfi.schemers.org/srfi-30/srfi-30.html,
+SRFI-30 block comments}, etc.
+
+The following example binds to @var{my-reader} a Scheme reader that
+supports DSSSL-style keywords and SRFI-62 comments, and that is case
+insensitive:
+
+@findex make-alternate-guile-reader
+
+@lisp
+(use-modules (system reader library))
+
+(define my-reader
+  (make-alternate-guile-reader '(dsssl-keywords
+                                 srfi62-sexp-comments
+                                 case-insensitive)))
+@end lisp
+
+This reader can then be used like the regular @code{read} procedure:
+
+@lisp
+(procedure? my-reader)
+=> #t
+
+(with-input-from-string "some-symbol" my-reader)
+=> some-symbol
+
+(my-reader (open-input-string "MiXeD-CaSe"))
+=> mixed-case
+
+(my-reader (open-input-string "(an sexp with a #;srfi-62 comment)"))
+=> (an sexp with a comment)
+
+(my-reader (open-input-string "#!some-DSSSL-keyword"))
+=> #:some-dsssl-keyword
+@end lisp
+
+Most of the time, you will want to use it as the current reader, at
+least in the module where you created it.  Fortunately, Guile 1.8
+provides a mechanism for this, the @code{current-reader} fluid
+(@pxref{Loading, @code{current-reader},, guile, Guile Reference
+Manual}).  Changing the value of this fluid from a file that is being
+loaded will affect the reader use to load it.  For instance:
+
+@vindex current-reader
+
+@lisp
+;;; This is the beginning of my Scheme file.  At this point, Guile's
+;;; default reader is used (or, alternatively, the one that was
+;;; passed as a second parameter to `load').  So, for instance, DSSSL
+;;; keywords are _not_ recognized.
+
+;;; Let's create our own customized reader...
+(use-modules (system reader library))
+
+(define my-reader
+  (make-alternate-guile-reader '(dsssl-keywords
+                                 srfi62-sexp-comments
+                                 case-insensitive)))
+
+;;; Let's make it the current reader.
+(fluid-set! current-reader my-reader)
+
+;;; From now on, MY-READER is used to read the rest of this file.  Thus
+;;; we can happily use the syntactic extensions it implements: DSSSL
+;;; keywords, SRFI-62 comments and case-insensitivity.
+
+(if (not (keyword? #!dsssl-keyword))
+    (error "Something went wrong, this should not happen!"))
+@end lisp
+
+The nice thing is that @code{current-reader} is reset to its initial
+value when the dynamic extent of @code{load} is left.  In other words,
+the loader of the file above is @emph{not} affected by the
+@code{fluid-set!} statement.  Reader changes are @emph{hygienic} and
+modules can use their own without risking to harm each other.
+
+The full list of options supported by @code{make-alternate-guile-reader}
+is shown in @ref{Reader Library}.  However, this option set is quite
+limited and you may find yourself wanting a syntactic extension not
+available here.  In that case, you will want to build a new reader,
+possibly reusing existing reader components known as @dfn{token
+readers}, as described in @ref{Defining a New Reader}.
+
+
+@c chapter ----------------------------------------------------------
+@node API Reference, Internals, Quick Start, Top
 @chapter API Reference
 
 All the Scheme procedures described below are exported by the
