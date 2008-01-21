@@ -40,17 +40,37 @@ AC_SUBST([GCC_CFLAGS])
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h string.h strings.h])
 
-LIGHTNING_CONFIGURE_IF_NOT_FOUND(
-  [if test "x$GCC" = "xyes"; then
-    # lightning's macros yield a lot of unused return values.  In addition,
-    # `jit_get_ip ()' yields this warning:
-    #
-    #    dereferencing type-punned pointer will break strict-aliasing rules
-    #
-    # ... hence the `-fno-strict-aliasing'.
-    GCC_CFLAGS="$GCC_CFLAGS -Wno-unused-value -fno-strict-aliasing"
-   fi],
-  [AC_MSG_WARN([GNU lightning not found.  Make sure it is not installable on your platform!])])
+# GNU lightning.
+
+# We don't bundle GNU lightning with Guile-Reader, as `lightningize'
+# would do.  Instead we simply use the available version of lightning,
+# if any.  This rules out use of `LIGHTNING_CONFIGURE_IF_NOT_FOUND'.
+AC_CHECK_HEADER([lightning.h], [have_lightning=yes], [have_lightning=no])
+if test "x$have_lightning" = "xyes"; then
+   if test "x$GCC" = "xyes"; then
+      # lightning's macros yield a lot of unused return values.  In addition,
+      # `jit_get_ip ()' yields this warning:
+      #
+      #    dereferencing type-punned pointer will break strict-aliasing rules
+      #
+      # ... hence the `-fno-strict-aliasing'.
+      GCC_CFLAGS="$GCC_CFLAGS -Wno-unused-value -fno-strict-aliasing"
+   fi
+
+   AC_MSG_CHECKING([whether GNU lightning supports `jit_allocai'])
+   AC_LINK_IFELSE(
+     [AC_LANG_PROGRAM([[#include <lightning.h>]],
+                      [[int x = jit_allocai (7);]])],
+     [AC_MSG_RESULT([yes])],
+     [AC_MSG_RESULT([no])
+      AC_MSG_ERROR([Your installation of GNU lightning is too old; install 1.2b or later.])
+      have_lightning=no])
+else
+  AC_MSG_WARN([GNU lightning not found; GNU lightning enhancements not compiled.])
+fi
+if test "x$have_lightning" = "xyes"; then
+   AC_DEFINE([HAVE_LIGHTNING], [1], [Define if GNU lightning can be used])
+fi
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
