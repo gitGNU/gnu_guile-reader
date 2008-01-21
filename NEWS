@@ -1,3 +1,9 @@
+New in Guile-Reader 0.5
+
+  * Bugs fixed
+
+    * Fix & improve detection of GNU lightning at configure time
+
 New in Guile-Reader 0.4
 
   * Bugs fixed
