@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2006, 2007, 2008  Ludovic Courtès <ludo@gnu.org>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
@@ -28,6 +28,10 @@
 /* A library of stardard token readers that can be assembled to create a
    reader equivalent to that of Guile.  */
 
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <libguile.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,7 +42,6 @@
 #include "reader.h"
 #include "token-readers.h"
 
-#include "config.h"
 #include "compat.h"
 
 

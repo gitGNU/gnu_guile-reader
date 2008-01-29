@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2006  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2006, 2008  Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,7 +20,9 @@
 
 /* Compatibility tricks among Guile versions.  */
 
-#include "config.h"
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
 
 #ifndef HAVE_SCM_C_LOCALE_STRINGN_TO_NUMBER
 # ifdef HAVE_SCM_I_MEM2NUMBER
