@@ -68,6 +68,15 @@ Thanks in advance for your feedback!  :-)
 
 
 
-December 2007.
 
-Ludovic Courtès <ludo@gnu.org>.
+
+Copyright 2005, 2006, 2007, 2008  Ludovic CourtÃ¨s <ludo@gnu.org>
+
+  Copying and distribution of this file, with or without modification,
+  are permitted in any medium without royalty provided the copyright
+  notice and this notice are preserved.
+
+;;; Local Variables:
+;;; mode: text
+;;; coding: utf-8
+;;; End:

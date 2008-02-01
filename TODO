@@ -1,4 +1,4 @@
-Things To Do
+Things To Do                                  -*- Org -*-
 ============
 
 * compatibility with Guile 1.[64]
@@ -6,8 +6,6 @@ Things To Do
 * augment the reader library: R5RS, Guile, Guile + keywords, Skribe
 
 * use Gnulib
-
-* add "Quick Start" section to the manual
 
 * fixes from the new reader in Guile 1.8.3
 
@@ -17,6 +15,8 @@ Things To Do
 ** `read_token ()': use `CHAR_IS_DELIMITER ()'
 ** `read_token ()': signal *READ == BUFSIZE
 
-;;; Local Variables
-;;; mode: outline
-;;; End:
+* support for SRFI-38 (data with shared structure)
+
+* support for SRFI-88 (keyword objects)
+
+* why not rather write an actual lexer compiler?
