@@ -17,9 +17,9 @@
 * Guile Reader: (guile-reader).      A Reader Framework for Guile.
 @end direntry
 
-This file documents Guile Reader.
+This file documents Guile-Reader.
 
-Copyright @copyright{} 2005, 2006, 2007 Ludovic Court@`es
+Copyright @copyright{} 2005, 2006, 2007, 2008 Ludovic Court@`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -827,7 +827,7 @@ In order to not have to trade too much performance for flexibility,
 guile-reader dynamically compiles code for the readers defined using
 GNU @emph{lightning} (@pxref{Overview, Introduction to GNU
 @emph{lightning},, lightning, Using and Porting GNU
-@emph{lightning}}).  As of version 1.2b, GNU @emph{lightning} can
+@emph{lightning}}).  As of version 1.2c, GNU @emph{lightning} can
 generate code for the PowerPC, SPARC, and IA32 architectures.  For
 other platforms, guile-reader provides an alternative (slower) C
 implementation that does not depend on it.  Using the

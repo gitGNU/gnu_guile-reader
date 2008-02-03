@@ -60,7 +60,7 @@ Installation
 ------------
 
 Guile-Reader is written for Guile 1.8.x.  For optimal performance, you
-may want to get GNU lightning 1.2b or later (on platforms supported by
+may want to get GNU lightning 1.2c or later (on platforms supported by
 GNU lightning).
 
 
