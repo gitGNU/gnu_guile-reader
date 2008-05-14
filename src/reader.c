@@ -1541,9 +1541,11 @@ scm_c_make_reader (void *code_buffer,
 
 #else /* SCM_READER_USE_LIGHTNING */
 
-/* The slow Lightning-free implementation of `scm_c_make_reader ()' and
+/* The lightning-free implementation of `scm_c_make_reader ()' and
    `scm_call_reader ()'.  */
-#warning "Compiling the slow, Lightning-free, implementation!"
+#ifdef __GNUC__
+# warning "Compiling the GNU lightning-free implementation"
+#endif
 
 struct scm_reader
 {
