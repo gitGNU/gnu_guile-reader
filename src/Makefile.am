@@ -17,10 +17,14 @@ EXTRA_DIST = symbol-token-reader.c example-repl.scm $(TESTS)		\
 
 # Some header files are generated (in builddir) and others are in srcdir.
 AM_CPPFLAGS = -I$(srcdir) -I$(builddir) -I$(top_builddir)
-AM_CFLAGS   = $(GCC_CFLAGS)
+AM_CFLAGS   = $(GUILE_CFLAGS) $(GCC_CFLAGS)
 
 
-snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(AM_CPPFLAGS)
+# We're adding $(GUILE_CFLAGS) since it may contain `-I' flags, and
+# hope that it does not contain anything that would make `cpp'
+# unhappy.
+snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(AM_CPPFLAGS) \
+	       $(GUILE_CFLAGS)
 
 
 .c.x:
