@@ -5,7 +5,7 @@ AC_PREREQ(2.59)
 AC_INIT(guile-reader, 0.6, guile-reader-devel@nongnu.org)
 AC_CONFIG_AUX_DIR(build-aux)
 
-AM_INIT_AUTOMAKE([gnu no-define check-news])
+AM_INIT_AUTOMAKE([gnu no-define check-news -Wall -Werror])
 
 AC_CONFIG_SRCDIR([src/reader.c])
 AC_CONFIG_HEADER([config.h src/reader-config.h])
