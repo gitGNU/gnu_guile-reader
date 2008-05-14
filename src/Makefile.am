@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libguile-reader.la
-libguile_reader_la_SOURCES = reader.c token-readers.c reader-lib.c
+libguile_reader_la_SOURCES = reader.c token-readers.c reader-lib.c compat.c
 libguile_reader_la_LDFLAGS = -module -version-info 1:0:0 $(GUILE_LDFLAGS)
 
 readerincludedir = $(includedir)/guile-reader

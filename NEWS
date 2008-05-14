@@ -1,3 +1,10 @@
+New in Guile-Reader 0.6
+
+  * Bugs fixed
+
+    * Provide replacement for some `scm_i_' functions that are no
+      longer accessible in Guile 1.8.6+
+
 New in Guile-Reader 0.5
 
   * Bugs fixed

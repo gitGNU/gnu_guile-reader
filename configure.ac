@@ -113,6 +113,10 @@ fi
 # equivalent to the former `scm_i_mem2number ()'.
 AC_CHECK_FUNCS([scm_c_locale_stringn_to_number scm_i_mem2number])
 
+# `scm_i_' functions may eventually be no longer exported, so avoid
+# relying on it.
+AC_CHECK_FUNCS([scm_i_input_error scm_i_read_array])
+
 CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 

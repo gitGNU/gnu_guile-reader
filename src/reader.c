@@ -2169,12 +2169,20 @@ SCM_DEFINE (scm_standard_token_reader, "standard-token-reader", 1, 0, 0,
 	    "reader, then an error is raised.")
 #define FUNC_NAME "standard-token-reader"
 {
-  SCM s_token_reader;
+  SCM s_token_reader, s_name_str;
   const scm_token_reader_spec_t *spec;
+  size_t c_name_len;
+  char *c_name;
 
   SCM_VALIDATE_SYMBOL (1, name);
 
-  spec = scm_token_reader_lookup (scm_i_symbol_chars (name));
+  s_name_str = scm_symbol_to_string (name);
+  c_name_len = scm_c_string_length (s_name_str);
+  c_name = (char *) alloca (c_name_len + 1);
+  (void) scm_to_locale_stringbuf (s_name_str, c_name, c_name_len);
+  c_name[c_name_len] = '\0';
+
+  spec = scm_token_reader_lookup (c_name);
   if (!spec)
     {
       scm_misc_error (FUNC_NAME, "not a standard token reader: ~A",
