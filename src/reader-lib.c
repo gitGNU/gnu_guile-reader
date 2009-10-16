@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2007, 2008  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2007, 2008, 2009  Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -158,7 +158,7 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
 
   /* Build a brand new sharp reader.  Should be enough for both readers.  */
   buffer = scm_malloc (SHARP_READER_SIZE + TOP_LEVEL_READER_SIZE);
-  c_sharp_reader = scm_c_make_reader (buffer + TOP_LEVEL_READER_SIZE,
+  c_sharp_reader = scm_c_make_reader ((char *) buffer + TOP_LEVEL_READER_SIZE,
 				      SHARP_READER_SIZE,
 				      scm_sharp_reader_standard_specs,
 				      fault_handler, c_flags,
