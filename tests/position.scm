@@ -1,13 +1,14 @@
 #!/bin/sh
 # aside from this initial boilerplate, this is actually -*- scheme -*- code
 LTDL_LIBRARY_PATH="`pwd`/.libs"
-export LTDL_LIBRARY_PATH
+GUILE_AUTO_COMPILE=0
+export LTDL_LIBRARY_PATH GUILE_AUTO_COMPILE
 main='(module-ref (resolve-module '\''(test-position)) '\'main')'
 exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
-;;; Copyright 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2006, 2009  Ludovic CourtÃ¨s <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -28,7 +29,7 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
   :use-module (system reader)
   :use-module (system reader library))
 
-;;; Author:  Ludovic Courtès
+;;; Author:  Ludovic CourtÃ¨s
 ;;;
 ;;; Commentary:
 ;;;
