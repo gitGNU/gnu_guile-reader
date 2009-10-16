@@ -119,6 +119,9 @@ AC_CHECK_FUNCS([scm_c_locale_stringn_to_number scm_i_mem2number])
 # relying on it.
 AC_CHECK_FUNCS([scm_i_input_error scm_i_read_array])
 
+# These symbols (which are not actual functions) vanished in 1.9.3.
+AC_CHECK_FUNCS([scm_charnames scm_charnums])
+
 CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 

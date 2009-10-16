@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2008  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2008, 2009  Ludovic Courtès <ludo@gnu.org>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
@@ -614,6 +614,33 @@ scm_read_boolean (int chr, SCM port, scm_reader_t scm_reader,
 
   return SCM_UNSPECIFIED;
 }
+
+#ifndef HAVE_SCM_CHARNAMES
+
+static const char *const scm_charnames[] =
+{
+  "nul","soh","stx","etx","eot","enq","ack","bel",
+   "bs", "ht", "newline", "vt", "np", "cr", "so", "si",
+  "dle","dc1","dc2","dc3","dc4","nak","syn","etb",
+  "can", "em","sub","esc", "fs", "gs", "rs", "us",
+  "space", "sp", "nl", "tab", "backspace", "return", "page", "null", "del"
+};
+
+#define scm_n_charnames  (sizeof (scm_charnames) / sizeof (char *))
+
+#endif /* !HAVE_SCM_CHARNAMES */
+
+#ifndef HAVE_SCM_CHARNUMS
+
+static const char scm_charnums[] =
+"\000\001\002\003\004\005\006\007\
+\010\011\012\013\014\015\016\017\
+\020\021\022\023\024\025\026\027\
+\030\031\032\033\034\035\036\037\
+  \n\t\b\r\f\0\177";
+
+#endif /* !HAVE_SCM_CHARNUMS */
+
 
 SCM
 scm_read_character (int chr, SCM port, scm_reader_t reader,
