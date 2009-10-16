@@ -21,8 +21,10 @@ AC_ARG_WITH([guilemoduledir],
 
 # Checks for programs.
 AC_PROG_CC
-AC_LIBTOOL_DLOPEN
-AC_PROG_LIBTOOL
+
+# Libtool.
+LT_PREREQ([2.2.6])
+LT_INIT([disable-static dlopen])
 
 if test "x$GCC" = "xyes"; then
   # Enable useful GCC compilation flags.
