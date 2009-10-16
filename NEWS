@@ -1,9 +1,16 @@
 New in Guile-Reader 0.6
 
+  * New token reader for R6RS-style syntax quotes: #', #`, and #,.
+
+  * `make-guile-reader' returns a reader that understands SRFI-62
+    s-exp comments and R6RS-style syntax quotes when using Guile 1.9+.
+
   * Bugs fixed
 
-    * Provide replacement for some `scm_i_' functions that are no
-      longer accessible in Guile 1.8.6+
+    * Provide replacement for some `scm_i_' functions and other
+      internals no longer accessible in Guile 1.9+.
+
+    * Adjust packaging so that it works with Guile 1.9+.
 
 New in Guile-Reader 0.5
 
