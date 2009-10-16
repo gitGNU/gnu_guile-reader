@@ -581,6 +581,56 @@ scm_read_quote (int chr, SCM port, scm_reader_t scm_reader,
   return p;
 }
 
+SCM_SYMBOL (sym_syntax, "syntax");
+SCM_SYMBOL (sym_quasisyntax, "quasisyntax");
+SCM_SYMBOL (sym_unsyntax, "unsyntax");
+SCM_SYMBOL (sym_unsyntax_splicing, "unsyntax-splicing");
+
+/* Read R6RS-style syntax quotes: #', #`, #,.  Adapted from Guile's `read.c'
+   where it appeared in commit 34f3d47d, dated 2009-05-28.  */
+SCM
+scm_read_r6rs_syntax_quote (int chr, SCM port, scm_reader_t scm_reader,
+			    scm_reader_t top_level_reader)
+{
+  SCM p;
+
+  switch (chr)
+    {
+    case '`':
+      p = sym_quasisyntax;
+      break;
+
+    case '\'':
+      p = sym_syntax;
+      break;
+
+    case ',':
+      {
+       int c;
+
+       c = scm_getc (port);
+       if ('@' == c)
+         p = sym_unsyntax_splicing;
+       else
+         {
+           scm_ungetc (c, port);
+           p = sym_unsyntax;
+         }
+       break;
+      }
+
+    default:
+      fprintf (stderr, "%s: unhandled syntax character (%i)\n",
+              "scm_read_syntax", chr);
+      abort ();
+    }
+
+  p = scm_cons2 (p, scm_call_reader (scm_reader, port, 0, top_level_reader),
+		 SCM_EOL);
+
+  return p;
+}
+
 SCM
 scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader,
 			    scm_reader_t top_level_reader)

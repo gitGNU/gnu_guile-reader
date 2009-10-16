@@ -46,6 +46,12 @@ const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
     SCM_TR_NUMBER_AND_RADIX,
     SCM_TR_GUILE_EXTENDED_SYMBOL,
     SCM_TR_SCSH_BLOCK_COMMENT,
+#if SCM_MAJOR_VERSION > 1					\
+    || (SCM_MAJOR_VERSION == 1 && SCM_MINOR_VERSION > 8)
+    /* This syntax is supported by default in Guile 1.9 and later.  */
+    SCM_TR_R6RS_SYNTAX_QUOTE_QUASIQUOTE_UNQUOTE,
+    SCM_TR_SRFI62_SEXP_COMMENT,
+#endif
     SCM_END_TOKENS
   };
 

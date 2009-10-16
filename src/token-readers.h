@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005  Ludovic Courtès  <ludovic.courtes@laas.fr>
+   Copyright (C) 2005, 2009  Ludovic Courtès  <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -82,6 +82,8 @@ extern SCM scm_read_r5rs_upper_case_number (int, SCM, scm_reader_t,
 extern SCM scm_read_r6rs_symbol (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_r6rs_number (int, SCM, scm_reader_t, scm_reader_t);
+
+extern SCM scm_read_r6rs_syntax_quote (int, SCM, scm_reader_t, scm_reader_t);
 
 extern SCM scm_read_brace_free_number (int, SCM, scm_reader_t, scm_reader_t);
 
@@ -281,6 +283,11 @@ extern void scm_initialize_token_reader_library (void);
   SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote",			  \
 		    scm_read_quote, 0,					  \
 		    "Read a quote, quasiquote, or unquote S-expression.")
+#define SCM_TR_R6RS_SYNTAX_QUOTE_QUASIQUOTE_UNQUOTE /* r6rs-syntax-quote-quasiquote-unquote */ \
+  SCM_DEFTOKEN_SET ("'`,", "r6rs-syntax-quasiquote-unquote",		\
+		    scm_read_r6rs_syntax_quote, 0,			\
+		    "Read an R6RS-style syntax, quasisyntax, or unsyntax " \
+		    "S-expression.")
 #define SCM_TR_SEMICOLON_COMMENT /* semicolon-comment */		   \
   SCM_DEFTOKEN_SINGLE (';', "semicolon-comment",			   \
 		       scm_read_semicolon_comment, 0,			   \
