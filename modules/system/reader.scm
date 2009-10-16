@@ -1,6 +1,6 @@
 ;;; reader.scm  --  A framework for building Scheme-like readers.
 ;;;
-;;; Copyright 2005, 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2006, 2009  Ludovic CourtÃ¨s <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -40,7 +40,7 @@
 	     %guile-reader-version-major
 	     %guile-reader-version-minor))
 
-;;; Author:  Ludovic Courtès
+;;; Author:  Ludovic CourtÃ¨s
 ;;;
 ;;; Commentary:
 ;;;
@@ -55,8 +55,7 @@
 ;;; Code:
 
 
-(dynamic-call "scm_reader_init_bindings"
-              (dynamic-link "libguile-reader.so"))
+(load-extension "libguile-reader" "scm_reader_init_bindings")
 
 
 ;;; reader.scm ends here
