@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2008  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2008, 2009  Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -193,6 +193,18 @@ extern SCM scm_reader_standard_fault_handler (SCM chr, SCM port, SCM reader);
 /* The `SCM' version (a Scheme procedure) of the above function.  */
 extern SCM scm_reader_standard_fault_handler_proc;
 
+/* Accessors.  */
+extern SCM scm_standard_token_reader (SCM name);
+extern SCM scm_token_reader_proc (SCM tr);
+extern SCM scm_token_reader_spec (SCM tr);
+extern SCM scm_token_reader_escape_p (SCM tr);
+extern SCM scm_token_reader_documentation (SCM tr);
+extern SCM scm_token_reader_handles_char_p (SCM tr, SCM chr);
+
+/* Versioning.  */
+extern SCM scm_guile_reader_uses_lightning (void);
+extern SCM scm_guile_reader_version_major (void);
+extern SCM scm_guile_reader_version_minor (void);
 
 
 /* Convenience macros for static initialization of C token readers.  */
