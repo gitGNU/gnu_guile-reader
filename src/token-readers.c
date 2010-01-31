@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2009  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010  Ludovic Courtès <ludo@gnu.org>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
@@ -625,7 +625,8 @@ scm_read_r6rs_syntax_quote (int chr, SCM port, scm_reader_t scm_reader,
       abort ();
     }
 
-  p = scm_cons2 (p, scm_call_reader (scm_reader, port, 0, top_level_reader),
+  p = scm_cons2 (p, scm_call_reader (top_level_reader, port, 0,
+				     top_level_reader),
 		 SCM_EOL);
 
   return p;
