@@ -1,6 +1,8 @@
+;;; -*- mode: scheme; coding: utf-8; -*-
+;;;
 ;;; extract-c-doc.scm  --  Output Texinfo from "snarffed" C files.
 ;;;
-;;; Copyright 2006, 2007  Free Software Foundation
+;;; Copyright 2006, 2007, 2010  Free Software Foundation
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -17,7 +19,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-;;; Written by Ludovic Courtès <ludo@chbouib.org>.
+;;; Written by Ludovic CourtÃ¨s <ludo@chbouib.org>.
 
 (use-modules (system documentation c-snarf)
              (system documentation output)

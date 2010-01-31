@@ -1,6 +1,8 @@
+;;; -*- mode: scheme; coding: utf-8; -*-
+;;;
 ;;; confinement.scm  --  Confinement of reader modifications.
 ;;;
-;;; Copyright 2005  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2010  Ludovic CourtÃ¨s <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -25,7 +27,7 @@
   #:use-module (srfi srfi-9)
   #:use-module (srfi srfi-11))
 
-;;; Author:  Ludovic Courtès
+;;; Author:  Ludovic CourtÃ¨s
 ;;;
 ;;; Commentary:
 ;;;

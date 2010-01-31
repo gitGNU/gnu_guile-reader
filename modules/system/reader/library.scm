@@ -1,6 +1,8 @@
+;;; -*- mode: scheme; coding: utf-8; -*-
+;;;
 ;;; library.scm  --  A framework for building Scheme-like readers.
 ;;;
-;;; Copyright 2005, 2006  Ludovic Courtès <ludovic.courtes@laas.fr>
+;;; Copyright 2005, 2006, 2010  Ludovic CourtÃ¨s <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -25,7 +27,7 @@
   :use-module (srfi srfi-17) ;; generalized `set!'
   :use-module (ice-9 optargs))
 
-;;; Author:  Ludovic Courtès
+;;; Author:  Ludovic CourtÃ¨s
 ;;;
 ;;; Commentary:
 ;;;
