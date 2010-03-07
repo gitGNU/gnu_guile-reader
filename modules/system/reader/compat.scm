@@ -86,6 +86,11 @@
 				  (cons 'case-insensitive
 					(reader-options)))))
 
+    (square-brackets #f ,(lambda (reader-options make-options)
+                           (set! (reader-options)
+                                 (cons 'square-brackets
+                                       (reader-options)))))
+
     (positions #f ,(lambda (read-options make-options)
 		     (set! (make-options)
 			   (cons 'reader/record-positions

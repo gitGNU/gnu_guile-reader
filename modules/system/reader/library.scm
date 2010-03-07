@@ -111,6 +111,7 @@ Add support for SRFI-62 S-expression comments, like:
 @item case-insensitive
 Read symbols in a case-insensitive way.
 @item square-bracket-sexps
+@itemx square-brackets
 Allow for square brackets around S-expressions.
 @end table\n"
   (let loop ((options options)
@@ -180,7 +181,7 @@ Allow for square brackets around S-expressions.
 			 (filter-out-symbol-token-readers top-specs)))
 
 		;; square brackets in s-expressions
-		((square-bracket-sexps)
+		((square-brackets square-bracket-sexps)
 		 (append (map standard-token-reader
 			      '(r6rs-symbol-upper-case
 				r6rs-symbol-lower-case
