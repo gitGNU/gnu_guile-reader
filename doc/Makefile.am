@@ -14,7 +14,7 @@ extract_c_doc =							\
 
 AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)		\
 	      -I$(top_srcdir)/src -I$(top_builddir)/src	\
-              $(CPPFLAGS)
+              $(CPPFLAGS) $(GUILE_CFLAGS)
 
 # Automatically extracted token reader documentation.
 BUILT_SOURCES = version.texi					\
