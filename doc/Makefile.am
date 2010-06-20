@@ -28,8 +28,9 @@ BUILT_SOURCES = version.texi					\
 CLEANFILES = $(BUILT_SOURCES)
 
 token-reader-doc.texi reader-lib-doc.texi: $(top_srcdir)/src/token-readers.h
-	main='(module-ref (resolve-module '\''(extract-doc)) '\'main')' &&  \
-	$(top_builddir)/pre-inst-guile -l $(srcdir)/extract-doc.scm	    \
+	main='(module-ref (resolve-module '\''(extract-doc)) '\'main')' &&	\
+	GUILE_AUTO_COMPILE=0							\
+	$(top_builddir)/pre-inst-guile -l $(srcdir)/extract-doc.scm		\
 	   -c "(apply $$main (cdr (command-line)))" $<
 
 #
