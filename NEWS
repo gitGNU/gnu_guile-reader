@@ -7,6 +7,8 @@ New in Guile-Reader 0.6
 
   * Bugs fixed
 
+    * Add support for rationals in the number token reader.
+
     * Provide replacement for some `scm_i_' functions and other
       internals no longer accessible in Guile 1.9+.
 

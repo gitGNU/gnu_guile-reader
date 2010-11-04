@@ -8,7 +8,7 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
-;;; Copyright 2005, 2007, 2009  Ludovic Courtès <ludo@gnu.org>
+;;; Copyright 2005, 2007, 2009, 2010  Ludovic Courtès <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -129,6 +129,7 @@ encountered."
     (number-exponential . "1e9")
     (number-exponential-negative . "1e-09")
     (negative-number-exponential-negative . "-77e-77")
+    (rational-number . "2/3")
     (complex-number . "1+2i")
     (complex-number-floating . "1.0-3.14I")
     (complex-pure-imaginary . "+i")
@@ -153,6 +154,8 @@ encountered."
     (symbol-one-plus . "1+")
     (symbol-plus-plus-i . "1++i")
     (symbol-plus-i-plus-i . "1+i+i")
+    (symbol-like-rational . "2/")
+    (symbol-like-rational-two-slashes . "2//3")
     (symbol-like-complex . "1+e10000i")
     (symbol-like-exponential . "1e")
     (quoted-symbol . "'quoted-symbol")

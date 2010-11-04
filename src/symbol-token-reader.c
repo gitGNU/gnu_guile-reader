@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007  Ludovic Courtès  <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2010  Ludovic Courtès  <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
   char c_num[SYMBOL_BUFFER_SIZE];
   size_t c_num_len = 0;
   unsigned saw_point = 0, saw_plus_or_minus = 0, saw_leading_sign = 0;
-  unsigned saw_exponent = 0, saw_at_sign = 0;
+  unsigned saw_exponent = 0, saw_at_sign = 0, saw_slash = 0;
   unsigned last_char_is_i = 0;
   unsigned return_symbol = 0;
 
@@ -75,6 +75,13 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 	    return_symbol = 1;
 	  else
 	    saw_point = 1;
+	}
+      else if (c == '/')
+	{
+	  if (saw_slash)
+	    return_symbol = 1;
+	  else
+	    saw_slash = 1;
 	}
       else if (c == '@')
 	saw_at_sign++;
