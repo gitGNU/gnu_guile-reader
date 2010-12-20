@@ -11,7 +11,8 @@ AC_CONFIG_SRCDIR([src/reader.c])
 AC_CONFIG_HEADER([config.h src/reader-config.h])
 
 AC_ARG_WITH([guilemoduledir],
-  [use the specified installation path for Guile modules],
+  [AS_HELP_STRING([--with-guilemoduledir=DIR],
+    [install Guile modules under DIR])],
   [case "x$withval" in
      xyes|xno) guilemoduledir="";;
      *)        guilemoduledir="$withval";;
