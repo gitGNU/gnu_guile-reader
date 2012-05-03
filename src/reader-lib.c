@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2007, 2008, 2009  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2007, 2008, 2009, 2012  Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -46,12 +46,13 @@ const scm_token_reader_spec_t scm_sharp_reader_standard_specs[] =
     SCM_TR_NUMBER_AND_RADIX,
     SCM_TR_GUILE_EXTENDED_SYMBOL,
     SCM_TR_SCSH_BLOCK_COMMENT,
-#if SCM_MAJOR_VERSION > 1					\
-    || (SCM_MAJOR_VERSION == 1 && SCM_MINOR_VERSION > 8)
-    /* This syntax is supported by default in Guile 1.9 and later.  */
+
+    /* The following syntax is supported by default in Guile 1.9 and later
+       only, but we always enable it, so that Guile-Reader can read the same
+       source regardless of the underlying version of Guile.  */
     SCM_TR_R6RS_SYNTAX_QUOTE_QUASIQUOTE_UNQUOTE,
     SCM_TR_SRFI62_SEXP_COMMENT,
-#endif
+
     SCM_END_TOKENS
   };
 
