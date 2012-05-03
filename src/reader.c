@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2008  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2008, 2012  Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -2061,7 +2061,7 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 1,
 				  &actual_size);
       if (!reader)
 	{
-	  debug ("%s: reader too small (%u vs. %u)\n",
+	  debug ("%s: reader too small (%zi vs. %zi)\n",
 		 __FUNCTION__, code_size, actual_size);
 	  code_size <<= 1;
 	  code_buffer = scm_realloc (code_buffer, code_size);

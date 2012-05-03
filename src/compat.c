@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2008  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2008, 2012  Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -153,7 +153,6 @@ SCM
 scm_i_read_array (SCM port, int c)
 {
   ssize_t rank;
-  int got_rank;
   char tag[80];
   int tag_len;
 
@@ -181,7 +180,6 @@ scm_i_read_array (SCM port, int c)
 	  return SCM_BOOL_F;
 	}
       rank = 1;
-      got_rank = 1;
       tag[0] = 'f';
       tag_len = 1;
       goto continue_reading_tag;
