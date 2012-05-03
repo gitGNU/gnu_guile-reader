@@ -8,7 +8,7 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
-;;; Copyright 2005, 2007, 2009, 2010  Ludovic Courtès <ludo@gnu.org>
+;;; Copyright 2005, 2007, 2009, 2010, 2012  Ludovic Courtès <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -119,7 +119,7 @@ encountered."
 (define-public test-cases
   ;; A series of simple test cases and corner cases for the standard Scheme
   ;; reader.
-  '((string . "\"hello\"")
+  `((string . "\"hello\"")
     (string-with-backslash . "\"hello \\\"world\\\"\"")
     (symbols-with-cr . "first-symbol\rsecond-symbol")
     (number . "777")
@@ -193,6 +193,16 @@ encountered."
     (oct-number . "#o10")
     (dec-number . "#d10")
     (bit-vector . "#*010101010101")
+    ,@(cond-expand
+       (guile-2                         ; syntax only supported in Guile 2.0+
+        '((srfi-62-sexp-comment-within-sexp . "(+ 1 #;(+ 4 5 6) 2)")
+          (srfi-62-sexp-comment-finishing-sexp . "(+ 1 2 #;(+ 4 5 6))")
+          (syntax-quote . "#'foo")
+          (syntax-quasiquote . "#`foo")
+          (syntax-unquote . "#`(foo #,bar)")
+          (syntax-unquote-splicing . "#`(foo #,@bar)")))
+       (else
+        '()))
 
     ;; more complex expressions
     (pair-of-chars . "(#\\a . #\\b)")
