@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2009  Ludovic Courtès  <ludo@gnu.org>
+   Copyright (C) 2005, 2009, 2012  Ludovic Courtès  <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA  */
 
 
-#ifndef __SCM_TOKEN_READERS_H__
-#define __SCM_TOKEN_READERS_H__
+#ifndef GUILE_TOKEN_READERS_H
+#define GUILE_TOKEN_READERS_H
 
 /* A list of specific token readers, most of which were stolen from
    Guile.  */
