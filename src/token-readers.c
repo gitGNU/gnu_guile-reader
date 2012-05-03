@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2012  Ludovic Courtès <ludo@gnu.org>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
@@ -78,7 +78,7 @@ read_token (SCM port, char *buf, size_t buf_size, size_t *read)
 
   while (buf_size)
     {
-      int chr;
+      scm_t_wchar chr;
       chr = scm_getc (port);
       if (chr == EOF)
 	break;
@@ -106,7 +106,8 @@ read_token (SCM port, char *buf, size_t buf_size, size_t *read)
 static int
 _flush_ws (SCM port, const char *eoferr)
 {
-  register int c;
+  scm_t_wchar c;
+
   while (1)
     switch (c = scm_getc (port))
       {
@@ -149,7 +150,7 @@ _flush_ws (SCM port, const char *eoferr)
 #define scm_flush_ws _flush_ws
 
 SCM
-scm_read_sexp (int chr, SCM port, scm_reader_t reader,
+scm_read_sexp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 	       scm_reader_t top_level_reader)
 #define FUNC_NAME "scm_read_sexp"
 {
@@ -276,7 +277,7 @@ exit:
 #undef scm_flush_ws
 
 SCM
-scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 		 scm_reader_t top_level_reader)
 #define FUNC_NAME "scm_read_string"
 {
@@ -286,7 +287,7 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
   SCM str = SCM_EOL;
   char c_str[512];
   unsigned c_str_len = 0;
-  int c;
+  scm_t_wchar c;
 
   while ('"' != (c = scm_getc (port)))
     {
@@ -343,7 +344,8 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
 	    break;
 	  case 'x':
 	    {
-	      int a, b;
+	      scm_t_wchar a, b;
+
 	      a = scm_getc (port);
 	      if (a == EOF) goto str_eof;
 	      b = scm_getc (port);
@@ -457,7 +459,7 @@ scm_read_string (int chr, SCM port, scm_reader_t scm_reader,
 
 
 SCM
-scm_read_number_and_radix (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_number_and_radix (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 			   scm_reader_t top_level_reader)
 {
   int c;
@@ -539,7 +541,7 @@ scm_read_number_and_radix (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 SCM
-scm_read_quote (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_quote (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 		scm_reader_t top_level_reader)
 {
   SCM p;
@@ -556,7 +558,7 @@ scm_read_quote (int chr, SCM port, scm_reader_t scm_reader,
 
     case ',':
       {
-	int c;
+	scm_t_wchar c;
 
 	c = scm_getc (port);
 	if ('@' == c)
@@ -589,7 +591,7 @@ SCM_SYMBOL (sym_unsyntax_splicing, "unsyntax-splicing");
 /* Read R6RS-style syntax quotes: #', #`, #,.  Adapted from Guile's `read.c'
    where it appeared in commit 34f3d47d, dated 2009-05-28.  */
 SCM
-scm_read_r6rs_syntax_quote (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_r6rs_syntax_quote (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 			    scm_reader_t top_level_reader)
 {
   SCM p;
@@ -606,7 +608,7 @@ scm_read_r6rs_syntax_quote (int chr, SCM port, scm_reader_t scm_reader,
 
     case ',':
       {
-       int c;
+       scm_t_wchar c;
 
        c = scm_getc (port);
        if ('@' == c)
@@ -633,10 +635,10 @@ scm_read_r6rs_syntax_quote (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 SCM
-scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_semicolon_comment (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 			    scm_reader_t top_level_reader)
 {
-  int c;
+  scm_t_wchar c;
 
   for (c = scm_getc (port);
        (c != EOF) && (c != '\n');
@@ -649,7 +651,7 @@ scm_read_semicolon_comment (int chr, SCM port, scm_reader_t scm_reader,
 /* Sharp readers, i.e. readers called after a `#' sign has been read.  */
 
 SCM
-scm_read_boolean (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_boolean (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 		  scm_reader_t top_level_reader)
 {
   switch (chr)
@@ -694,7 +696,7 @@ static const char scm_charnums[] =
 
 
 SCM
-scm_read_character (int chr, SCM port, scm_reader_t reader,
+scm_read_character (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		    scm_reader_t top_level_reader)
 {
   unsigned c;
@@ -742,7 +744,7 @@ scm_read_character (int chr, SCM port, scm_reader_t reader,
 }
 
 SCM
-scm_read_keyword (int chr, SCM port, scm_reader_t reader,
+scm_read_keyword (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		  scm_reader_t top_level_reader)
 {
   SCM symbol;
@@ -764,7 +766,7 @@ scm_read_keyword (int chr, SCM port, scm_reader_t reader,
 }
 
 SCM
-scm_read_vector (int chr, SCM port, scm_reader_t reader,
+scm_read_vector (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		 scm_reader_t top_level_reader)
 {
   /* Note: We call `scm_read_sexp ()' rather than READER here in order to
@@ -776,14 +778,14 @@ scm_read_vector (int chr, SCM port, scm_reader_t reader,
 }
 
 SCM
-scm_read_srfi4_vector (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_srfi4_vector (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 		       scm_reader_t top_level_reader)
 {
   return scm_i_read_array (port, chr);
 }
 
 SCM
-scm_read_guile_bit_vector (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_guile_bit_vector (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 			   scm_reader_t top_level_reader)
 {
   /* Read the `#*10101'-style read syntax for bit vectors in Guile.  This is
@@ -804,14 +806,14 @@ scm_read_guile_bit_vector (int chr, SCM port, scm_reader_t scm_reader,
 }
 
 SCM
-scm_read_scsh_block_comment (int chr, SCM port, scm_reader_t reader,
+scm_read_scsh_block_comment (scm_t_wchar chr, SCM port, scm_reader_t reader,
 			     scm_reader_t top_level_reader)
 {
   int bang_seen = 0;
 
   for (;;)
     {
-      int c = scm_getc (port);
+      scm_t_wchar c = scm_getc (port);
 
       if (c == EOF)
 	scm_i_input_error (__FUNCTION__, port,
@@ -829,7 +831,7 @@ scm_read_scsh_block_comment (int chr, SCM port, scm_reader_t reader,
 }
 
 SCM
-scm_read_srfi30_block_comment (int chr, SCM port, scm_reader_t reader,
+scm_read_srfi30_block_comment (scm_t_wchar chr, SCM port, scm_reader_t reader,
 			       scm_reader_t top_level_reader)
 {
   /* Unlike SCSH-style block comments, SRFI-30 block comments may be nested.
@@ -839,7 +841,7 @@ scm_read_srfi30_block_comment (int chr, SCM port, scm_reader_t reader,
 
   while (nesting_level > 0)
     {
-      int c = scm_getc (port);
+      scm_t_wchar c = scm_getc (port);
 
       if (c == EOF)
 	scm_i_input_error (__FUNCTION__, port,
@@ -869,7 +871,7 @@ scm_read_srfi30_block_comment (int chr, SCM port, scm_reader_t reader,
 }
 
 SCM
-scm_read_srfi62_sexp_comment (int chr, SCM port, scm_reader_t reader,
+scm_read_srfi62_sexp_comment (scm_t_wchar chr, SCM port, scm_reader_t reader,
 			      scm_reader_t top_level_reader)
 {
   /* Skip the S-expression that follows the semi-colon.  */
@@ -879,7 +881,7 @@ scm_read_srfi62_sexp_comment (int chr, SCM port, scm_reader_t reader,
 }
 
 SCM
-scm_read_extended_symbol (int chr, SCM port, scm_reader_t scm_reader,
+scm_read_extended_symbol (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 			  scm_reader_t top_level_reader)
 {
   /* Guile's extended symbol read syntax looks like this:
@@ -937,7 +939,7 @@ scm_read_extended_symbol (int chr, SCM port, scm_reader_t scm_reader,
 
 /* Skribe's read syntax.  So-called sk-exps.  */
 SCM
-scm_read_skribe_exp (int chr, SCM port, scm_reader_t reader,
+scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		     scm_reader_t top_level_reader)
 {
   int c, escaped = 0;

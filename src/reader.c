@@ -1679,7 +1679,7 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
 		 scm_reader_t top_level_reader)
 #define FUNC_NAME "%call-reader"
 {
-  int c = 0;
+  scm_t_wchar c = 0;
   scm_token_reader_spec_t *tr;
   SCM result = SCM_UNSPECIFIED;
 

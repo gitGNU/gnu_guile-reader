@@ -124,6 +124,12 @@ AC_CHECK_FUNCS([scm_i_input_error scm_i_read_array])
 # These symbols (which are not actual functions) vanished in 1.9.3.
 AC_CHECK_FUNCS([scm_charnames scm_charnums])
 
+# This type appeared in Guile 2.0.
+AC_CHECK_TYPE([scm_t_wchar],
+  [AC_DEFINE([SCM_READER_HAVE_SCM_T_WCHAR], [1],
+    [Define if the `scm_t_wchar' type exists.])], [:],
+  [#include <libguile.h>])
+
 CFLAGS="$clean_CFLAGS"
 LDFLAGS="$clean_LDFLAGS"
 

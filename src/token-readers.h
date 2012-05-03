@@ -29,70 +29,81 @@
 
 /* Main token readers.  */
 
-extern SCM scm_read_sexp (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_sexp (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_string (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_string (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_guile_number (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_guile_number (scm_t_wchar, SCM, scm_reader_t,
+				  scm_reader_t);
 
-extern SCM scm_read_number_and_radix (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_number_and_radix (scm_t_wchar, SCM, scm_reader_t,
+				      scm_reader_t);
 
-extern SCM scm_read_quote (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_quote (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_semicolon_comment (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_semicolon_comment (scm_t_wchar, SCM, scm_reader_t,
+				       scm_reader_t);
 
-extern SCM scm_read_scsh_block_comment (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_scsh_block_comment (scm_t_wchar, SCM, scm_reader_t,
+					scm_reader_t);
 
-extern SCM scm_read_srfi30_block_comment (int, SCM, scm_reader_t,
+extern SCM scm_read_srfi30_block_comment (scm_t_wchar, SCM, scm_reader_t,
 					  scm_reader_t);
 
-extern SCM scm_read_srfi62_sexp_comment (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_srfi62_sexp_comment (scm_t_wchar, SCM, scm_reader_t,
+					 scm_reader_t);
 
-extern SCM scm_read_boolean (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_boolean (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_character (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_character (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_keyword (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_keyword (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_vector (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_vector (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_srfi4_vector (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_srfi4_vector (scm_t_wchar, SCM, scm_reader_t,
+				  scm_reader_t);
 
-extern SCM scm_read_guile_bit_vector (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_guile_bit_vector (scm_t_wchar, SCM, scm_reader_t,
+				      scm_reader_t);
 
-extern SCM scm_read_skribe_exp (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_skribe_exp (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
 
 /* Symbol token readers.  */
-extern SCM scm_read_guile_mixed_case_symbol (int, SCM, scm_reader_t,
+extern SCM scm_read_guile_mixed_case_symbol (scm_t_wchar, SCM, scm_reader_t,
 					     scm_reader_t);
 
-extern SCM scm_read_r5rs_lower_case_symbol (int, SCM, scm_reader_t,
+extern SCM scm_read_r5rs_lower_case_symbol (scm_t_wchar, SCM, scm_reader_t,
 					    scm_reader_t);
 
-extern SCM scm_read_r5rs_upper_case_symbol (int, SCM, scm_reader_t,
+extern SCM scm_read_r5rs_upper_case_symbol (scm_t_wchar, SCM, scm_reader_t,
 					    scm_reader_t);
 
-extern SCM scm_read_r5rs_lower_case_number (int, SCM, scm_reader_t,
+extern SCM scm_read_r5rs_lower_case_number (scm_t_wchar, SCM, scm_reader_t,
 					    scm_reader_t);
 
-extern SCM scm_read_r5rs_upper_case_number (int, SCM, scm_reader_t,
+extern SCM scm_read_r5rs_upper_case_number (scm_t_wchar, SCM, scm_reader_t,
 					    scm_reader_t);
 
-extern SCM scm_read_r6rs_symbol (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_r6rs_symbol (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_r6rs_number (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_r6rs_number (scm_t_wchar, SCM, scm_reader_t, scm_reader_t);
 
-extern SCM scm_read_r6rs_syntax_quote (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_r6rs_syntax_quote (scm_t_wchar, SCM, scm_reader_t,
+				       scm_reader_t);
 
-extern SCM scm_read_brace_free_number (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_brace_free_number (scm_t_wchar, SCM, scm_reader_t,
+				       scm_reader_t);
 
-extern SCM scm_read_brace_free_symbol (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_brace_free_symbol (scm_t_wchar, SCM, scm_reader_t,
+				       scm_reader_t);
 
 
 /* Sharp token readers, should be called after `#' has been read.  */
 
-extern SCM scm_read_extended_symbol (int, SCM, scm_reader_t, scm_reader_t);
+extern SCM scm_read_extended_symbol (scm_t_wchar, SCM, scm_reader_t,
+				     scm_reader_t);
 
 
 /* Look for a token reader named NAME in the standard token readers and

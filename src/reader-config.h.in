@@ -10,3 +10,13 @@
 #  define SCM_READER_USE_LIGHTNING 1
 # endif
 #endif /* HAVE_LIGHTNING */
+
+/* Define this when `scm_t_wchar' is available.  */
+#undef SCM_READER_HAVE_SCM_T_WCHAR
+
+#ifndef SCM_READER_HAVE_SCM_T_WCHAR
+
+/* The wide character type found in Guile 2.0.  */
+typedef int scm_t_wchar;
+
+#endif	/* SCM_READER_HAVE_SCM_T_WCHAR */
