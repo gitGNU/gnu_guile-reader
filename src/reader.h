@@ -190,8 +190,9 @@ extern SCM scm_make_token_reader (SCM spec, SCM proc, SCM escape_p);
 /* The standard fault handler.  */
 extern SCM scm_reader_standard_fault_handler (SCM chr, SCM port, SCM reader);
 
-/* The `SCM' version (a Scheme procedure) of the above function.  */
-extern SCM scm_reader_standard_fault_handler_proc;
+/* The `SCM' version (a Scheme variable holding a procedure) of the above
+   function.  */
+extern SCM scm_reader_standard_fault_handler_var;
 
 /* Accessors.  */
 extern SCM scm_standard_token_reader (SCM name);

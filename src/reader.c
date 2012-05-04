@@ -2014,7 +2014,8 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 1,
   SCM_VALIDATE_LIST (1, token_readers);
   if ((fault_handler_proc == SCM_UNDEFINED)
       || (fault_handler_proc == SCM_BOOL_F))
-    fault_handler_proc = scm_reader_standard_fault_handler_proc;
+    fault_handler_proc =
+      scm_variable_ref (scm_reader_standard_fault_handler_var);
   else
     SCM_VALIDATE_PROC (2, fault_handler_proc);
 
@@ -2579,8 +2580,8 @@ token_reader_proc_apply (SCM tr_proc, SCM chr, SCM port, SCM reader)
 
 
 
-/* The standard fault handler proc.  */
-SCM scm_reader_standard_fault_handler_proc = SCM_BOOL_F;
+/* A variable holding the standard fault handler proc.  */
+SCM scm_reader_standard_fault_handler_var = SCM_BOOL_F;
 
 SCM_DEFINE (scm_reader_standard_fault_handler,
 	    "%reader-standard-fault-handler", 3, 0, 0,
@@ -2620,13 +2621,10 @@ scm_reader_init_bindings (void)
 
 #include "reader.x"
 
-  scm_reader_standard_fault_handler_proc =
-    SCM_VARIABLE_REF (scm_c_lookup ("%reader-standard-fault-handler"));
+  scm_reader_standard_fault_handler_var =
+    scm_c_lookup ("%reader-standard-fault-handler");
 
   /* Initialize the other subsystems.  */
   scm_initialize_token_reader_library ();
   scm_initialize_reader_library ();
-
-  /* Compile the standard reader.  */
-  scm_load_standard_reader ();
 }

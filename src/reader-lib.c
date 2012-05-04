@@ -156,7 +156,7 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
   void *buffer;
 
   if (fault_handler == SCM_UNDEFINED)
-    fault_handler = scm_reader_standard_fault_handler_proc;
+    fault_handler = scm_variable_ref (scm_reader_standard_fault_handler_var);
 
   if (fault_handler != SCM_BOOL_F)
     SCM_VALIDATE_PROC (1, fault_handler);
@@ -243,7 +243,8 @@ scm_load_standard_reader (void)
 	scm_c_make_reader (standard_sharp_reader_code,
 			   sizeof (standard_sharp_reader_code),
 			   scm_sharp_reader_standard_specs,
-			   scm_reader_standard_fault_handler_proc, 0,
+			   scm_variable_ref (scm_reader_standard_fault_handler_var),
+			   0,
 			   &code_size);
     }
 
@@ -260,7 +261,8 @@ scm_load_standard_reader (void)
 	scm_c_make_reader (standard_reader_code,
 			   sizeof (standard_reader_code),
 			   scm_reader_standard_specs,
-			   scm_reader_standard_fault_handler_proc, 0,
+			   scm_variable_ref (scm_reader_standard_fault_handler_var),
+			   0,
 			   &code_size);
     }
 }
