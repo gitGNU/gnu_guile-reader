@@ -6,8 +6,8 @@
    based on Guile code released under the GNU LGPL (file `read.c') which
    contains the following copyright line:
 
-   Copyright (C) 1995,1996,1997,1999,2000,2001,2003, 2004 Free Software
-   Foundation, Inc.
+   Copyright (C) 1995, 1996, 1997, 1999, 2000, 2001, 2003, 2004, 2006,
+     2007, 2008, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
 
 
    This program is free software; you can redistribute it and/or modify
@@ -336,6 +336,44 @@ exit:
 
 #undef scm_flush_ws
 
+/* Number of 32-bit codepoints in the buffer used to read strings.  */
+#define READER_STRING_BUFFER_SIZE 128
+
+/* Read a hexadecimal number NDIGITS in length.  Put its value into the variable
+   C.  If TERMINATOR is non-null, terminate early if the TERMINATOR character is
+   found.  */
+#define SCM_READ_HEX_ESCAPE(ndigits, terminator)                   \
+  do                                                               \
+    {                                                              \
+      scm_t_wchar a;                                               \
+      size_t i = 0;                                                \
+      c = 0;                                                       \
+      while (i < ndigits)                                          \
+        {                                                          \
+          a = scm_getc (port);                                     \
+          if (a == EOF)                                            \
+            goto str_eof;                                          \
+          if (terminator                                           \
+              && (a == (scm_t_wchar) terminator)                   \
+              && (i > 0))                                          \
+            break;                                                 \
+          if ('0' <= a && a <= '9')                                \
+            a -= '0';                                              \
+          else if ('A' <= a && a <= 'F')                           \
+            a = a - 'A' + 10;                                      \
+          else if ('a' <= a && a <= 'f')                           \
+            a = a - 'a' + 10;                                      \
+          else                                                     \
+            {                                                      \
+              c = a;                                               \
+              goto bad_escaped;                                    \
+            }                                                      \
+          c = c * 16 + a;                                          \
+          i ++;                                                    \
+        }                                                          \
+    } while (0)
+
+/* FIXME: Add a version that supports R6RS escapes.  */
 SCM
 scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 		 scm_reader_t top_level_reader)
@@ -345,95 +383,90 @@ scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
      object (the string returned).  */
 
   SCM str = SCM_EOL;
-  char c_str[512];
-  unsigned c_str_len = 0;
-  scm_t_wchar c;
+  size_t c_str_len = 0;
+  scm_t_wchar c, c_str[READER_STRING_BUFFER_SIZE];
 
   while ('"' != (c = scm_getc (port)))
     {
       if (c == EOF)
-	str_eof: scm_i_input_error (FUNC_NAME, port,
-				    "end of file in string constant",
-				    SCM_EOL);
+        {
+        str_eof:
+          scm_i_input_error (FUNC_NAME, port,
+                             "end of file in string constant", SCM_EOL);
+        }
 
-      if (c_str_len + 1 >= sizeof (c_str))
+      if (c_str_len + 1 >= READER_STRING_BUFFER_SIZE)
 	{
-	  /* Flush the C buffer onto a Scheme string.  */
-	  str = scm_cons (scm_from_locale_stringn (c_str, c_str_len), str);
-
+	  str = scm_cons (scm_from_utf32_stringn (c_str, c_str_len), str);
 	  c_str_len = 0;
 	}
 
       if (c == '\\')
-	switch (c = scm_getc (port))
-	  {
-	  case EOF:
-	    goto str_eof;
-	  case '"':
-	  case '\\':
-	    break;
-#if 0 /* SCM_ENABLE_ELISP */
-	  case '(':
-	  case ')':
-	    if (SCM_ESCAPED_PARENS_P)
+        {
+          switch (c = scm_getc (port))
+            {
+            case EOF:
+              goto str_eof;
+            case '"':
+            case '\\':
+              break;
+            case '\n':
+              continue;
+            case '0':
+              c = '\0';
+              break;
+            case 'f':
+              c = '\f';
+              break;
+            case 'n':
+              c = '\n';
+              break;
+            case 'r':
+              c = '\r';
+              break;
+            case 't':
+              c = '\t';
+              break;
+            case 'a':
+              c = '\007';
+              break;
+            case 'v':
+              c = '\v';
+              break;
+            case 'b':
+              c = '\010';
+              break;
+            case 'x':
+	      SCM_READ_HEX_ESCAPE (2, '\0');
+              break;
+            case 'u':
+	      SCM_READ_HEX_ESCAPE (4, '\0');
 	      break;
-	    goto bad_escaped;
-#endif
-	  case '\n':
-	    continue;
-	  case '0':
-	    c = '\0';
-	    break;
-	  case 'f':
-	    c = '\f';
-	    break;
-	  case 'n':
-	    c = '\n';
-	    break;
-	  case 'r':
-	    c = '\r';
-	    break;
-	  case 't':
-	    c = '\t';
-	    break;
-	  case 'a':
-	    c = '\007';
-	    break;
-	  case 'v':
-	    c = '\v';
-	    break;
-	  case 'x':
-	    {
-	      scm_t_wchar a, b;
+            case 'U':
+	      SCM_READ_HEX_ESCAPE (6, '\0');
+	      break;
 
-	      a = scm_getc (port);
-	      if (a == EOF) goto str_eof;
-	      b = scm_getc (port);
-	      if (b == EOF) goto str_eof;
-	      if      ('0' <= a && a <= '9') a -= '0';
-	      else if ('A' <= a && a <= 'F') a = a - 'A' + 10;
-	      else if ('a' <= a && a <= 'f') a = a - 'a' + 10;
-	      else goto bad_escaped;
-	      if      ('0' <= b && b <= '9') b -= '0';
-	      else if ('A' <= b && b <= 'F') b = b - 'A' + 10;
-	      else if ('a' <= b && b <= 'f') b = b - 'a' + 10;
-	      else goto bad_escaped;
-	      c = a * 16 + b;
-	      break;
-	    }
-	  default:
-	  bad_escaped:
-	    scm_i_input_error(FUNC_NAME, port,
-			      "illegal character in escape sequence: ~S",
-			      scm_list_1 (SCM_MAKE_CHAR (c)));
-	  }
+            default:
+	    bad_escaped:
+              scm_i_input_error (FUNC_NAME, port,
+                                 "invalid character in escape sequence: ~S",
+                                 scm_list_1 (SCM_MAKE_CHAR (c)));
+            }
+        }
+
       c_str[c_str_len++] = c;
     }
 
-  if (c_str_len > 0)
-    str = scm_cons (scm_from_locale_stringn (c_str, c_str_len), str);
+  if (scm_is_null (str))
+    /* Fast path: we got a string that fits in C_STR.  */
+    str = scm_from_utf32_stringn (c_str, c_str_len);
+  else
+    {
+      if (c_str_len > 0)
+	str = scm_cons (scm_from_utf32_stringn (c_str, c_str_len), str);
 
-  str = scm_string_concatenate (scm_reverse_x (str, SCM_EOL));
+      str = scm_string_concatenate_reverse (str, SCM_UNDEFINED, SCM_UNDEFINED);
+    }
 
   return str;
 }

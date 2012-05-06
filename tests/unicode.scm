@@ -72,6 +72,14 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
   (with-fluids ((%default-port-encoding "UTF-8"))
     (exit
      (and (eq? 'λ (pk 'lambda (call-with-input-string "λ" (default-reader))))
+          (string=? "Χαοσ"
+                    (pk 'chaos (call-with-input-string "\"Χαοσ\""
+                                                       (default-reader))))
+          (string=? "teĥnikaĵoj"
+                    (with-fluids ((%default-port-encoding "ISO-8859-3"))
+                      (pk 'teĥnikaĵoj
+                          (call-with-input-string "\"teĥnikaĵoj\""
+                                                  (default-reader)))))
           (equal? '`("this is Χαοσ " ,(+ 1 2) " !")
                   (pk 'Χαοσ (call-with-input-string "[this is Χαοσ ,(+ 1 2) !]"
                                                     %skribe-read)))))))
