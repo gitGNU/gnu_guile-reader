@@ -39,7 +39,12 @@
 
 #ifndef HAVE_SCM_FROM_STRINGN
 # define scm_from_stringn(buf, count, enc, handler)	\
-    scm_from_locale_stringn (buf, count)
+    scm_from_locale_stringn ((buf), (count))
+#endif
+
+#ifndef HAVE_SCM_FROM_UTF32_STRINGN
+# define scm_from_utf32_stringn(buf, count)	\
+    scm_from_locale_stringn ((buf), (count))
 #endif
 
 #endif

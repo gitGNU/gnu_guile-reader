@@ -126,7 +126,9 @@ AC_CHECK_FUNCS([scm_charnames scm_charnums])
 
 # Functions for Unicode support that appeared in Guile 2.0.
 AC_CHECK_FUNCS([scm_from_stringn scm_get_byte_or_eof \
-  scm_unget_byte scm_gc_malloc_pointerless])
+  scm_unget_byte scm_from_utf32_stringn scm_gc_malloc_pointerless])
+
+AM_CONDITIONAL([HAVE_GUILE2], [test "x$ac_cv_func_scm_from_utf32_stringn" = "xyes"])
 
 # This type appeared in Guile 2.0.
 AC_CHECK_TYPE([scm_t_wchar],

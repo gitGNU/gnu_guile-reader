@@ -1002,24 +1002,20 @@ SCM
 scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		     scm_reader_t top_level_reader)
 {
-  int c, escaped = 0;
-  char c_literal[2048];
+  scm_t_wchar c, escaped = 0;
+  scm_t_wchar c_literal[1024];
   size_t c_literal_len = 0;
-  SCM result = SCM_EOL, s_literal;
+  SCM result = SCM_EOL, s_literal = SCM_EOL;
 
 #define FLUSH_STRING()							\
   do									\
     {									\
       s_literal =							\
-	scm_string_append (scm_list_2					\
-			   (s_literal,					\
-			    scm_from_locale_stringn (c_literal,		\
-						     c_literal_len)));	\
+	scm_cons (scm_from_utf32_stringn (c_literal, c_literal_len),	\
+		  s_literal);						\
       c_literal_len = 0;						\
     }									\
   while (0)
-
-  s_literal = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
 
   for (c = scm_getc (port);
        (c != EOF) && ((c != ']') || (escaped));
@@ -1027,7 +1023,7 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
     {
       if (escaped)
 	{
-	  c_literal[c_literal_len++] = (char)c;
+	  c_literal[c_literal_len++] = c;
 	  escaped = 0;
 	}
       else
@@ -1041,8 +1037,11 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		  SCM subexp;
 
 		  FLUSH_STRING ();
+		  s_literal = scm_string_concatenate_reverse (s_literal,
+							      SCM_UNDEFINED,
+							      SCM_UNDEFINED);
 		  result = scm_cons (s_literal, result);
-		  s_literal = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
+		  s_literal = SCM_EOL;
 
 		  scm_ungetc (c, port);
 		  subexp = scm_cons2 (scm_sym_unquote,
@@ -1056,7 +1055,7 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		{
 		  c_literal[c_literal_len++] = ',';
 		  if (c != EOF)
-		    c_literal[c_literal_len++] = (char)c;
+		    c_literal[c_literal_len++] = c;
 		}
 	      break;
 
@@ -1065,7 +1064,7 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 	      break;
 
 	    default:
-	      c_literal[c_literal_len++] = (char)c;
+	      c_literal[c_literal_len++] = c;
 	    }
 	}
 
@@ -1076,8 +1075,12 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
     }
 
   FLUSH_STRING ();
-  if (scm_c_string_length (s_literal) > 0)
-    result = scm_cons (s_literal, result);
+  if (scm_is_pair (s_literal))
+    {
+      s_literal = scm_string_concatenate_reverse (s_literal, SCM_UNDEFINED,
+						  SCM_UNDEFINED);
+      result = scm_cons (s_literal, result);
+    }
 
   result = scm_reverse_x (result, SCM_EOL);
   result = scm_cons2 (scm_sym_quasiquote, result, SCM_EOL);
