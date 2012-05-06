@@ -26,3 +26,4 @@ pre-inst-guile
 stamp-h[0-9]
 reader-config.h
 reader-config.h.in
+/tests/*.log
