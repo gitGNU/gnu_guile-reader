@@ -141,6 +141,10 @@ read_complete_token (SCM port, char *buffer, size_t buffer_size,
 	      memcpy (new_buf, overflow_buffer, overflow_size);
               memcpy (new_buf + overflow_size, buffer, bytes_read);
 
+#ifdef HAVE_SCM_GC_MALLOC_POINTERLESS
+	      free (overflow_buffer);
+#endif
+
 	      overflow_buffer = new_buf;
               overflow_size += bytes_read;
             }
