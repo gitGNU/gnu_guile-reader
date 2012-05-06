@@ -1,9 +1,16 @@
 New in Guile-Reader 0.6
 
+  * Guile-Reader is now distributed under GPLv3 or later (instead of
+    GPLv2 or later).
+
   * New token reader for R6RS-style syntax quotes: #', #`, and #,.
 
   * `make-guile-reader' returns a reader that understands SRFI-62
-    s-exp comments and R6RS-style syntax quotes when using Guile 1.9+.
+    s-exp comments, R6RS-style syntax quotes, and s-exps introduced by
+    square brackets.  All these are supported by default by `read' in
+    Guile 2.0.
+
+  * On Guile 2.0, non-ASCII Unicode symbols are correctly read.
 
   * Bugs fixed
 
