@@ -13,7 +13,7 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation; either version 2 of the License, or
+;;; the Free Software Foundation; either version 3 of the License, or
 ;;; (at your option) any later version.
 ;;;
 ;;; This program is distributed in the hope that it will be useful,
@@ -252,8 +252,11 @@ encountered."
 
 		  ;; Try out two versions of the Guile reader: one that
 		  ;; doesn't record positions and one that does.
+                  ;; Explicitly use `%reader-standard-fault-handler' so that
+                  ;; Unicode symbols are properly read on Guile 2.
 		  (list (default-reader)
-			(make-guile-reader #f 'reader/record-positions)))
+			(make-guile-reader %reader-standard-fault-handler
+                                           'reader/record-positions)))
 	(format #t "~%~%* summary~%~%total: ~a~%failed: ~a~%"
 		total failed))
 
