@@ -4,7 +4,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -32,7 +32,14 @@
 # endif
 #endif
 
+#ifndef HAVE_SCM_GET_BYTE_OR_EOF
+# define scm_get_byte_or_eof scm_getc
+# define scm_unget_byte scm_ungetc
 #endif
 
-/* arch-tag: d7a0f4a6-4480-40b4-a5d3-ed3dbebae0fa
- */
+#ifndef HAVE_SCM_FROM_STRINGN
+# define scm_from_stringn(buf, count, enc, handler)	\
+    scm_from_locale_stringn (buf, count)
+#endif
+
+#endif

@@ -4,7 +4,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -31,6 +31,75 @@ scm_guile_reader_unused ()
   /* Just to make sure we don't produce an empty object file.  */
 }
 
+#if defined HAVE_SCM_GET_BYTE_OR_EOF && !defined HAVE_SCM_UNGET_BYTE
+
+/* Guile 2.0.[0-5] leaves `scm_unget_byte' internal.  */
+
+void
+scm_unget_byte (int c, SCM port)
+#define FUNC_NAME "scm_unget_byte"
+{
+  scm_t_port *pt = SCM_PTAB_ENTRY (port);
+
+  if (pt->read_buf == pt->putback_buf)
+    /* already using the put-back buffer.  */
+    {
+      /* enlarge putback_buf if necessary.  */
+      if (pt->read_end == pt->read_buf + pt->read_buf_size
+	  && pt->read_buf == pt->read_pos)
+	{
+	  size_t new_size = pt->read_buf_size * 2;
+	  unsigned char *tmp = (unsigned char *)
+	    scm_gc_realloc (pt->putback_buf, pt->read_buf_size, new_size,
+			    "putback buffer");
+
+	  pt->read_pos = pt->read_buf = pt->putback_buf = tmp;
+	  pt->read_end = pt->read_buf + pt->read_buf_size;
+	  pt->read_buf_size = pt->putback_buf_size = new_size;
+	}
+
+      /* shift any existing bytes to buffer + 1.  */
+      if (pt->read_pos == pt->read_end)
+	pt->read_end = pt->read_buf + 1;
+      else if (pt->read_pos != pt->read_buf + 1)
+	{
+	  int count = pt->read_end - pt->read_pos;
+
+	  memmove (pt->read_buf + 1, pt->read_pos, count);
+	  pt->read_end = pt->read_buf + 1 + count;
+	}
+
+      pt->read_pos = pt->read_buf;
+    }
+  else
+    /* switch to the put-back buffer.  */
+    {
+      if (pt->putback_buf == NULL)
+	{
+	  pt->putback_buf
+	    = (unsigned char *) scm_gc_malloc_pointerless
+	    (SCM_INITIAL_PUTBACK_BUF_SIZE, "putback buffer");
+	  pt->putback_buf_size = SCM_INITIAL_PUTBACK_BUF_SIZE;
+	}
+
+      pt->saved_read_buf = pt->read_buf;
+      pt->saved_read_pos = pt->read_pos;
+      pt->saved_read_end = pt->read_end;
+      pt->saved_read_buf_size = pt->read_buf_size;
+
+      pt->read_pos = pt->read_buf = pt->putback_buf;
+      pt->read_end = pt->read_buf + 1;
+      pt->read_buf_size = pt->putback_buf_size;
+    }
+
+  *pt->read_buf = c;
+
+  if (pt->rw_random)
+    pt->rw_active = SCM_PORT_READ;
+}
+#undef FUNC_NAME
+
+#endif
 
 #ifndef HAVE_SCM_I_INPUT_ERROR
 

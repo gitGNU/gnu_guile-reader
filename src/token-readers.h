@@ -4,7 +4,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -260,7 +260,7 @@ extern void scm_initialize_token_reader_library (void);
   SCM_DEFTOKEN_SINGLE ('"', "string", scm_read_string, 0,	\
 		       "Read an R5RS string.")
 #define SCM_TR_GUILE_NUMBER /* guile-number */				\
-  SCM_DEFTOKEN_RANGE ('0', '9', "guile-number",				\
+  SCM_DEFTOKEN_SET   ("-+.0123456789", "guile-number",			\
 		      scm_read_guile_number, 0,				\
 		      "Read a number following Guile's fashion, "	\
 		      "that is, as in R5RS (@inforef{Lexical "		\
@@ -285,7 +285,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "Read a symbol that starts with an upper-case "	\
 		      "letter in a case-sensitive fashion.")
 #define SCM_TR_GUILE_SYMBOL_MISC_CHARS /* guile-symbol-misc-chars */	 \
-  SCM_DEFTOKEN_SET ("[]{}~^:.+-/*%&@_<>!=?$",				 \
+  SCM_DEFTOKEN_SET ("[]{}~^:/*%&@_<>!=?$",				 \
 		    "guile-symbol-misc-chars",				 \
 		    scm_read_guile_mixed_case_symbol, 0,		 \
 		    "Read a symbol that starts with a non-alphanumeric " \
@@ -348,7 +348,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "letter and return a lower-case symbol, "				 \
 		      "regardless of the case of the input.")
 #define SCM_TR_R5RS_LOWER_CASE_SYMBOL_MISC_CHARS /* r5rs-lower-case-symbol-misc-chars */ \
-  SCM_DEFTOKEN_SET ("[]{}~^:.+-/*%&@_<>!=?$",						 \
+  SCM_DEFTOKEN_SET ("[]{}~^:/*%&@_<>!=?$",						 \
 		    "r5rs-lower-case-symbol-misc-chars",				 \
 		    scm_read_r5rs_lower_case_symbol, 0,					 \
 		    "Read a symbol that starts with a non-"				 \
@@ -376,7 +376,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "brackets as delimiters (@pxref{Token "		\
 		      "Delimiters}).")
 #define SCM_TR_R6RS_SYMBOL_MISC_CHARS /* r6rs-symbol-misc-chars */	\
-  SCM_DEFTOKEN_SET ("{}~^:.+-/*%&@_<>!=?$",				\
+  SCM_DEFTOKEN_SET ("{}~^:/*%&@_<>!=?$",				\
 		    "r6rs-symbol-misc-chars",				\
 		    scm_read_r6rs_symbol, 0,				\
 		    "Read a symbol that starts with a non-"		\
@@ -401,7 +401,7 @@ extern void scm_initialize_token_reader_library (void);
 		      "reader recognizes braces as delimiters, "		\
 		      "unlike R5RS/R6RS.")
 #define SCM_TR_BRACE_FREE_SYMBOL_MISC_CHARS /* brace-free-symbol-misc-chars */ \
-  SCM_DEFTOKEN_SET ("[]~^:.+-/*%&@_<>!=?$",				       \
+  SCM_DEFTOKEN_SET ("[]~^:/*%&@_<>!=?$",				       \
 		    "brace-free-symbol-misc-chars",			       \
 		    scm_read_brace_free_symbol, 0,			       \
 		    "Read a symbol that starts with a non-"		       \
@@ -413,21 +413,21 @@ extern void scm_initialize_token_reader_library (void);
 /* Flavours of numbers.  */
 
 #define SCM_TR_R5RS_LOWER_CASE_NUMBER /* r5rs-lower-case-number */	\
-  SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-lower-case-number",		\
+  SCM_DEFTOKEN_SET   ("-+.0123456789", "r5rs-lower-case-number",		\
 		      scm_read_r5rs_lower_case_number, 0,		\
 		      "Return a number or a lower-case symbol.")
 #define SCM_TR_R5RS_UPPER_CASE_NUMBER /* r5rs-upper-case-number */	\
-  SCM_DEFTOKEN_RANGE ('0', '9', "r5rs-upper-case-number",		\
+  SCM_DEFTOKEN_SET   ("-+.0123456789", "r5rs-upper-case-number",	\
 		      scm_read_r5rs_upper_case_number, 0,		\
 		      "Return a number or an upper-case symbol.")
 #define SCM_TR_R6RS_NUMBER /* r6rs-number */				\
-  SCM_DEFTOKEN_RANGE ('0', '9', "r6rs-number",				\
+  SCM_DEFTOKEN_SET   ("-+.0123456789", "r6rs-number",			\
 		      scm_read_r6rs_number, 0,				\
 		      "Return a number or a symbol.  This token "	\
 		      "reader conforms to R6RS, i.e. it considers "	\
 		      "square brackets as delimiters.")
 #define SCM_TR_BRACE_FREE_NUMBER /* brace-free-number */		\
-  SCM_DEFTOKEN_RANGE ('0', '9', "brace-free-number",			\
+  SCM_DEFTOKEN_SET   ("-+.0123456789", "brace-free-number",		\
 		      scm_read_brace_free_number, 0,			\
 		      "Return a number or a symbol, considering "	\
 		      "curly braces as delimiters.")			\

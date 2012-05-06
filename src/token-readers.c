@@ -12,7 +12,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
+   the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -71,31 +71,89 @@
 #define CHAR_IS_R6RS_DELIMITER(c)		\
   (index (R6RS_DELIMITERS, (c)) != NULL)
 
-/* Helper function similar to `scm_read_token ()'.  Read from PORT until a
-   whitespace is read.  */
-static inline void
-read_token (SCM port, char *buf, size_t buf_size, size_t *read)
+
+/* Read from PORT until a delimiter (e.g., a whitespace) is read.  Put the
+   result in the pre-allocated buffer BUF.  Return zero if the whole token has
+   fewer than BUF_SIZE bytes, non-zero otherwise. READ will be set the number of
+   bytes actually read.  */
+int
+read_token (SCM port, char *buf, size_t buf_size, const char *delimiters,
+	    size_t *read)
 {
   *read = 0;
 
-  while (buf_size)
+  while (*read < buf_size)
     {
-      scm_t_wchar chr;
-      chr = scm_getc (port);
+      int chr;
+
+      chr = scm_get_byte_or_eof (port);
+
       if (chr == EOF)
-	break;
-      else if (CHAR_IS_R5RS_DELIMITER (chr))
+	return 0;
+      else if (index (delimiters, chr) != NULL)
 	{
-	  scm_ungetc (chr, port);
-	  break;
+	  scm_unget_byte (chr, port);
+	  return 0;
 	}
-
-      *(buf++) = (char)chr;
-      (*read)++;
-
-      if (*read == buf_size)
-	break;
+      else
+	{
+	  *buf = (char) chr;
+	  buf++, (*read)++;
+	}
     }
+
+  return 1;
+}
+
+/* Like `read_token', but return either BUFFER, or a GC-allocated buffer
+   if the token doesn't fit in BUFFER_SIZE bytes.  */
+static char *
+read_complete_token (SCM port, char *buffer, size_t buffer_size,
+		     const char *delimiters, size_t *read)
+{
+  int overflow = 0;
+  size_t bytes_read, overflow_size = 0;
+  char *overflow_buffer = NULL;
+
+  do
+    {
+      overflow = read_token (port, buffer, buffer_size,
+			     delimiters, &bytes_read);
+      if (bytes_read == 0)
+        break;
+      if (overflow || overflow_size != 0)
+        {
+          if (overflow_size == 0)
+            {
+              overflow_buffer = scm_gc_malloc_pointerless (bytes_read, "read");
+              memcpy (overflow_buffer, buffer, bytes_read);
+              overflow_size = bytes_read;
+            }
+          else
+            {
+	      char *new_buf =
+#ifdef HAVE_SCM_GC_MALLOC_POINTERLESS
+		scm_gc_malloc_pointerless (overflow_size + bytes_read, "read");
+#else
+	        scm_malloc (overflow_size + bytes_read);
+#endif
+
+	      memcpy (new_buf, overflow_buffer, overflow_size);
+              memcpy (new_buf + overflow_size, buffer, bytes_read);
+
+	      overflow_buffer = new_buf;
+              overflow_size += bytes_read;
+            }
+        }
+    }
+  while (overflow);
+
+  if (overflow_size)
+    *read = overflow_size;
+  else
+    *read = bytes_read;
+
+  return (overflow_size > 0 ? overflow_buffer : buffer);
 }
 
 
@@ -397,12 +455,12 @@ scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 
 #define SYMBOL_TR_NAME scm_read_guile_mixed_case_symbol
 #define NUMBER_TR_NAME scm_read_guile_number
-#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
+#define SYMBOL_TR_TRANSFORM_CHARACTERS(s)  do {} while (0)
 #define DELIMITERS     R5RS_DELIMITERS
 
 #include "symbol-token-reader.c"
 
-#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef SYMBOL_TR_TRANSFORM_CHARACTERS
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
 
@@ -410,23 +468,23 @@ scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 
 #define SYMBOL_TR_NAME scm_read_r5rs_lower_case_symbol
 #define NUMBER_TR_NAME scm_read_r5rs_lower_case_number
-#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)	\
-  do { (_c) = tolower (_c); } while (0)
+#define SYMBOL_TR_TRANSFORM_CHARACTERS(s)		\
+  do { s = scm_string_downcase_x (s); } while (0)
 
 #include "symbol-token-reader.c"
 
-#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef SYMBOL_TR_TRANSFORM_CHARACTERS
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
 
 #define SYMBOL_TR_NAME scm_read_r5rs_upper_case_symbol
 #define NUMBER_TR_NAME scm_read_r5rs_upper_case_number
-#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)	\
-  do { (_c) = toupper (_c); } while (0)
+#define SYMBOL_TR_TRANSFORM_CHARACTERS(s)		\
+  do { s = scm_string_upcase_x (s); } while (0)
 
 #include "symbol-token-reader.c"
 
-#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef SYMBOL_TR_TRANSFORM_CHARACTERS
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
 #undef DELIMITERS
@@ -435,23 +493,23 @@ scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 
 #define SYMBOL_TR_NAME scm_read_r6rs_symbol
 #define NUMBER_TR_NAME scm_read_r6rs_number
-#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
+#define SYMBOL_TR_TRANSFORM_CHARACTERS(s)  do {} while (0)
 #define DELIMITERS     R6RS_DELIMITERS
 #include "symbol-token-reader.c"
 
-#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef SYMBOL_TR_TRANSFORM_CHARACTERS
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
 #undef DELIMITERS
 
 #define SYMBOL_TR_NAME scm_read_brace_free_symbol
 #define NUMBER_TR_NAME scm_read_brace_free_number
-#define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
+#define SYMBOL_TR_TRANSFORM_CHARACTERS(s)  do {} while (0)
 #define DELIMITERS     R5RS_DELIMITERS "{}"
 
 #include "symbol-token-reader.c"
 
-#undef SYMBOL_TR_TRANSFORM_CHARACTER
+#undef SYMBOL_TR_TRANSFORM_CHARACTERS
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
 #undef DELIMITERS
@@ -704,7 +762,8 @@ scm_read_character (scm_t_wchar chr, SCM port, scm_reader_t reader,
   char charname[100];
   size_t charname_len;
 
-  read_token (port, charname, sizeof (charname), &charname_len);
+  read_token (port, charname, sizeof charname, R5RS_DELIMITERS,
+	      &charname_len);
 
   if (charname_len == 0)
     {
