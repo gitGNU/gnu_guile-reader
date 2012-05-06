@@ -47,27 +47,29 @@
 
 
 /* `isblank' is only in C99.  */
-#define CHAR_IS_BLANK_(_chr)					\
-  (((_chr) == ' ') || ((_chr) == '\t') || ((_chr) == '\n')	\
-   || ((_chr) == '\f') || ((_chr) == '\r'))
 
+#define BLANK_CHARS_ " \t\n\f\r"
 #ifdef MSDOS
-# define CHAR_IS_BLANK(_chr)			\
-  ((CHAR_IS_BLANK_ (chr)) || ((_chr) == 26))
+# define BLANK_CHARS  BLANK_CHARS_ "\032"
 #else
-# define CHAR_IS_BLANK CHAR_IS_BLANK_
+# define BLANK_CHARS  BLANK_CHARS_
 #endif
+
+#define CHAR_IS_BLANK(c)			\
+  (index (BLANK_CHARS, (c)) != NULL)
 
 
 /* R5RS one-character delimiters (see section 7.1.1, ``Lexical
    structure'').  */
-#define CHAR_IS_R5RS_DELIMITER(c)				\
-  (CHAR_IS_BLANK (c)						\
-   || (c == ')') || (c == '(') || (c == ';') || (c == '"'))
+#define R5RS_DELIMITERS  BLANK_CHARS "();\""
 
-#define CHAR_IS_R6RS_DELIMITER(c)				\
-  (CHAR_IS_R5RS_DELIMITER (c) || (c == '[') || (c == ']'))
+#define CHAR_IS_R5RS_DELIMITER(c)		\
+  (index (R5RS_DELIMITERS, (c)) != NULL)
 
+#define R6RS_DELIMITERS  R5RS_DELIMITERS "[]"
+
+#define CHAR_IS_R6RS_DELIMITER(c)		\
+  (index (R6RS_DELIMITERS, (c)) != NULL)
 
 /* Helper function similar to `scm_read_token ()'.  Read from PORT until a
    whitespace is read.  */
@@ -396,7 +398,7 @@ scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 #define SYMBOL_TR_NAME scm_read_guile_mixed_case_symbol
 #define NUMBER_TR_NAME scm_read_guile_number
 #define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
-#define CHAR_IS_DELIMITER(_c)   (CHAR_IS_R5RS_DELIMITER (_c))
+#define DELIMITERS     R5RS_DELIMITERS
 
 #include "symbol-token-reader.c"
 
@@ -427,33 +429,32 @@ scm_read_string (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 #undef SYMBOL_TR_TRANSFORM_CHARACTER
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
-#undef CHAR_IS_DELIMITER
+#undef DELIMITERS
 
 /* FIXME: Check whether this really corresponds to R6RS.  */
 
 #define SYMBOL_TR_NAME scm_read_r6rs_symbol
 #define NUMBER_TR_NAME scm_read_r6rs_number
 #define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
-#define CHAR_IS_DELIMITER(_c)   (CHAR_IS_R6RS_DELIMITER (_c))
+#define DELIMITERS     R6RS_DELIMITERS
 #include "symbol-token-reader.c"
 
 #undef SYMBOL_TR_TRANSFORM_CHARACTER
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
-#undef CHAR_IS_DELIMITER
+#undef DELIMITERS
 
 #define SYMBOL_TR_NAME scm_read_brace_free_symbol
 #define NUMBER_TR_NAME scm_read_brace_free_number
 #define SYMBOL_TR_TRANSFORM_CHARACTER(_c)  do {} while (0)
-#define CHAR_IS_DELIMITER(_c)			\
-  ((CHAR_IS_R5RS_DELIMITER (_c))		\
-   || ((_c) == '}') || ((_c) == '{'))
+#define DELIMITERS     R5RS_DELIMITERS "{}"
 
 #include "symbol-token-reader.c"
 
 #undef SYMBOL_TR_TRANSFORM_CHARACTER
 #undef NUMBER_TR_NAME
 #undef SYMBOL_TR_NAME
+#undef DELIMITERS
 #undef SYMBOL_TR_VALID_CHARACTER
 
 

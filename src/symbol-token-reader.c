@@ -53,7 +53,7 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
 
   while (c != EOF)
     {
-      if ((c == EOF) || (CHAR_IS_DELIMITER (c)))
+      if ((c == EOF) || (index (DELIMITERS, c) != NULL))
 	{
 	  /* We need to special-case characters that cannot normally be part
 	     of a symbol name.  There are actually few of them (see R5RS,
@@ -167,8 +167,8 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
     {
       SYMBOL_TR_TRANSFORM_CHARACTER (c);
 
-      if (!CHAR_IS_DELIMITER (c))
-	c_id[c_id_len++] = (char)c;
+      if (index (DELIMITERS, c) == NULL)
+	c_id[c_id_len++] = (char) c;
       else
 	{
 	  scm_ungetc (c, port);
