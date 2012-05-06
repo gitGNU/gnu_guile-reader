@@ -43,6 +43,9 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
 ;;;
 ;;; Code:
 
+;; Have the current output port use the current locale encoding.
+(setlocale LC_ALL "")
+
 
 (define-public (read-this str reader)
   (with-input-from-string str
