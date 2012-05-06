@@ -70,12 +70,17 @@ scm_token_reader_spec_t scm_reader_standard_specs[] =
 			 "It is actually defined at reader's compile-"
 			 "time."),
 
-    SCM_TR_SEXP,
     SCM_TR_STRING,
-    SCM_TR_GUILE_NUMBER,
-    SCM_TR_GUILE_SYMBOL_LOWER_CASE,
-    SCM_TR_GUILE_SYMBOL_UPPER_CASE,
-    SCM_TR_GUILE_SYMBOL_MISC_CHARS,
+    SCM_TR_SEXP,
+
+    /* Guile 2.0 recognizes square brackets by default, so follow
+       its lead.  */
+    SCM_TR_SQUARE_BRACKET_SEXP,
+    SCM_TR_R6RS_NUMBER,
+    SCM_TR_R6RS_SYMBOL_LOWER_CASE,
+    SCM_TR_R6RS_SYMBOL_UPPER_CASE,
+    SCM_TR_R6RS_SYMBOL_MISC_CHARS,
+
     SCM_TR_QUOTE_QUASIQUOTE_UNQUOTE,
     SCM_TR_SEMICOLON_COMMENT,
 
@@ -140,11 +145,11 @@ SCM_DEFINE (scm_default_sharp_reader_token_readers,
 
 SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
 	    (SCM fault_handler, SCM flags),
-	    "Make and return a new reader compatible with Guile's built-in "
-	    "reader.  This function call @code{make-reader} with "
-	    "@var{flags}.  Note that the sharp reader used by the returned "
-	    "reader is also instantiated using @var{flags}.  The value of "
-	    "@var{fault-handler} defaults to "
+	    "Make and return a new reader compatible with Guile 2.0's "
+	    "@code{read}, with its default settings.  This function calls "
+	    "@code{make-reader} with @var{flags}.  Note that the sharp "
+	    "reader used by the returned reader is also instantiated using "
+	    "@var{flags}.  The value of @var{fault-handler} defaults to "
 	    "@code{%reader-standard-fault-handler}.")
 #define FUNC_NAME s_scm_make_guile_reader
 {

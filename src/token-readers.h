@@ -284,12 +284,15 @@ extern void scm_initialize_token_reader_library (void);
 		      scm_read_guile_mixed_case_symbol, 0,		\
 		      "Read a symbol that starts with an upper-case "	\
 		      "letter in a case-sensitive fashion.")
-#define SCM_TR_GUILE_SYMBOL_MISC_CHARS /* guile-symbol-misc-chars */	 \
-  SCM_DEFTOKEN_SET ("[]{}~^:/*%&@_<>!=?$",				 \
-		    "guile-symbol-misc-chars",				 \
-		    scm_read_guile_mixed_case_symbol, 0,		 \
+#define SCM_TR_GUILE_SYMBOL_MISC_CHARS /* guile-symbol-misc-chars */	\
+  SCM_DEFTOKEN_SET ("[]{}~^:/*%&@_<>!=?$",				\
+		    "guile-symbol-misc-chars",				\
+		    scm_read_guile_mixed_case_symbol, 0,		\
 		    "Read a symbol that starts with a non-alphanumeric " \
-		    "character in a case-sensitive fashion.")
+		    "character in a case-sensitive fashion.  Note that " \
+		    "this token reader does @emph{not} consider square " \
+		    "brackets as delimiters, as was the case with Guile " \
+		    "1.8 and earlier.")
 #define SCM_TR_QUOTE_QUASIQUOTE_UNQUOTE /* quote-quasiquote-unquote */	  \
   SCM_DEFTOKEN_SET ("'`,", "quote-quasiquote-unquote",			  \
 		    scm_read_quote, 0,					  \
