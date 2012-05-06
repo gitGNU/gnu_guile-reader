@@ -10,7 +10,8 @@ New in Guile-Reader 0.6
     square brackets.  All these are supported by default by `read' in
     Guile 2.0.
 
-  * On Guile 2.0, non-ASCII Unicode symbols are correctly read.
+  * On Guile 2.0, non-ASCII Unicode symbols, strings, characters, and
+    Skribe-expressions are correctly read.
 
   * Bugs fixed
 
