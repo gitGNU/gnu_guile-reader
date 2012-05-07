@@ -169,7 +169,7 @@ encountered."
     (pair-long . "(a b . c)")
     (pair-again . "(a .b)")
     (fake-pair . "(. a)")
-    (quasiquote . "`a")
+    (quasi-quote . "`a")
     (quasiquote-unquote . "`(a ,b)")
     (quasiquote-unquote-splicing . "`(a ,@b)")
     (line-comment . ";;; line comment\n777")
