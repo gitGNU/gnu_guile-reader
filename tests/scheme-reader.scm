@@ -147,7 +147,6 @@ encountered."
     (symbol-star . "*symbol*")
     (symbol-at . "@symbol@")
     (symbol-brace . "{symbol}")
-    (symbol-square-brackets . "[symbol]")
     (symbol-dot . ".")
     (symbol-lower-than . "<")
     (symbol-greater-than-or-equal . ">=")
@@ -203,7 +202,8 @@ encountered."
           (syntax-quote . "#'foo")
           (syntax-quasiquote . "#`foo")
           (syntax-unquote . "#`(foo #,bar)")
-          (syntax-unquote-splicing . "#`(foo #,@bar)")))
+          (syntax-unquote-splicing . "#`(foo #,@bar)")
+          (square-bracket-sexp . "[not-a-symbol]"))) ; a list under Guile 2.0
        (else
         '()))
 
