@@ -125,7 +125,11 @@ read_complete_token (SCM port, char *buffer, size_t buffer_size,
         {
           if (overflow_size == 0)
             {
+#ifdef HAVE_SCM_GC_MALLOC_POINTERLESS
               overflow_buffer = scm_gc_malloc_pointerless (bytes_read, "read");
+#else
+	      overflow_buffer = scm_malloc (bytes_read);
+#endif
               memcpy (overflow_buffer, buffer, bytes_read);
               overflow_size = bytes_read;
             }
