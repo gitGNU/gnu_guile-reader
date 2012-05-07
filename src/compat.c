@@ -133,6 +133,23 @@ scm_i_input_error (char const *function,
 
 #endif /* HAVE_SCM_I_INPUT_ERROR */
 
+#ifndef HAVE_SCM_FROM_UTF32_STRINGN
+
+/* On Guile 1.8, return a plain 8-bit string.  */
+SCM
+scm_from_utf32_stringn (const scm_t_wchar *str, size_t len)
+{
+  size_t i;
+  char *c_str;
+
+  c_str = alloca (len);
+  for (i = 0; i < len; i++)
+    c_str[i] = (char) str[i];
+
+  return scm_from_locale_stringn (c_str, len);
+}
+
+#endif /* HAVE_SCM_FROM_UTF32_STRINGN */
 
 #ifndef HAVE_SCM_I_READ_ARRAY
 

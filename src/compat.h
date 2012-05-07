@@ -43,8 +43,9 @@
 #endif
 
 #ifndef HAVE_SCM_FROM_UTF32_STRINGN
-# define scm_from_utf32_stringn(buf, count)	\
-    scm_from_locale_stringn ((buf), (count))
+
+extern SCM scm_from_utf32_stringn (const scm_t_wchar *str, size_t len);
+
 #endif
 
 #endif
