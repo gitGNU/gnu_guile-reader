@@ -133,6 +133,46 @@ scm_i_input_error (char const *function,
 
 #endif /* HAVE_SCM_I_INPUT_ERROR */
 
+#ifndef HAVE_SCM_GET_BYTE_OR_EOF
+
+/* Guile 2.0's `scm_get_byte_or_eof' doesn't update PORT's position,
+   whereas `scm_getc' in 1.8 and 2.0 does.  */
+int
+scm_get_byte_or_eof (SCM port)
+{
+  int c;
+  long line;
+  int col;
+
+  line = SCM_LINUM (port);
+  col = SCM_COL (port);
+
+  c = scm_getc (port);
+
+  SCM_LINUM (port) = line;
+  SCM_COL (port) = col;
+
+  return c;
+}
+
+/* Likewise.  */
+void
+scm_unget_byte (int c, SCM port)
+{
+  long line;
+  int col;
+
+  line = SCM_LINUM (port);
+  col = SCM_COL (port);
+
+  scm_ungetc (c, port);
+
+  SCM_LINUM (port) = line;
+  SCM_COL (port) = col;
+}
+
+#endif /* !HAVE_SCM_GET_BYTE_OR_EOF */
+
 #ifndef HAVE_SCM_FROM_UTF32_STRINGN
 
 /* On Guile 1.8, return a plain 8-bit string.  */

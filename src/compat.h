@@ -35,8 +35,10 @@
 #endif
 
 #ifndef HAVE_SCM_GET_BYTE_OR_EOF
-# define scm_get_byte_or_eof scm_getc
-# define scm_unget_byte scm_ungetc
+
+extern int scm_get_byte_or_eof (SCM port);
+extern void scm_unget_byte (int c, SCM port);
+
 #endif
 
 #ifndef HAVE_SCM_FROM_STRINGN
