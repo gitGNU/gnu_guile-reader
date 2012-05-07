@@ -24,6 +24,8 @@
 # include <config.h>
 #endif
 
+#include <reader-config.h>
+
 #ifndef HAVE_SCM_C_LOCALE_STRINGN_TO_NUMBER
 # ifdef HAVE_SCM_I_MEM2NUMBER
 #  define scm_c_locale_stringn_to_number scm_i_mem2number
