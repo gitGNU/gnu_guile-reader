@@ -13,6 +13,8 @@ New in Guile-Reader 0.6
   * On Guile 2.0, non-ASCII Unicode symbols, strings, characters, and
     Skribe-expressions are correctly read.
 
+  * On Guile 2.0, Scheme source files are compiled and installed.
+
   * Bugs fixed
 
     * Add support for rationals in the number token reader.
