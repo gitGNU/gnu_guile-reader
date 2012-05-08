@@ -31,7 +31,7 @@ let
                cp -v $(find ${pkgs.gettext} -name config.rpath) build-aux/
             '';
 
-          buildInputs = with pkgs; [ gettext texinfo gperf guile_1_8 pkgconfig ];
+          buildInputs = with pkgs; [ gettext texinfo gperf guile pkgconfig ];
           dontBuild = false;
         };
 
