@@ -19,7 +19,7 @@
 
 This file documents Guile-Reader.
 
-Copyright @copyright{} 2005, 2006, 2007, 2008, 2009 Ludovic Court@`es
+Copyright @copyright{} 2005, 2006, 2007, 2008, 2009, 2012 Ludovic Court@`es
 
 Permission is granted to make and distribute verbatim copies of this
 manual provided the copyright notice and this permission notice are
@@ -71,7 +71,7 @@ approved by the Free Software Foundation.
 @top A Reader Framework for Guile
 
 This document describes Guile-Reader version @value{VERSION}, for GNU
-Guile 1.8 and later.  It was last updated in @value{UPDATED-MONTH}.
+Guile 1.8 and 2.0.  It was last updated in @value{UPDATED-MONTH}.
 
 This documentation should be mostly complete.  Details about the C API
 are omitted from this manual.  They can be found in the public header
@@ -119,11 +119,13 @@ comments (@pxref{Block Comments, SCSH block comments,, guile, Guile
 Reference Manual}).  In short the current reader syntax is hardly
 extensible.
 
-The idea of Guile Reader is to provide a framework allowing users to
+The idea of Guile-Reader is to provide a framework allowing users to
 quickly define readers for whatever syntax (or rather: variant of the
 Scheme syntax) they like.  Programs can then provide their own readers
 and, thanks to Guile's @code{current-reader} mechanism, have their
-code read with this reader.
+code read with this reader.  When using Guile 2.0, readers produced by
+Guile-Reader are Unicode-capable; they can read from any
+ASCII-compatible encoding, such as UTF-8 or ISO-8859-1.
 
 @cindex SILex
 @cindex lexer
@@ -143,12 +145,12 @@ manual (@pxref{Limitations}).
 @cindex read table
 Common Lisp has a similar mechanism to extend its reader which is
 called the @dfn{read
-table}. @uref{http://www.iro.umontreal.ca/~gambit/, Gambit Scheme},
+table}.  @uref{http://www.iro.umontreal.ca/~gambit/, Gambit Scheme},
 for instance, also provides an implementation of read tables.
 However, it appears to have limitations similar to Guile's
 @code{read-enable} and @code{read-hash-extend} in terms of
 possibilities for syntax extension.  On the other hand, it allows the
-reader and writer to be kept consistent, which guile-reader does not
+reader and writer to be kept consistent, which Guile-Reader does not
 address.
 
 
@@ -157,11 +159,11 @@ address.
 @chapter Overview
 
 @cindex reader library
-Guile-reader allows for the construction of readers capable of
+Guile-Reader allows for the construction of readers capable of
 understanding various syntactic variants.  The simplest way to use it
 is through its @dfn{reader library} that allows one to pick and choose
 various commonly used syntactic extensions to the standard Scheme
-syntax (@pxref{Reader Library}).  However, guile-reader also provides
+syntax (@pxref{Reader Library}).  However, Guile-Reader also provides
 a finer-grain programming interface allowing the construction of
 virtually any reader, with its own syntactic specificities.  The
 following sections focus primarily on this capability.
@@ -169,13 +171,13 @@ following sections focus primarily on this capability.
 @cindex reader
 @cindex token reader
 Before going into the details of the reader framework API, let us have
-a quick overview of what this is.  Basically, guile-reader introduces
+a quick overview of what this is.  Basically, Guile-Reader introduces
 two objects: @dfn{readers} and @dfn{token readers}.  Readers can be
 thought of, simply, as procedures like Scheme's @code{read}
 (@pxref{Input, R5RS,, r5rs, Revised^5 Report on the Algorithmic
 Language Scheme}), i.e., procedures that take one (optional) argument,
 namely the port to read from.  We will see later that readers as
-defined by guile-reader can actually receive two more arguments
+defined by Guile-Reader can actually receive two more arguments
 (@pxref{Defining a New Reader}).  A reader, like @code{read}, reads a
 sequence of characters (the @dfn{external representation} of some
 object) and returns a Scheme object.
@@ -190,7 +192,7 @@ upper-case letters associated with the appropriate procedure form a
 token reader for symbols.
 
 In Guile-Reader, TRs may be written either in Scheme or in C, and they
-can even be a reader produced by guile-reader itself.  Unless it is a
+can even be a reader produced by Guile-Reader itself.  Unless it is a
 reader, the procedure (or C function) used to create a TR will receive
 four arguments:
 
@@ -256,7 +258,7 @@ This reader can then be used like the regular @code{read} procedure:
 @end lisp
 
 Most of the time, you will want to use it as the current reader, at
-least in the module where you created it.  Fortunately, Guile 1.8
+least in the module where you created it.  Fortunately, Guile
 provides a mechanism for this, the @code{current-reader} fluid
 (@pxref{Loading, @code{current-reader},, guile, Guile Reference
 Manual}).  Changing the value of this fluid from a file that is being
@@ -482,7 +484,7 @@ sub-reader.
 @subsection Token Reader Library
 
 @cindex token reader library
-Guile-reader comes with a number of re-usable token readers.
+Guile-Reader comes with a number of re-usable token readers.
 Together, they might be assembled to form a complete Scheme reader
 equivalent to that of Guile (@pxref{Reader Library}).  Or they can be
 used individually in any reader.
@@ -523,7 +525,7 @@ The procedures available to manipulate token readers are listed below:
 @subsection Limitations
 
 This section describes the main limitations and common pitfalls
-encountered when using guile-reader.
+encountered when using Guile-Reader.
 
 @menu
 * Token Delimiters::            Dealing with token delimiters.
@@ -573,7 +575,7 @@ reason for this is that this TR relies on the top-level reader's
 symbol reader to read the symbol that makes up the keyword being read.
 
 @cindex pitfall
-In the current design of guile-reader, this token delimiter issue
+In the current design of Guile-Reader, this token delimiter issue
 creates a number of pitfalls when one is willing to change the current
 delimiters.  In particular, one has to be very careful about using TRs
 that consistently assume the same token delimiters.
@@ -581,7 +583,7 @@ that consistently assume the same token delimiters.
 A ``real'' lexer generator such as Danny Dub@'e's SILex avoids such
 issues because it allows the definition of tokens using regular
 expressions.  However, its usage may be less trivial than that of
-guile-reader.
+Guile-Reader.
 
 @node Overlapping Token Readers,  , Token Delimiters, Limitations
 @subsubsection Overlapping Token Readers
@@ -629,7 +631,7 @@ string has been found.
 @node Readers,  , Token Readers, API Reference
 @section Readers
 
-Guile-reader is about defining readers.  Continuing to read this
+Guile-Reader is about defining readers.  Continuing to read this
 manual was definitely a good idea since we have finally reached the
 point where we will start talking about how to define new readers.
 
@@ -660,7 +662,7 @@ procedures.  Written in Scheme, it could resemble something like:
 @end lisp
 
 @findex make-reader
-Using guile-reader, this is done simply by providing a list of token
+Using Guile-Reader, this is done simply by providing a list of token
 readers to the @code{make-reader} procedure, as in the following
 example:
 
@@ -824,12 +826,12 @@ of these functions from within a file being loaded by
 @chapter Internals
 
 In order to not have to trade too much performance for flexibility,
-guile-reader dynamically compiles code for the readers defined using
+Guile-Reader dynamically compiles code for the readers defined using
 GNU @emph{lightning} (@pxref{Overview, Introduction to GNU
 @emph{lightning},, lightning, Using and Porting GNU
 @emph{lightning}}).  As of version 1.2c, GNU @emph{lightning} can
 generate code for the PowerPC, SPARC, and IA32 architectures.  For
-other platforms, guile-reader provides an alternative (slower) C
+other platforms, Guile-Reader provides an alternative (slower) C
 implementation that does not depend on it.  Using the
 @emph{lightning}-generated readers typically provides a 5% performance
 improvement over the static C implementation.
