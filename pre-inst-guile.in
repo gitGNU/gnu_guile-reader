@@ -23,6 +23,9 @@
 GUILE_LOAD_PATH="@abs_top_builddir@/modules:@abs_top_srcdir@/modules:$GUILE_LOAD_PATH"
 export GUILE_LOAD_PATH
 
+GUILE_LOAD_COMPILED_PATH="@abs_top_builddir@/modules:$GUILE_LOAD_COMPILED_PATH"
+export GUILE_LOAD_COMPILED_PATH
+
 GUILE_READER_LIBDIR="@abs_top_builddir@/src"
 export GUILE_READER_LIBDIR
 

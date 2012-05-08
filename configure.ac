@@ -103,6 +103,7 @@ AC_PATH_PROG([guile_snarf], [guile-snarf], [not-found])
 if test "x$guile_snarf" = "xnot-found"; then
    AC_MSG_ERROR([`guile-snarf' not found.  Please install Guile 1.8.x or later.])
 fi
+AC_PATH_PROGS([GUILD], [guild guile-tools])
 GUILE_SITE_DIR
 
 clean_LDFLAGS="$LDFLAGS"
