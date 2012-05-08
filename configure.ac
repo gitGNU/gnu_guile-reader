@@ -23,6 +23,8 @@ AC_ARG_WITH([guilemoduledir],
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_SED
+AC_PROG_MKDIR_P
 
 # Libtool.
 LT_PREREQ([2.2.6])

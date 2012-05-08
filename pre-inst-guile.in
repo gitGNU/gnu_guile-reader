@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2006, 2007, 2010  Ludovic Courtès  <ludo@gnu.org>
+# Copyright (C) 2006, 2007, 2010, 2012  Ludovic Courtès  <ludo@gnu.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,8 +20,11 @@
 # and produce the documentation.
 
 
-GUILE_LOAD_PATH="@abs_top_srcdir@/modules:$GUILE_LOAD_PATH"
+GUILE_LOAD_PATH="@abs_top_builddir@/modules:@abs_top_srcdir@/modules:$GUILE_LOAD_PATH"
 export GUILE_LOAD_PATH
+
+GUILE_READER_LIBDIR="@abs_top_builddir@/src"
+export GUILE_READER_LIBDIR
 
 # In Guile 2.x this variable must be set so that Guile's default
 # extension dir has lower precedence than ours.

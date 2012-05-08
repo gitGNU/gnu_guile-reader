@@ -56,8 +56,12 @@
 ;;;
 ;;; Code:
 
+(define %libguile-reader
+  (string-append (or (getenv "GUILE_READER_LIBDIR")
+                     "@libdir@")
+                 "/libguile-reader"))
 
-(load-extension "libguile-reader" "scm_reader_init_bindings")
+(load-extension %libguile-reader "scm_reader_init_bindings")
 
 (cond-expand
  (guile-2
@@ -74,6 +78,6 @@
   ;; Use `%reader-standard-fault-handler' as defined in `reader.c'.
   #t))
 
-(load-extension "libguile-reader" "scm_load_standard_reader")
+(load-extension %libguile-reader "scm_load_standard_reader")
 
 ;;; reader.scm ends here
