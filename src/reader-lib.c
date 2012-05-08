@@ -160,7 +160,7 @@ SCM_DEFINE (scm_make_guile_reader, "make-guile-reader", 0, 1, 1,
   size_t code_size;
   void *buffer;
 
-  if (fault_handler == SCM_UNDEFINED)
+  if (SCM_UNBNDP (fault_handler))
     fault_handler = scm_variable_ref (scm_reader_standard_fault_handler_var);
 
   if (fault_handler != SCM_BOOL_F)

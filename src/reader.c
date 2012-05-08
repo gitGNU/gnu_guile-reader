@@ -1680,10 +1680,10 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
   scm_token_reader_spec_t *tr;
   SCM result = SCM_UNSPECIFIED;
 
-  if (port == SCM_UNDEFINED)
+  if (SCM_UNBNDP (port))
     port = scm_current_input_port ();
-  else
-    SCM_VALIDATE_PORT (2, port);
+
+  SCM_VALIDATE_PORT (2, port);
 
  doit:
   while (1)
@@ -2009,8 +2009,8 @@ SCM_DEFINE (scm_make_reader, "make-reader", 1, 1, 1,
   scm_token_reader_spec_t *c_specs;
 
   SCM_VALIDATE_LIST (1, token_readers);
-  if ((fault_handler_proc == SCM_UNDEFINED)
-      || (fault_handler_proc == SCM_BOOL_F))
+  if (SCM_UNBNDP (fault_handler_proc)
+      || fault_handler_proc == SCM_BOOL_F)
     fault_handler_proc =
       scm_variable_ref (scm_reader_standard_fault_handler_var);
   else
@@ -2094,7 +2094,7 @@ SCM_DEFINE (scm_make_token_reader, "make-token-reader", 2, 1, 0,
   if (proc != SCM_BOOL_F)
     SCM_VALIDATE_PROC (2, proc);
 
-  if (escape_p == SCM_UNDEFINED)
+  if (SCM_UNBNDP (escape_p))
     escape_p = SCM_BOOL_F;
   else
     SCM_VALIDATE_BOOL (3, escape_p);
