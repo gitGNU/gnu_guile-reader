@@ -8,12 +8,12 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
-;;; Copyright 2006, 2009  Ludovic Courtès <ludo@gnu.org>
+;;; Copyright 2006, 2009, 2012  Ludovic Courtès <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation; either version 2 of the License, or
+;;; the Free Software Foundation; either version 3 of the License, or
 ;;; (at your option) any later version.
 ;;;
 ;;; This program is distributed in the hope that it will be useful,
@@ -100,11 +100,9 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
 		  (lambda () (read-enable  'positions) read))
 	    (list (lambda () (make-guile-reader))
 		  (lambda ()
-		    (make-guile-reader #f 'reader/record-positions)))))
+		    (make-guile-reader %reader-standard-fault-handler
+                                       'reader/record-positions)))))
 
 (define main benchmark)
-
-
-;;; arch-tag: d0777df5-80c6-4ac4-b861-a2adfb87744c
 
 ;;; benchmark.scm ends here
