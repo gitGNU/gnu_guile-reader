@@ -2,6 +2,9 @@
 
   Hand-written Autoheader template meant to be installed.  */
 
+#ifndef GUILE_READER_CONFIG_H
+#define GUILE_READER_CONFIG_H
+
 /* Define this if we have Lightning.  */
 #undef HAVE_LIGHTNING
 
@@ -20,3 +23,5 @@
 typedef int scm_t_wchar;
 
 #endif	/* SCM_READER_HAVE_SCM_T_WCHAR */
+
+#endif	/* GUILE_READER_CONFIG_H */
