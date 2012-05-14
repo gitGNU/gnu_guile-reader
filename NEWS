@@ -1,3 +1,9 @@
+New in Guile-Reader 0.7
+
+  * Bugs fixed
+
+    * Fix compilation with GCC 4.5.
+
 New in Guile-Reader 0.6
 
   * Guile-Reader is now distributed under GPLv3 or later (instead of
