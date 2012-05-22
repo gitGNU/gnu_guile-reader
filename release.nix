@@ -44,6 +44,9 @@ let
         pkgs.releaseTools.nixBuild {
           name = "guile-reader";
           src = jobs.tarball;
+          preConfigure =
+            '' export configureFlags="$configureFlags --with-guilemoduledir=$out/share/guile/site/2.0"
+            '';
           buildInputs = with pkgs; [ guile pkgconfig gperf ];
           inherit buildOutOfSourceTree;
         };
@@ -57,6 +60,9 @@ let
         pkgs.releaseTools.nixBuild {
           name = "guile-reader";
           src = jobs.tarball;
+          preConfigure =
+            '' export configureFlags="$configureFlags --with-guilemoduledir=$out/share/guile/site/2.0"
+            '';
           buildInputs = with pkgs; [ guile pkgconfig gperf lightning ];
           inherit buildOutOfSourceTree;
         };
@@ -70,6 +76,9 @@ let
         pkgs.releaseTools.nixBuild {
           name = "guile-reader";
           src = jobs.tarball;
+          preConfigure =
+            '' export configureFlags="$configureFlags --with-guilemoduledir=$out/share/guile/site"
+            '';
           buildInputs = with pkgs; [ guile_1_8 gperf ];
           inherit buildOutOfSourceTree;
         };
