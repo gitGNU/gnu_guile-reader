@@ -25,6 +25,7 @@ AC_ARG_WITH([guilemoduledir],
 AC_PROG_CC
 AC_PROG_SED
 AC_PROG_MKDIR_P
+AM_PROG_AR
 
 # Libtool.
 LT_PREREQ([2.2.6])
