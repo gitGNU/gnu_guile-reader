@@ -40,7 +40,7 @@ token-reader-lookup.c: $(srcdir)/token-readers.h
 token-reader-list.c: $(srcdir)/token-readers.h
 	cat $< | \
 	$(srcdir)/extract-token-readers.sh --no-gperf-header | \
-	cut -f 1 -d , | sort | sed -e's/^\(.*\)$$/"\1",/g' > $@
+	cut -f 1 -d , | sort | $(SED) -e's/^\(.*\)$$/"\1",/g' > $@
 
 # `make-reader' flags.
 make-reader-flags.c: $(srcdir)/reader.h
