@@ -33,17 +33,17 @@ snarfcppopts = $(DEFS) $(INCLUDES) $(CPPFLAGS) $(AM_CPPFLAGS) \
 
 # Token reader lookup.
 token-reader-lookup.c: $(srcdir)/token-readers.h
-	cat $< | \
+	LC_ALL=C ; export LC_ALL ; cat $< | \
 	$(srcdir)/extract-token-readers.sh | \
 	$(GPERF) -t -C -N _scm_token_reader_lookup > $@
 
 token-reader-list.c: $(srcdir)/token-readers.h
-	cat $< | \
+	LC_ALL=C ; export LC_ALL ; cat $< | \
 	$(srcdir)/extract-token-readers.sh --no-gperf-header | \
 	cut -f 1 -d , | sort | $(SED) -e's/^\(.*\)$$/"\1",/g' > $@
 
 # `make-reader' flags.
 make-reader-flags.c: $(srcdir)/reader.h
-	cat $< | \
+	LC_ALL=C ; export LC_ALL ; cat $< | \
 	$(srcdir)/extract-make-reader-flags.sh | \
 	$(GPERF) -t -C -N _scm_to_make_reader_flag > $@
