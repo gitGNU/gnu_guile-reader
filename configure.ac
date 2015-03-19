@@ -64,13 +64,15 @@ if test "x$have_lightning" = "xyes"; then
       GCC_CFLAGS="$GCC_CFLAGS -Wno-unused-value -fno-strict-aliasing"
    fi
 
+   dnl The following test fails with lightning version < 1.2b and with
+   dnl 2.x, which is not supported (yet?).
    AC_MSG_CHECKING([whether GNU lightning supports `jit_allocai'])
    AC_LINK_IFELSE(
      [AC_LANG_PROGRAM([[#include <lightning.h>]],
                       [[int x = jit_allocai (7);]])],
      [AC_MSG_RESULT([yes])],
      [AC_MSG_RESULT([no])
-      AC_MSG_ERROR([Your installation of GNU lightning is too old; install 1.2b or later.])
+      AC_MSG_WARN([GNU lightning is too old or too recent (try version 1.2); not using it])
       have_lightning=no])
 else
   AC_MSG_WARN([GNU lightning not found; GNU lightning enhancements not compiled.])

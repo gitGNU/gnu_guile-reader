@@ -47,7 +47,7 @@ If you want do discuss about it, do not hesitate to subscribe to the
 Source code if managed using Git (http://git.or.cz/).  A copy of the
 repository can be obtained using:
 
-  git-clone git://git.sv.gnu.org/guile-reader.git
+  git clone git://git.sv.gnu.org/guile-reader.git
 
 Alternatively, the repository can be browsed online at:
 
@@ -60,8 +60,8 @@ Installation
 ------------
 
 Guile-Reader is written for Guile 1.8.x.  For optimal performance, you
-may want to get GNU lightning 1.2c or later (on platforms supported by
-GNU lightning).
+may want to get GNU lightning 1.2c or later, but not lightning 2.x,
+which is not supported yet.
 
 
 Thanks in advance for your feedback!  :-)
@@ -70,7 +70,7 @@ Thanks in advance for your feedback!  :-)
 
 
 
-Copyright 2005, 2006, 2007, 2008  Ludovic Courtès <ludo@gnu.org>
+Copyright 2005, 2006, 2007, 2008, 2015 Ludovic Courtès <ludo@gnu.org>
 
   Copying and distribution of this file, with or without modification,
   are permitted in any medium without royalty provided the copyright
