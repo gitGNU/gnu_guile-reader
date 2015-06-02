@@ -1,6 +1,7 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2012  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2012,
+     2015 Ludovic Courtès <ludo@gnu.org>
 
    Part of the code here (a few `scm_token_reader_t' functions below) is
    based on Guile code released under the GNU LGPL (file `read.c') which
@@ -1039,12 +1040,15 @@ scm_read_extended_symbol (scm_t_wchar chr, SCM port, scm_reader_t scm_reader,
 
 
 /* Skribe's read syntax.  So-called sk-exps.  */
+
+#define SKEXP_BUFFER_SIZE  1024
+
 SCM
 scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 		     scm_reader_t top_level_reader)
 {
   scm_t_wchar c, escaped = 0;
-  scm_t_wchar c_literal[1024];
+  scm_t_wchar c_literal[SKEXP_BUFFER_SIZE];
   size_t c_literal_len = 0;
   SCM result = SCM_EOL, s_literal = SCM_EOL;
 
@@ -1062,6 +1066,11 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
        (c != EOF) && ((c != ']') || (escaped));
        c = scm_getc (port))
     {
+      if (c_literal_len + 2 >= SKEXP_BUFFER_SIZE)
+	/* Flush the contents of C_LITERAL to S_LITERAL, a dynamically grown
+	   Scheme string.  */
+	FLUSH_STRING ();
+
       if (escaped)
 	{
 	  c_literal[c_literal_len++] = c;
@@ -1108,11 +1117,6 @@ scm_read_skribe_exp (scm_t_wchar chr, SCM port, scm_reader_t reader,
 	      c_literal[c_literal_len++] = c;
 	    }
 	}
-
-      if (c_literal_len + 1 >= sizeof (c_literal))
-	/* Flush the contents of C_LITERAL to S_LITERAL, a dynamically grown
-	   Scheme string.  */
-	FLUSH_STRING ();
     }
 
   FLUSH_STRING ();

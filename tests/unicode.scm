@@ -8,7 +8,7 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
         -c "(apply $main (cdr (command-line)))" "$@"
 !#
 ;;;
-;;; Copyright 2012  Ludovic Courtès <ludo@gnu.org>
+;;; Copyright 2012, 2015 Ludovic Courtès <ludo@gnu.org>
 ;;;
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
@@ -82,7 +82,14 @@ exec ${GUILE-"${top_builddir-..}/pre-inst-guile"} -l $0  \
                                                   (default-reader)))))
           (equal? '`("this is Χαοσ " ,(+ 1 2) " !")
                   (pk 'Χαοσ (call-with-input-string "[this is Χαοσ ,(+ 1 2) !]"
-                                                    %skribe-read)))))))
+                              %skribe-read)))
+
+          ;; In Guile-Reader 0.6 this would trigger a buffer overrun.
+          (equal? (list 'quasiquote (list (make-string 4999 #\a)))
+                  (pk 'long-string
+                      (call-with-input-string
+                          (string-append "[" (make-string 4999 #\a) "]")
+                        %skribe-read)))))))
 
 ;; Local Variables:
 ;; coding: utf-8
