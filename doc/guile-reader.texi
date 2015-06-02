@@ -468,17 +468,22 @@ reader may be implemented like this:
   (let ((sexp-read (token-reader-procedure
                     (standard-token-reader 'sexp))))
     (apply vector
-           (sexp-read chr port reader top-level-reader))))
+           (sexp-read chr port reader))))
 @end example
 
 When this procedure is invoked, @var{reader} points to the @code{#}
-sub-reader.  Clearly, in order to read the symbols that comprise the
-list, @var{sexp-read} should @emph{not} invoke @var{reader} because
-@var{reader} only knows about @code{#}-prefixed object syntaxes.  For
-this reason, in order to be consistent in re-usable, the S-exp reader
-must call @var{top-level-reader} which points to the top-level reader,
-i.e., the reader which yielded the invocation of the @code{#}
 sub-reader.
+@c FIXME: Currently the token_reader_proc_apply supports only
+@c 3 arguments, see the code for details.  The explanation below is
+@c for the day when it supports the fourth argument.
+@c
+@c Clearly, in order to read the symbols that comprise the
+@c list, @var{sexp-read} should @emph{not} invoke @var{reader} because
+@c @var{reader} only knows about @code{#}-prefixed object syntaxes.  For
+@c this reason, in order to be consistent in re-usable, the S-exp reader
+@c must call @var{top-level-reader} which points to the top-level reader,
+@c i.e., the reader which yielded the invocation of the @code{#}
+@c sub-reader.
 
 @node Token Reader Library, Limitations, Invoking a Reader from a TR, Token Readers
 @subsection Token Reader Library
