@@ -4,6 +4,12 @@ New in Guile-Reader 0.7
 
     * Fix compilation with GCC 4.5.
 
+    * Fix documentation extraction for recent versions of GNU grep.
+
+    * Ignore lightning when version >= 2 is found.
+
+    * Fix buffer overrun in the skexp token reader when (with Guile 2.0).
+
 New in Guile-Reader 0.6
 
   * Guile-Reader is now distributed under GPLv3 or later (instead of
