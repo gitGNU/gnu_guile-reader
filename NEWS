@@ -8,7 +8,7 @@ New in Guile-Reader 0.6.1
 
     * Ignore lightning when version >= 2 is found.
 
-    * Fix buffer overrun in the skexp token reader when (with Guile 2.0).
+    * Fix buffer overrun in the skexp token reader (with Guile 2.0).
 
 New in Guile-Reader 0.6
 
