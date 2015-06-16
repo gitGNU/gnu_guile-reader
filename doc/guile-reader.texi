@@ -248,7 +248,11 @@ least in the module where you created it.  Fortunately, Guile
 provides a mechanism for this, the @code{current-reader} fluid
 (@pxref{Loading, @code{current-reader},, guile, Guile Reference
 Manual}).  Changing the value of this fluid from a file that is being
-loaded will affect the reader use to load it.  For instance:
+loaded will affect the reader use to load it.  In general, you will want
+to modify @code{current-reader} not only at run time, but also at
+compile time and when the code is evaluated, which can be achieved
+using @code{eval-when} (@pxref{Eval When, @code{eval-when},, guile, GNU
+Guile Reference Manual}).  For instance:
 
 @vindex current-reader
 
@@ -258,20 +262,24 @@ loaded will affect the reader use to load it.  For instance:
 ;;; passed as a second parameter to `load').  So, for instance, DSSSL
 ;;; keywords are _not_ recognized.
 
-;;; Let's create our own customized reader...
+;; Let's create our own customized reader...
 (use-modules (system reader library))
 
-(define my-reader
-  (make-alternate-guile-reader '(dsssl-keywords
-                                 srfi62-sexp-comments
-                                 case-insensitive)))
+;; 'eval-when' here is needed to make 'my-reader' accessible at
+;; compile time, and to have the 'current-reader' change take
+;; effect at compile time.
+(eval-when (compile load eval)
+  (define my-reader
+    (make-alternate-guile-reader '(dsssl-keywords
+                                   srfi62-sexp-comments
+                                   case-insensitive)))
 
-;;; Let's make it the current reader.
-(fluid-set! current-reader my-reader)
+  ;; Let's make it the current reader.
+  (fluid-set! current-reader my-reader))
 
-;;; From now on, MY-READER is used to read the rest of this file.  Thus
-;;; we can happily use the syntactic extensions it implements: DSSSL
-;;; keywords, SRFI-62 comments and case-insensitivity.
+;; From now on, MY-READER is used to read the rest of this file.  Thus
+;; we can happily use the syntactic extensions it implements: DSSSL
+;; keywords, SRFI-62 comments and case-insensitivity.
 
 (if (not (keyword? #!dsssl-keyword))
     (error "Something went wrong, this should not happen!"))
