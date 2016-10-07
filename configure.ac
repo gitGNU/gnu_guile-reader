@@ -149,7 +149,7 @@ LDFLAGS="$clean_LDFLAGS"
 
 pkgdatadir="$datadir/$PACKAGE_NAME"
 if test "x$guilemoduledir" = "x"; then
-  guilemoduledir="$pkgdatadir"
+  guilemoduledir="${datarootdir}/guile/site/$GUILE_EFFECTIVE_VERSION"
 fi
 AC_SUBST([guilemoduledir])
 
