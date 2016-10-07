@@ -56,8 +56,10 @@ Edition @value{EDITION} @*
 @node Top, Introduction, (dir), (dir)
 @top A Reader Framework for Guile
 
-This document describes Guile-Reader version @value{VERSION}, for GNU
-Guile 1.8 and 2.0.  It was last updated in @value{UPDATED-MONTH}.
+This document describes Guile-Reader version @value{VERSION}, for
+GNU@tie{}Guile's 2.0 stable series, as well as the forthcoming 2.2
+series and the legacy 1.8 series.  It was last updated in
+@value{UPDATED-MONTH}.
 
 This documentation should be mostly complete.  Details about the C API
 are omitted from this manual.  They can be found in the public header

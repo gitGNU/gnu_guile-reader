@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2008, 2012  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2008, 2012, 2016 Ludovic Courtès <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ void
 scm_unget_byte (int c, SCM port)
 #define FUNC_NAME "scm_unget_byte"
 {
-  scm_t_port *pt = SCM_PTAB_ENTRY (port);
+  scm_t_port *pt = SCM_PORT (port);
 
   if (pt->read_buf == pt->putback_buf)
     /* already using the put-back buffer.  */
@@ -109,8 +109,8 @@ void
 scm_i_input_error (char const *function,
 		   SCM port, const char *message, SCM arg)
 {
-  SCM fn = (scm_is_string (SCM_FILENAME(port))
-	    ? SCM_FILENAME(port)
+  SCM fn = (scm_is_string (scm_port_filename (port))
+	    ? scm_port_filename (port)
 	    : scm_from_locale_string ("#<unknown port>"));
 
   SCM string_port = scm_open_output_string ();
@@ -118,8 +118,8 @@ scm_i_input_error (char const *function,
   scm_simple_format (string_port,
 		     scm_from_locale_string ("~A:~S:~S: ~A"),
 		     scm_list_4 (fn,
-				 scm_from_long (SCM_LINUM (port) + 1),
-				 scm_from_int (SCM_COL (port) + 1),
+				 scm_port_line (port),
+				 scm_port_column (port),
 				 scm_from_locale_string (message)));
 
   string = scm_get_output_string (string_port);
@@ -406,3 +406,52 @@ scm_i_read_array (SCM port, int c)
 }
 
 #endif /* HAVE_SCM_I_READ_ARRAY */
+
+#ifdef SCM_COL					  /* Guile < 2.1.4 */
+
+void
+increase_port_column (SCM port, size_t increment)
+{
+  SCM_COL (port) += increment;
+}
+
+#else  /* !defined SCM_COL */
+
+void
+increase_port_column (SCM port, size_t increment)
+{
+  size_t column = scm_to_size_t (scm_port_column (port));
+
+  scm_set_port_column_x (port,
+			 scm_from_size_t (column + increment));
+}
+
+const char *
+port_encoding (SCM port)
+{
+  /* XXX: A lot of overhead just to get the encoding as a C string.  */
+  char *encoding, *result;
+
+  encoding = scm_to_locale_string (scm_port_encoding (port));
+  result = scm_gc_malloc_pointerless (strlen (encoding) + 1, "encoding");
+  strcpy (result, encoding);
+  free (encoding);
+
+  return result;
+}
+
+scm_t_string_failed_conversion_handler
+port_conversion_strategy (SCM port)
+{
+  /* XXX: libguile should provide this function.  */
+  SCM strategy = scm_port_conversion_strategy (port);
+
+  if (scm_is_eq (strategy, scm_from_locale_symbol ("substitute")))
+    return SCM_FAILED_CONVERSION_QUESTION_MARK;
+  if (scm_is_eq (strategy, scm_from_locale_symbol ("escape")))
+    return SCM_FAILED_CONVERSION_ESCAPE_SEQUENCE;
+
+  return SCM_FAILED_CONVERSION_ERROR;
+}
+
+#endif	/* !define SCM_COL */

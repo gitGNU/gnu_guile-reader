@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2006, 2008, 2012  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2006, 2008, 2012, 2016 Ludovic CourtÃ¨s <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -50,6 +50,24 @@ extern void scm_unget_byte (int c, SCM port);
 
 extern SCM scm_from_utf32_stringn (const scm_t_wchar *str, size_t len);
 
+#endif
+
+extern void increase_port_column (SCM port, size_t increment);
+
+
+/* Guile >= 2.1.4 has a new port API.  */
+#ifndef SCM_PORT
+# define SCM_PORT(port)  (SCM_PTAB_ENTRY (port))
+# define PORT_ENCODING(port)  (SCM_PTAB_ENTRY (port)->encoding)
+# define PORT_CONVERSION_STRATEGY(port) (SCM_PTAB_ENTRY (port)->ilseq_handler)
+#else
+
+extern const char *port_encoding (SCM port);
+extern scm_t_string_failed_conversion_handler
+port_conversion_strategy (SCM port);
+
+# define PORT_ENCODING(port)  (port_encoding (port))
+# define PORT_CONVERSION_STRATEGY(port) (port_conversion_strategy (port))
 #endif
 
 #endif

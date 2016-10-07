@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2010, 2012  Ludovic Courtès  <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2010, 2012, 2016  Ludovic Courtès  <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -43,13 +43,14 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
   SCM result, str = SCM_EOL;
   char local_buffer[SYMBOL_BUFFER_SIZE], *buffer;
   size_t bytes_read;
-  scm_t_port *pt = SCM_PTAB_ENTRY (port);
 
   scm_ungetc (chr, port);
   buffer = read_complete_token (port, local_buffer, sizeof local_buffer,
 				DELIMITERS, &bytes_read);
 
-  str = scm_from_stringn (buffer, bytes_read, pt->encoding, pt->ilseq_handler);
+  str = scm_from_stringn (buffer, bytes_read,
+			  PORT_ENCODING (port),
+			  PORT_CONVERSION_STRATEGY (port));
 
   result = scm_string_to_number (str, SCM_UNDEFINED);
   if (scm_is_false (result))
@@ -59,7 +60,7 @@ NUMBER_TR_NAME (int chr, SCM port, scm_reader_t scm_reader,
       result = scm_string_to_symbol (str);
     }
 
-  SCM_COL (port) += scm_c_string_length (str);
+  increase_port_column (port, scm_c_string_length (str));
   return result;
 }
 
@@ -74,7 +75,6 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
   size_t bytes_read;
   int postfix = 0;				  /* XXX: keyword style */
   char local_buffer[SYMBOL_BUFFER_SIZE], *buffer;
-  scm_t_port *pt = SCM_PTAB_ENTRY (port);
   SCM str;
 
   scm_ungetc (chr, port);
@@ -98,7 +98,8 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
   if (postfix && ends_with_colon && (bytes_read > 1))
     {
       str = scm_from_stringn (buffer, bytes_read - 1,
-			      pt->encoding, pt->ilseq_handler);
+			      PORT_ENCODING (port),
+			      PORT_CONVERSION_STRATEGY (port));
 
       SYMBOL_TR_TRANSFORM_CHARACTERS (str);
       result = scm_symbol_to_keyword (scm_string_to_symbol (str));
@@ -106,13 +107,14 @@ SYMBOL_TR_NAME (int chr, SCM port, scm_reader_t reader,
   else
     {
       str = scm_from_stringn (buffer, bytes_read,
-			      pt->encoding, pt->ilseq_handler);
+			      PORT_ENCODING (port),
+			      PORT_CONVERSION_STRATEGY (port));
 
       SYMBOL_TR_TRANSFORM_CHARACTERS (str);
       result = scm_string_to_symbol (str);
     }
 
-  SCM_COL (port) += scm_c_string_length (str);
+  increase_port_column (port, scm_c_string_length (str));
 
 #ifndef HAVE_SCM_GC_MALLOC_POINTERLESS
   if (buffer != local_buffer)

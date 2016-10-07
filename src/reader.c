@@ -1,6 +1,6 @@
 /* A Scheme reader compiler for Guile.
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2012  Ludovic Courtès <ludo@gnu.org>
+   Copyright (C) 2005, 2006, 2007, 2008, 2012, 2016 Ludovic CourtÃ¨s <ludo@gnu.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -274,7 +274,7 @@ typedef struct
 
 /* Fetch in RESULT_REG the pointer to the `scm_t_port' object corresponding
    to the `SCM' object in PORT_REG (normally, V0).  This is equivalent to
-   `SCM_PTAB_ENTRY ()'.  */
+   `SCM_PORT'.  */
 #define SCM_JIT_PTAB_ENTRY(_result_reg, _port_reg)	\
   jit_ldxi_p ((_result_reg), (_port_reg), sizeof (SCM))
 
@@ -1694,9 +1694,9 @@ scm_call_reader (scm_reader_t reader, SCM port, int caller_handled,
 
       if (reader->flags & SCM_READER_FLAG_POSITIONS)
 	{
-	  column = SCM_COL (port);
-	  line = SCM_LINUM (port);
-	  filename = SCM_FILENAME (port);
+	  column = scm_to_int (scm_port_column (port));
+	  line = scm_to_long (scm_port_line (port));
+	  filename = scm_port_filename (port);
 	}
 
       c = scm_getc (port);
@@ -2429,7 +2429,7 @@ SCM_DEFINE (test_getc, "test-getc", 1, 0, 0,
 #undef _jit
     }
 
-  c_port = SCM_PTAB_ENTRY (port);
+  c_port = SCM_PORT (port);
   printf ("port info for %p: %s %s %s\n",
 	  port,
 	  (c_port->rw_active == SCM_PORT_WRITE)

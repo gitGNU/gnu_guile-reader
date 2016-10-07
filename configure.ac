@@ -100,6 +100,7 @@ if test "x$GPERF" = "xnot-found"; then
 fi
 
 # Guile!
+GUILE_PKG([2.2 2.0 1.8])
 GUILE_PROGS
 GUILE_FLAGS
 AC_PATH_PROG([guile_snarf], [guile-snarf], [not-found])
