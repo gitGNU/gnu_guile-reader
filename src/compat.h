@@ -52,6 +52,12 @@ extern SCM scm_from_utf32_stringn (const scm_t_wchar *str, size_t len);
 
 #endif
 
+#ifndef HAVE_SCM_I_READ_ARRAY
+
+extern SCM scm_i_read_array (SCM port, int chr);
+
+#endif
+
 extern void increase_port_column (SCM port, size_t increment);
 
 
