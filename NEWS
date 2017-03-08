@@ -1,3 +1,11 @@
+New in Guile-Reader 0.6.2
+
+  * Port to Guile 2.1.7 (aka. 2.2).
+
+  * Install .go files in $libdir/guile/2.X by default.
+
+  * Mention 'eval-when' in the manual.
+
 New in Guile-Reader 0.6.1
 
   * Bugs fixed
