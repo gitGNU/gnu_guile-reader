@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([Guile-Reader], [0.6.1], [guile-reader-devel@nongnu.org],
+AC_INIT([Guile-Reader], [0.6.2], [guile-reader-devel@nongnu.org],
   [guile-reader], [http://nongnu.org/guile-reader/])
 AC_CONFIG_AUX_DIR(build-aux)
 
