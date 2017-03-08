@@ -12,8 +12,8 @@ nobase_nodist_guilemodule_DATA =		\
 
 
 .in.scm:
-	$(MKDIR_P) `dirname "$@"`
-	$(SED) -e 's|[@]libdir[@]|$(libdir)|g' < "$<" > "$@.tmp"
+	$(AM_V_GEN)$(MKDIR_P) `dirname "$@"` ;				\
+	$(SED) -e 's|[@]libdir[@]|$(libdir)|g' < "$<" > "$@.tmp" ;	\
 	mv "$@.tmp" "$@"
 
 if HAVE_GUILE2
@@ -26,8 +26,12 @@ GUILE_WARNINGS =				\
   -Wunbound-variable -Warity-mismatch -Wformat	\
   -Wunused-variable
 
+AM_V_GUILEC = $(AM_V_GUILEC_$(V))
+AM_V_GUILEC_ = $(AM_V_GUILEC_$(AM_DEFAULT_VERBOSITY))
+AM_V_GUILEC_0 = @echo "  GUILEC  " $@;
+
 .scm.go:
-	$(MKDIR_P) `dirname "$@"`
+	$(AM_V_GUILEC)$(MKDIR_P) `dirname "$@"` ;		\
 	GUILE_AUTO_COMPILE=0					\
 	GUILE_READER_LIBDIR="$(abs_top_builddir)/src"		\
 	$(GUILD) compile --target="$(host)" $(GUILE_WARNINGS)	\

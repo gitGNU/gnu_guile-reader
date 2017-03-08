@@ -8,6 +8,7 @@ GUILE_FOR_BUILD =				\
 
 # Basic command to run the C doc extractor.
 extract_c_doc =							\
+  $(AM_V_GEN)							\
   $(GUILE_FOR_BUILD) -l "$(srcdir)/extract-c-doc.scm"		\
 	             -e '(apply main (cdr (command-line)))'	\
 		     --

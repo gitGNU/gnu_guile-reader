@@ -7,7 +7,7 @@ AC_INIT([Guile-Reader], [0.6.1], [guile-reader-devel@nongnu.org],
 AC_CONFIG_AUX_DIR(build-aux)
 
 AM_INIT_AUTOMAKE([1.11 color-tests parallel-tests silent-rules \
-  gnu no-define check-news -Wall -Werror])
+  gnu no-define check-news -Wno-portability -Werror])
 
 AC_CONFIG_SRCDIR([src/reader.c])
 AC_CONFIG_HEADER([config.h src/reader-config.h])
