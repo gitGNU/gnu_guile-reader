@@ -18,7 +18,7 @@ nobase_nodist_guilemodule_DATA =		\
 
 if HAVE_GUILE2
 
-nobase_nodist_guilemodule_DATA +=		\
+nobase_nodist_guileobject_DATA =		\
   $(nobase_dist_guilemodule_DATA:%.scm=%.go)	\
   system/reader.go
 
@@ -39,9 +39,11 @@ GUILE_WARNINGS =				\
 # files.  See
 # <http://lists.gnu.org/archive/html/guile-devel/2010-07/msg00125.html>
 # for details.
-guilereader_install_go_files = install-nobase_nodist_guilemoduleDATA
+guilereader_install_go_files = install-nobase_nodist_guileobjectDATA
 $(guilereader_install_go_files): install-nobase_dist_guilemoduleDATA
 
 endif HAVE_GUILE2
 
-CLEANFILES = $(nobase_nodist_guilemodule_DATA)
+CLEANFILES =					\
+  $(nobase_nodist_guilemodule_DATA)		\
+  $(nobase_nodist_guileobject_DATA)

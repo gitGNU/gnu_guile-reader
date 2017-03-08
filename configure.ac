@@ -150,8 +150,12 @@ LDFLAGS="$clean_LDFLAGS"
 pkgdatadir="$datadir/$PACKAGE_NAME"
 if test "x$guilemoduledir" = "x"; then
   guilemoduledir="${datarootdir}/guile/site/$GUILE_EFFECTIVE_VERSION"
+  guileobjectdir="${libdir}/guile/$GUILE_EFFECTIVE_VERSION/site-ccache"
+else
+  guileobjectdir="$guilemoduledir"
 fi
 AC_SUBST([guilemoduledir])
+AC_SUBST([guileobjectdir])
 
 if test "$guilemoduledir" != "$GUILE_SITE"; then
    # Guile won't be able to locate the module "out of the box", so
